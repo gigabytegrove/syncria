@@ -11,7 +11,14 @@ test -f VERSION || exit 0
 version="$(tr -d '\r\n ' < VERSION)"
 case "$version" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "Invalid VERSION" >&2; exit 2 ;; esac
 if test -z "${GH_TOKEN:-}" || test -z "${GITHUB_USER:-}"; then echo 'GH_TOKEN and GITHUB_USER are required' >&2; exit 2; fi
-status="$(curl -fsS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/gigabytegrove/syncria/releases/tags/$version" || true)"
-if test "$status" = 200; then echo "Syncria $version already published"; exit 0; fi
-if test "$status" != 404; then echo "Cannot determine release status (HTTP $status)" >&2; exit 1; fi
+status="$(curl -sS -o /tmp/syncria-release-status.json -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/gigabytegrove/syncria/releases/tags/$version")"
+if test "$status" = 200; then
+  if python3 - /tmp/syncria-release-status.json <<'PY'
+import json,sys
+sys.exit(0 if not json.load(open(sys.argv[1]))['draft'] else 1)
+PY
+  then echo "Syncria $version already published"; exit 0; fi
+  echo "Resuming incomplete draft release $version"
+elif test "$status" != 404; then echo "Cannot determine release status (HTTP $status)" >&2; exit 1
+fi
 bash scripts/publish-release.sh "$version"
