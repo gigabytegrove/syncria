@@ -81,5 +81,24 @@ docker buildx create --name "$builder" --driver docker-container >/dev/null
 trap 'docker buildx rm "$builder" >/dev/null 2>&1 || true; rm -rf "$tmp" "$auth"; unset GH_TOKEN' EXIT
 docker buildx build --builder "$builder" --platform linux/amd64,linux/arm64 --build-arg "APP_VERSION=$version" -t "ghcr.io/gigabytegrove/syncria:$version" -t ghcr.io/gigabytegrove/syncria:latest --push .
 code="$(curl -sS -o "$tmp/publish.json" -w '%{http_code}' -X PATCH -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -d '{"draft":false}' "https://api.github.com/repos/gigabytegrove/syncria/releases/$release_id")"
-if test "$code" != 200; then cat "$tmp/publish.json" >&2; exit 1; fi
+if test "$code" != 200; then
+  # The Releases API may reject publishing a duplicate draft with HTTP 422
+  # after the original release was made public in a previous attempt.
+  # Never report completion based only on a successful Docker push.
+  lookup="$(curl -sS -o "$tmp/public.json" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/gigabytegrove/syncria/releases/tags/$version")"
+  if test "$lookup" = 200 && python3 - "$tmp/public.json" <<'PY'
+import json,sys
+r=json.load(open(sys.argv[1]))
+required={"syncria-linux-amd64","syncria-linux-arm64","syncria-windows-amd64.exe","syncria-darwin-amd64","SHA256SUMS"}
+assets={a["name"] for a in r.get("assets",[]) if a.get("state")=="uploaded" and a.get("size",0)>0}
+sys.exit(0 if not r.get("draft") and required.issubset(assets) else 1)
+PY
+  then
+    echo "Release $version already publicly published with complete binaries and GHCR image"
+    exit 0
+  fi
+  cat "$tmp/publish.json" >&2
+  echo "Release $version remains unavailable in the public updater API" >&2
+  exit 1
+fi
 echo "Published $version"
