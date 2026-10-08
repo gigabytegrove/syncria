@@ -15,7 +15,7 @@ func TestReplacementUINavigation(t *testing.T){
   "view-updates","view-settings","id=\"picker\"",
   "id=\"syncWizard\"","/api/browse/drive",
   "/api/browse/local","/api/shares/action",
-  "/api/update/status","action=\"update_install\"",
+  "/api/update/status","value=\"update_install\"",
  }
  for _,part:=range required{
   if !strings.Contains(newUI,part){t.Errorf("replacement UI missing %q",part)}
