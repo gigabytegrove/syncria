@@ -72,14 +72,6 @@ PY
   code="$(curl -sS -o "$tmp/asset.json" -w '%{http_code}' -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/octet-stream" --data-binary "@$file" "$upload_url?name=$name")"
   if test "$code" != 201; then cat "$tmp/asset.json" >&2; exit 1; fi
 done
-auth="$(mktemp -d)"
-export DOCKER_CONFIG="$auth"
-trap 'rm -rf "$tmp" "$auth"; unset GH_TOKEN' EXIT
-printf %s "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
-builder="syncria-release-${BASHPID}"
-docker buildx create --name "$builder" --driver docker-container >/dev/null
-trap 'docker buildx rm "$builder" >/dev/null 2>&1 || true; rm -rf "$tmp" "$auth"; unset GH_TOKEN' EXIT
-docker buildx build --builder "$builder" --platform linux/amd64,linux/arm64 --build-arg "APP_VERSION=$version" -t "ghcr.io/gigabytegrove/syncria:$version" -t ghcr.io/gigabytegrove/syncria:latest --push .
 code="$(curl -sS -o "$tmp/publish.json" -w '%{http_code}' -X PATCH -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -d '{"draft":false}' "https://api.github.com/repos/gigabytegrove/syncria/releases/$release_id")"
 if test "$code" != 200; then
   # The Releases API may reject publishing a duplicate draft with HTTP 422
@@ -101,4 +93,17 @@ PY
   echo "Release $version remains unavailable in the public updater API" >&2
   exit 1
 fi
-echo "Published $version"
+echo "Published GitHub release $version"
+# Optional GHCR publishing must never block direct GitHub binary updates.
+if test "${SYNCRIA_PUBLISH_GHCR:-0}" = 1; then
+  auth="$(mktemp -d)"
+  export DOCKER_CONFIG="$auth"
+  trap 'rm -rf "$tmp" "$auth"; unset GH_TOKEN' EXIT
+  printf %s "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
+  builder="syncria-release-${BASHPID}"
+  docker buildx create --name "$builder" --driver docker-container >/dev/null
+  trap 'docker buildx rm "$builder" >/dev/null 2>&1 || true; rm -rf "$tmp" "$auth"; unset GH_TOKEN' EXIT
+  docker buildx build --builder "$builder" --platform linux/amd64,linux/arm64 --build-arg "APP_VERSION=$version" -t "ghcr.io/gigabytegrove/syncria:$version" -t ghcr.io/gigabytegrove/syncria:latest --push .
+
+fi
+
