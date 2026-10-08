@@ -30,12 +30,28 @@ elif test "$tag_status" = 404; then
 else
   cat "$tmp/tag.json" >&2; echo "Cannot inspect release tag" >&2; exit 1
 fi
-release_status="$(curl -sS -o "$tmp/release.json" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/gigabytegrove/syncria/releases/tags/$version")"
-if test "$release_status" = 404; then
+# The tag lookup does NOT expose draft releases. Search the authenticated
+# release collection first, so an interrupted publish can resume.
+found=0
+for page in 1 2 3 4 5; do
+  code="$(curl -sS -o "$tmp/releases-page.json" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/gigabytegrove/syncria/releases?per_page=100&page=$page")"
+  if test "$code" != 200; then cat "$tmp/releases-page.json" >&2; exit 1; fi
+  if python3 - "$tmp/releases-page.json" "$version" "$tmp/release.json" <<'PY'
+import json,sys
+items=json.load(open(sys.argv[1]))
+match=next((item for item in items if item.get("tag_name")==sys.argv[2]),None)
+if match is None:sys.exit(1)
+with open(sys.argv[3],"w") as f:json.dump(match,f)
+PY
+  then found=1; break; fi
+  count="$(python3 -c 'import json,sys;print(len(json.load(open(sys.argv[1]))))' "$tmp/releases-page.json")"
+  test "$count" = 100 || break
+done
+if test "$found" = 0; then
   code="$(curl -sS -o "$tmp/release.json" -w '%{http_code}' -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" -d "{\"tag_name\":\"$version\",\"name\":\"Syncria $version\",\"draft\":true}" https://api.github.com/repos/gigabytegrove/syncria/releases)"
   if test "$code" != 201; then cat "$tmp/release.json" >&2; exit 1; fi
-elif test "$release_status" != 200; then
-  cat "$tmp/release.json" >&2; echo "Cannot inspect existing release" >&2; exit 1
+else
+  echo "Resuming existing draft release $version"
 fi
 python3 - "$tmp/release.json" <<'PY'
 import json,sys
