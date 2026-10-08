@@ -59,7 +59,7 @@ done
 auth="$(mktemp -d)"
 trap 'rm -rf "$tmp" "$auth"; unset GH_TOKEN' EXIT
 printf %s "$GH_TOKEN" | docker --config "$auth" login ghcr.io -u "$GITHUB_USER" --password-stdin
-builder="syncria-release-$"
+builder="syncria-release-${BASHPID}"
 docker buildx create --name "$builder" --driver docker-container >/dev/null
 trap 'docker buildx rm "$builder" >/dev/null 2>&1 || true; rm -rf "$tmp" "$auth"; unset GH_TOKEN' EXIT
 docker --config "$auth" buildx build --builder "$builder" --platform linux/amd64,linux/arm64 --build-arg "APP_VERSION=$version" -t "ghcr.io/gigabytegrove/syncria:$version" -t ghcr.io/gigabytegrove/syncria:latest --push .
