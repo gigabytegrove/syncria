@@ -90,3 +90,21 @@ func (a *App) browseDrive(w http.ResponseWriter,r *http.Request){
  }
  sendBrowse(w,result)
 }
+
+func (a *App) createLocalFolder(w http.ResponseWriter,r *http.Request){
+ if r.Method!=http.MethodPost{http.Error(w,"POST required",405);return}
+ if !a.authenticated(r){http.Error(w,"Unauthorized",401);return}
+ if err:=r.ParseForm();err!=nil{http.Error(w,"Invalid request",400);return}
+ name:=strings.TrimSpace(r.FormValue("name"))
+ if !safeName(name){http.Error(w,"Invalid directory name",400);return}
+ base,err:=resolvedPath(browseStorageRoot());if err!=nil{http.Error(w,"Storage root unavailable",503);return}
+ parent:=r.FormValue("parent")
+ if parent==""{parent=base}
+ if !filepath.IsAbs(parent){http.Error(w,"Absolute parent path required",400);return}
+ parent,err=resolvedPath(parent)
+ if err!=nil||!contained(base,parent){http.Error(w,"Destination not available or outside storage root",403);return}
+ dir:=filepath.Join(parent,name)
+ if _,err:=os.Lstat(dir);err==nil{http.Error(w,"Directory already exists",409);return}else if !os.IsNotExist(err){http.Error(w,"Cannot inspect destination",500);return}
+ if err:=os.Mkdir(dir,0750);err!=nil{http.Error(w,"Cannot create directory: "+err.Error(),500);return}
+ sendBrowse(w,browseResponse{Path:dir,Entries:[]browseEntry{},Parent:parent,Message:"Directory created"})
+}
