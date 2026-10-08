@@ -1,17 +1,13 @@
 services:
   syncria:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: syncria:local
+    image: ghcr.io/gigabytegrove/syncria:latest
     container_name: syncria
     restart: unless-stopped
     ports:
       - "${SYNCRIA_BIND_IP:-127.0.0.1}:9764:9764"
     volumes:
       - "${SYNCRIA_DATA_DIR:-./data}:/data"
-      # Expose ONE storage root, not individual NAS shares.
-      # Syncria manages account/folder mappings dynamically in its web UI.
+      # One storage root only. Folder mappings are set in the Syncria UI.
       - type: bind
         source: ${SYNCRIA_STORAGE_ROOT:-/mnt}
         target: /storage
