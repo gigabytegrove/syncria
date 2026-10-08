@@ -25,6 +25,7 @@ type StorageShare struct {
  Export string `json:"export"`
  Username string `json:"username,omitempty"`
  Local string `json:"local"`
+ Mounted bool `json:"-"`
 }
 
 var shareHost = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.:-]{0,252}$`)
