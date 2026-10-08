@@ -17,7 +17,7 @@ import (
  "time"
 )
 
-const releaseAPI = "https://api.github.com/repos/gigabytegrove/gdsync/releases/latest"
+const releaseAPI = "https://api.github.com/repos/gigabytegrove/syncria/releases/latest"
 
 type releaseAsset struct { Name string `json:"name"`; URL string `json:"url"` }
 type releaseInfo struct { Tag string `json:"tag_name"`; Assets []releaseAsset `json:"assets"` }
