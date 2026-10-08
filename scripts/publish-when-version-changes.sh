@@ -24,7 +24,8 @@ PY
     if docker manifest inspect "ghcr.io/gigabytegrove/syncria:$version" >/dev/null 2>&1; then
       echo "Syncria $version release and GHCR image already published"; exit 0
     fi
-    echo "GitHub Release exists but GHCR image is missing; publisher must repair image"
+    echo "GitHub Release exists but GHCR image is missing; do not declare success" >&2
+    exit 1
   fi
   echo "Resuming incomplete draft release $version"
 elif test "$status" != 404; then echo "Cannot determine release status (HTTP $status)" >&2; exit 1
