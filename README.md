@@ -59,6 +59,14 @@ docker compose down            # Stops container; bind-mounted data remains
 docker compose up -d --build   # Rebuild and start after updating the source
 ```
 
+## Built-in updater
+
+From the **Software updates** panel, sign in as the administrator and choose **Check for updates**, **Install latest**, or **Rollback**. Releases are fetched directly from GitHub Releases, **not a container registry**. Each release must include the correct OS/CPU binary named `syncria-<os>-<arch>` (with `.exe` for Windows) and a `SHA256SUMS` asset. Downloads are checksum-validated before activation. The previous executable is kept for rollback. State, account credentials, and mappings stay in the configured data directory.
+
+In Docker, the launcher monitors the child agent and activates staged binaries from persistent `/data/runtime/current`. Future container restarts continue using that version, so **rebuilding the Docker image is not necessary for normal app releases**. Rebuilding is still recommended when the container base OS, launcher, or bundled CA certificates change. Linux/macOS standalone installations can restart into the staged binary without modifying their original executable. Windows installs can check for new releases, but automated installation and restart are intentionally disabled in this alpha.
+
+**Update prerequisites:** Publish at least one GitHub Release with the platform assets; GitHub Actions on version tags builds them. The latest release endpoint currently expects the repository to have been renamed to `gigabytegrove/syncria`. If GitHub still considers the repository private, provide a read-only repository token using the `SYNCRIA_GITHUB_TOKEN` environment variable; do not put this token in a public repository or shared Compose file. Only releases from a repository you trust should be installed. SHA-256 checksums confirm transfer integrity, but do not provide publisher authenticity independent of the release itself. Updater actions are blocked while the agent is actively synchronizing files.
+
 ## Google authentication (per-installation setup)
 
 1. In Google Cloud Console, create/select a project and enable the **Google Drive API**.
