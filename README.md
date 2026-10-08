@@ -33,31 +33,26 @@ For server / NAS use, choose a data directory you back up, mount the NAS shares 
 
 **Never publish the listener directly on the internet**. Put a TLS-enabled, authenticated reverse proxy in front of it if you need remote management. On Windows run `syncria.exe`; create the local directories before adding a mapping. For Windows file shares, prefer an existing UNC path with service-account permissions, rather than relying on a drive letter only available in an interactive user session.
 
-## Docker Compose (optional)
+## Docker Compose (no build required)
 
-Syncria is still a single Go executable; Docker is an alternative way to run the **same agent**.
+The published Docker image is `ghcr.io/gigabytegrove/syncria:latest` (linux/amd64 and linux/arm64). The workflow `.github/workflows/docker.yml` publishes it from main and tagged releases. The package must be publicly visible for anonymous `docker pull`, or users must authenticate to GHCR. Check that the workflow has completed successfully before deploying.
 
-```sh
-git clone https://github.com/gigabytegrove/gdsync.git
-cd gdsync
-cp .env.example .env
-mkdir -p data sync
-docker compose up -d --build
-```
+Create a Compose deployment using the repository's `compose.yaml` with the following environment values:
 
-Open **http://127.0.0.1:9764** on the Docker host to set the admin password. The container listens on port 9764; the Compose file publishes it **only to host loopback** by default for security. To manage it from another device on a trusted LAN, change `SYNCRIA_BIND_IP` in `.env` to the Docker host's LAN IP and run `docker compose up -d`. Use HTTPS and additional network protection for access from untrusted networks; do not expose this HTTP service directly to the internet.
-
-**Storage:** `SYNCRIA_DATA_DIR` is mounted at `/data` inside the container and stores credentials, refresh tokens, state, and recovered locally deleted files. `SYNCRIA_SYNC_DIR` is mounted at `/sync`; point it at a directory or a NAS share **already mounted on the Docker host**, for example `/mnt/yks-zero1`. When creating sync mappings in the UI, use paths inside the container, such as `/sync/brad`, **not** host paths. Additional host shares can be exposed by adding further bind mounts in `compose.yaml`, for example `- "/mnt/nas2:/nas2"`. Never use two running Syncria instances against the same `/data`.
-
-**Permissions:** the image currently runs as the container's default user to accommodate a broad range of host/NAS permissions. Secure host shares and Docker access; consider specifying a non-root `user: "UID:GID"` in the Compose service when the mapped files and data folder grant that UID/GID appropriate read/write permissions. If a NAS share is not mounted before container startup, an empty host directory can be mistaken for a valid directory. Verify mounts and back up both Drive and NAS data before enabling alpha sync.
-
-Google OAuth's authorized redirect URI must match the exact URL entered in the web UI (for example `http://localhost:9764/oauth/callback` when you access the UI locally). If accessing the UI over an HTTPS reverse proxy, register its public HTTPS callback URL instead.
+- `SYNCRIA_BIND_IP`: host-side listener IP (default `127.0.0.1`).
+- `SYNCRIA_DATA_DIR`: persistent state, OAuth tokens, recovery data, updater runtime (default `./data`).
+- `SYNCRIA_STORAGE_ROOT`: one **existing** host directory exposing locally mounted disks/NAS devices, visible inside Syncria as `/storage` (default `/mnt`).
 
 ```sh
-docker compose logs -f syncria
-docker compose down            # Stops container; bind-mounted data remains
-docker compose up -d --build   # Rebuild and start after updating the source
+docker compose pull
+docker compose up -d
 ```
+
+Do not add a `build:` block. All Google account and Google Drive sync mappings are created and changed from the Syncria dashboard. For example, the host path `/mnt/nas1/photos` appears at `/storage/nas1/photos` inside the container.
+
+**Docker isolation limitation:** the app cannot mount arbitrary host paths or unmounted SMB/NFS shares from its web UI. The storage root must already exist on the Docker host and contain the shares. Adding genuinely new SMB/NFS network mounts from the UI requires additional mount-management features not implemented yet. Do not grant Docker socket or privileged access to work around this.
+
+The image includes the runtime launcher and uses `/data/runtime/current` for built-in app updates, so future app updates do not require a new container image. Security updates to the base image or launcher still require an image pull/recreate.
 
 ## Built-in updater
 
