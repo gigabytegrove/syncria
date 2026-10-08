@@ -17,23 +17,55 @@ import (
  "time"
 )
 
-const releaseAPI = "https://api.github.com/repos/gigabytegrove/syncria/releases/latest"
+const tagsAPI = "https://api.github.com/repos/gigabytegrove/syncria/tags?per_page=100"
+const releaseForTagAPI = "https://api.github.com/repos/gigabytegrove/syncria/releases/tags/"
 
 type releaseAsset struct { Name string `json:"name"`; URL string `json:"url"` }
 type releaseInfo struct { Tag string `json:"tag_name"`; Assets []releaseAsset `json:"assets"` }
+type githubTag struct { Name string `json:"name"` }
 
 func releaseRequest(ctx context.Context, url, accept string) (*http.Response,error) {
- req,err:=http.NewRequestWithContext(ctx,"GET",url,nil); if err!=nil{return nil,err}
+ req,err:=http.NewRequestWithContext(ctx,"GET",url,nil);if err!=nil{return nil,err}
  req.Header.Set("Accept",accept)
  req.Header.Set("User-Agent","Syncria-Updater/"+appVersion)
- if tok:=os.Getenv("SYNCRIA_GITHUB_TOKEN");tok!="" { req.Header.Set("Authorization","Bearer "+tok) }
+ if tok:=os.Getenv("SYNCRIA_GITHUB_TOKEN");tok!=""{req.Header.Set("Authorization","Bearer "+tok)}
  return (&http.Client{Timeout:15*time.Minute}).Do(req)
 }
+func versionParts(tag string)([3]int,bool){
+ var p [3]int
+ tag=strings.TrimPrefix(tag,"v")
+ if _,err:=fmt.Sscanf(tag,"%d.%d.%d",&p[0],&p[1],&p[2]);err!=nil{return p,false}
+ return p,true
+}
+func newerVersion(a,b string)bool{
+ x,ok:=versionParts(a);if !ok{return false}
+ y,ok:=versionParts(b);if !ok{return true}
+ for i:=0;i<3;i++{if x[i]!=y[i]{return x[i]>y[i]}}
+ return false
+}
+func latestTag(ctx context.Context)(string,error){
+ resp,err:=releaseRequest(ctx,tagsAPI,"application/vnd.github+json");if err!=nil{return "",err};defer resp.Body.Close()
+ if resp.StatusCode!=200{return "",fmt.Errorf("GitHub tag lookup returned HTTP %d",resp.StatusCode)}
+ var tags []githubTag
+ if err=json.NewDecoder(io.LimitReader(resp.Body,1<<20)).Decode(&tags);err!=nil{return "",err}
+ best:=""
+ for _,tag:=range tags{if newerVersion(tag.Name,best){best=tag.Name}}
+ if best==""{return "",errors.New("no version tags found")}
+ return best,nil
+}
+func releaseForTag(ctx context.Context,tag string)(releaseInfo,error){
+ resp,err:=releaseRequest(ctx,releaseForTagAPI+tag,"application/vnd.github+json");if err!=nil{return releaseInfo{},err};defer resp.Body.Close()
+ if resp.StatusCode==404{return releaseInfo{},fmt.Errorf("%s tag exists, but its release binaries are not published yet",tag)}
+ if resp.StatusCode!=200{return releaseInfo{},fmt.Errorf("GitHub release for %s returned HTTP %d",tag,resp.StatusCode)}
+ var r releaseInfo
+ if err=json.NewDecoder(io.LimitReader(resp.Body,2<<20)).Decode(&r);err!=nil{return r,err}
+ if _,ok:=assetFor(r,assetName());!ok{return r,fmt.Errorf("%s has no binary for this platform",tag)}
+ if _,ok:=assetFor(r,"SHA256SUMS");!ok{return r,fmt.Errorf("%s has no checksum file",tag)}
+ return r,nil
+}
 func latestRelease(ctx context.Context)(releaseInfo,error){
- resp,err:=releaseRequest(ctx,releaseAPI,"application/vnd.github+json");if err!=nil{return releaseInfo{},err};defer resp.Body.Close()
- if resp.StatusCode!=200{return releaseInfo{},fmt.Errorf("GitHub release lookup returned HTTP %d",resp.StatusCode)}
- var r releaseInfo;err=json.NewDecoder(io.LimitReader(resp.Body,2<<20)).Decode(&r)
- if err!=nil{return r,err};if r.Tag==""||len(r.Assets)==0{return r,errors.New("release has no assets")};return r,nil
+ tag,err:=latestTag(ctx);if err!=nil{return releaseInfo{},err}
+ return releaseForTag(ctx,tag)
 }
 func assetName()string{return "syncria-"+runtime.GOOS+"-"+runtime.GOARCH+func()string{if runtime.GOOS=="windows"{return ".exe"};return ""}()}
 func assetFor(r releaseInfo,name string)(releaseAsset,bool){for _,a:=range r.Assets{if a.Name==name{return a,true}};return releaseAsset{},false}
