@@ -6,6 +6,14 @@ A lightweight, self-hosted, **experimental** Google Drive ↔ filesystem synchro
 
 > **Alpha warning:** This version has not been live-tested with Google Drive accounts. Make backups before enabling synchronization. Native Google Docs/Sheets/Slides, shortcuts, shared drives, files with duplicate names, and complicated rename/move scenarios are not fully supported. The agent **stops with a visible error** instead of silently processing unsupported Google-native formats. Do not use for your only copy of important data.
 
+## Interactive sync location selection
+
+The web dashboard now includes authenticated folder browsers. Choose a connected Google account, click **Browse Drive folders** to select the whole **My Drive** root or navigate its folders, then click **Browse storage folders** to navigate an existing local destination. Each mapping remains paused until explicitly enabled. Folder lists use the linked Google account and the agent's filesystem; no third-party browser service is involved.
+
+**Docker storage boundary:** The storage browser starts at `/storage` and can navigate child folders, including shares already mounted beneath the configured host root. It cannot create a new NFS/SMB mount from inside an unprivileged Docker container; host mount management is a separate feature and is not implemented by the folder browser. If a new NAS share is mounted under an exposed host root using the correct bind propagation, its directories become selectable in Syncria. The browser refuses paths outside the configured storage root and excludes symlink escapes.
+
+**Distribution:** The GitHub source has changed, but previously published GHCR image tags are not automatically rebuilt or published. Deploying a new web UI requires a new image build and publisher-authorized push. Do not assume `latest` contains these features until the digest changes.
+
 ## Features
 
 - Multiple Google OAuth accounts (individual account tokens, multiple independently configured sync mappings)
