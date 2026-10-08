@@ -9,7 +9,7 @@ COPY *.go ./
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w -X main.appVersion=$APP_VERSION" -o /out/syncria .
 
 FROM alpine:3.21
-RUN apk add --no-cache ca-certificates tzdata && mkdir -p /data /sync
+RUN apk add --no-cache ca-certificates tzdata nfs-utils cifs-utils util-linux && mkdir -p /data /sync
 COPY --from=build /out/syncria /usr/local/bin/syncria
 COPY launcher.sh /usr/local/bin/syncria-launcher
 RUN chmod 755 /usr/local/bin/syncria-launcher
