@@ -6,6 +6,14 @@ A lightweight, self-hosted, **experimental** Google Drive ↔ filesystem synchro
 
 > **Alpha warning:** This version has not been live-tested with Google Drive accounts. Make backups before enabling synchronization. Native Google Docs/Sheets/Slides, shortcuts, shared drives, files with duplicate names, and complicated rename/move scenarios are not fully supported. The agent **stops with a visible error** instead of silently processing unsupported Google-native formats. Do not use for your only copy of important data.
 
+## Zero-cost versioned releases (publisher host)
+
+No GitHub Actions runner, hosted build account, credit card, or paid CI service is required. The repository contains `scripts/publish-release.sh`, which uses temporary Docker Go builders on a publisher host, creates a **GitHub Release** with versioned binaries and `SHA256SUMS`, pushes a multi-architecture GHCR image, then makes the GitHub Release visible. The updater reads published GitHub Releases, **not** source commits. Only run this script for changes ready to distribute.
+
+The publisher needs Docker Buildx, git, curl, Python 3, and a classic GitHub token authorized for public repository releases and GHCR package publishing. Use a trusted host such as `dockeradm` with `GITHUB_USER` set to the GitHub publisher's username, and run `bash scripts/publish-release.sh v0.2.0` from the checked-out source tree. The script prompts for a token without echoing it, and does not include NAS data, configuration, or OAuth state in build input.
+
+**Do not mistake a source commit for a release.** A feature is deployable via the in-app updater only after the publisher runs successfully, a GitHub Release is published with the matching assets, and the image is anonymously pullable. The old `latest` image remains unchanged until a publisher pushes a new one.
+
 ## Interactive sync location selection
 
 The web dashboard now includes authenticated folder browsers. Choose a connected Google account, click **Browse Drive folders** to select the whole **My Drive** root or navigate its folders, then click **Browse storage folders** to navigate an existing local destination. Each mapping remains paused until explicitly enabled. Folder lists use the linked Google account and the agent's filesystem; no third-party browser service is involved.
