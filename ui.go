@@ -26,7 +26,7 @@ body{background:linear-gradient(150deg,#f7fbff 0%,#edf5ff 100%);color:#092b54}
 code{color:#076bd3}
 .danger{background:#fff0f2;border:1px solid #f1c2c9;color:#b32238}
 </style></head><body>
-<main><aside class="sidebar"><div class="brand"><span class="mark">↻</span> Syncria</div><div><div class="tiny">Workspace</div><nav class="nav" aria-label="Main navigation">
+<main><aside class="sidebar"><div class="brand"><img src="/assets/syncria-logo.svg" alt="Syncria" style="display:block;width:200px;max-width:100%;height:auto;object-fit:contain;object-position:left"></div><div><div class="tiny">Workspace</div><nav class="nav" aria-label="Main navigation">
 <button class="active" type="button" data-view="overview">◫ &nbsp; Overview</button>
 <button type="button" data-view="sync">⇄ &nbsp; Sync relationships</button>
 <button type="button" data-view="storage">▤ &nbsp; Storage</button>
