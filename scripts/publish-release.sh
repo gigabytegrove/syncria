@@ -33,7 +33,7 @@ done
 auth="$(mktemp -d)"
 trap 'rm -rf "$tmp" "$auth"; unset GH_TOKEN' EXIT
 printf %s "$GH_TOKEN" | docker --config "$auth" login ghcr.io -u "$GITHUB_USER" --password-stdin
-docker --config "$auth" buildx build --platform linux/amd64,linux/arm64 -t "ghcr.io/gigabytegrove/syncria:$version" -t ghcr.io/gigabytegrove/syncria:latest --push .
+docker --config "$auth" buildx build --platform linux/amd64,linux/arm64 --build-arg "APP_VERSION=$version" -t "ghcr.io/gigabytegrove/syncria:$version" -t ghcr.io/gigabytegrove/syncria:latest --push .
 code="$(curl -sS -o "$tmp/publish.json" -w '%{http_code}' -X PATCH -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -d '{"draft":false}' "https://api.github.com/repos/gigabytegrove/syncria/releases/$release_id")"
 if test "$code" != 200; then cat "$tmp/publish.json" >&2; exit 1; fi
 echo "Published $version"
