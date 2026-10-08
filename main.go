@@ -1241,16 +1241,18 @@ async function refreshUpdateStatus(){
  }catch(err){target.textContent='Cannot check updates: '+err.message}
 }
 document.addEventListener('DOMContentLoaded',refreshUpdateStatus);
-let browseMode='',browseCurrent='',browseParent='';
+let browseMode='',browseCurrent='',browseParent='',browseLabel='',browseGeneration=0;
 async function browseStart(mode){
- browseMode=mode;
+ browseMode=mode;browseLabel=mode==='drive'?'Entire My Drive':'Storage root';
  document.getElementById('browserPanel').hidden=false;
  browseCurrent='';browseParent='';
  document.getElementById('browserHeading').textContent=mode==='drive'?'Select Google Drive folder':'Select local or NAS folder';document.getElementById('browserCreate').hidden=mode==='drive';
  document.getElementById('browserPanel').scrollIntoView({behavior:'smooth'});
  await browseLoad(mode==='drive'?'root':'');
 }
-async function browseLoad(path){
+async function browseLoad(path,label){
+ const generation=++browseGeneration;
+ if(label)browseLabel=label;
  const root=browseMode==='drive';
  const account=document.querySelector('select[name="account"]');
  const url=root?'/api/browse/drive?account='+encodeURIComponent(account?account.value:'')+'&parent='+encodeURIComponent(path||'root'):'/api/browse/local?path='+encodeURIComponent(path);
@@ -1260,13 +1262,14 @@ async function browseLoad(path){
  const response=await fetch(url,{credentials:'same-origin',cache:'no-store'});
  if(!response.ok)throw new Error((await response.text()).trim());
  const result=await response.json();
+ if(generation!==browseGeneration)return;
  browseCurrent=result.path; browseParent=result.parent||(root?'root':'');
- document.getElementById('browserLocation').textContent=root?'My Drive / '+browseCurrent:browseCurrent;
+ document.getElementById('browserLocation').textContent=root?(browseCurrent==='root'?'My Drive':('My Drive / '+browseLabel)):browseCurrent;
  const box=document.getElementById('browserItems');box.replaceChildren();
  result.entries.forEach(folder=>{
  const btn=document.createElement('button');
  btn.type='button';btn.className='ghost';btn.style.cssText='display:block;width:100%;text-align:left;margin:5px 0';
- btn.textContent='📁 '+folder.name;btn.addEventListener('click',()=>browseLoad(folder.id));box.appendChild(btn);
+ btn.textContent='📁 '+folder.name;btn.addEventListener('click',()=>browseLoad(folder.id,folder.name));box.appendChild(btn);
  });
  document.getElementById('browserNotice').textContent=result.message||(result.entries.length?'Choose a folder or select this location.':'No subfolders.');
  }catch(error){document.getElementById('browserNotice').textContent='Could not load folders: '+error.message;}
@@ -1287,7 +1290,7 @@ function browseChoose(){
  if(!browseCurrent)return;
  const root=browseMode==='drive';
  document.getElementById(root?'remoteSelection':'localSelection').value=browseCurrent;
- document.getElementById(root?'remoteLabel':'localLabel').textContent=root&&browseCurrent==='root'?'Entire My Drive':browseCurrent;
+ document.getElementById(root?'remoteLabel':'localLabel').textContent=root?(browseCurrent==='root'?'Entire My Drive':browseLabel):browseCurrent;
  document.getElementById('browserPanel').hidden=true;
 }
 </script></body></html>`))
