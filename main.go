@@ -954,6 +954,17 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 			redirect(w, r, e.Error())
 			return
 		}
+		storageRoot, rootErr := resolvedPath(browseStorageRoot())
+		if rootErr != nil {
+			redirect(w, r, "Storage root is unavailable")
+			return
+		}
+		realPath, resolveErr := resolvedPath(path)
+		if resolveErr != nil || !contained(storageRoot, realPath) {
+			redirect(w, r, "Choose a directory from available storage")
+			return
+		}
+		path = realPath
 		st, e := os.Stat(path)
 		if e != nil || !st.IsDir() {
 			redirect(w, r, "Local directory must exist and be accessible")
