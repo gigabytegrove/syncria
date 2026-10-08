@@ -92,7 +92,7 @@ func (a *App) browseDrive(w http.ResponseWriter,r *http.Request){
 }
 
 func (a *App) createLocalFolder(w http.ResponseWriter,r *http.Request){
- if r.Method!=http.MethodPost{http.Error(w,"POST required",405);return}
+ if !localPost(r){http.Error(w,"Same-origin POST required",405);return}
  if !a.authenticated(r){http.Error(w,"Unauthorized",401);return}
  if err:=r.ParseForm();err!=nil{http.Error(w,"Invalid request",400);return}
  name:=strings.TrimSpace(r.FormValue("name"))
