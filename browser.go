@@ -3,7 +3,8 @@ package main
 import (
  "context"
  "encoding/json"
- "errors"\n "io"
+ "errors"
+ "io"
  "net/http"
  "net/url"
  "os"
