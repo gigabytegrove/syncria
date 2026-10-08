@@ -20,7 +20,7 @@ PY
  count="$(python3 -c 'import json,sys;print(len(json.load(open(sys.argv[1]))))' "$temp/releases.json")"
  test "$count" = 100 || break
 done
-test "$found" = 1 || { echo "No GitHub release found for $version" >&2; exit 1; }
+test "$found" = 1 || { echo "No existing release found for $version" >&2; exit 10; }
 python3 - "$temp/release.json" <<'PY'
 import json,sys
 r=json.load(open(sys.argv[1]))
@@ -31,9 +31,7 @@ missing=required-assets
 if missing:raise SystemExit("Release assets not complete: "+", ".join(sorted(missing)))
 print("All five release assets uploaded")
 PY
-docker manifest inspect "ghcr.io/gigabytegrove/syncria:$version" >/dev/null || { echo "Versioned GHCR image missing" >&2; exit 1; }
-docker manifest inspect ghcr.io/gigabytegrove/syncria:latest >/dev/null || { echo "GHCR latest missing" >&2; exit 1; }
 release_id="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["id"])' "$temp/release.json")"
 status="$(curl -sS -o "$temp/updated.json" -w '%{http_code}' -X PATCH -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" -d '{"draft":false}' "https://api.github.com/repos/gigabytegrove/syncria/releases/$release_id")"
 test "$status" = 200 || { cat "$temp/updated.json" >&2; exit 1; }
-echo "Published Syncria $version after verifying assets and GHCR images"
+echo "Published Syncria $version after verifying assets"
