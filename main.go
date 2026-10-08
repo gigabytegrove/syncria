@@ -1244,7 +1244,7 @@ func (a *App) scheduler(ctx context.Context) {
 func restartSyncria(dataDir string){
     if os.Getenv("SYNCRIA_SUPERVISED")=="1" {os.Exit(75)}
     binary:=filepath.Join(dataDir,"runtime","current")
-    cmd:=exec.Command(binary,os.Args[1:]...)
+    cmd:=exec.Command("sh",append([]string{"-c","sleep 1; exec \"$@\"", "syncria",binary},os.Args[1:]...)...)
     cmd.Stdout=os.Stdout;cmd.Stderr=os.Stderr;cmd.Stdin=os.Stdin
     if err:=cmd.Start();err!=nil{log.Printf("update restart failed: %v",err);return}
     os.Exit(0)
