@@ -1,4 +1,6 @@
-# GDSync
+# Syncria
+
+**Pronunciation:** Sink-Re-Ah. **Default local web UI:** `http://127.0.0.1:9764` (configurable with `-listen`). The repository is temporarily named `gdsync` until its owner renames it to `syncria`. The Go module path and existing default data folder retain `gdsync` for compatibility during the transition. Restart the agent after upgrading; existing instances launched with an explicit `-listen` argument continue using that chosen port.
 
 A lightweight, self-hosted, **experimental** Google Drive ↔ filesystem synchronization agent written in Go. Single binary, embedded browser UI, no external database, and no JavaScript build tool. Suitable for Windows and Linux (including servers with mounted NAS shares).
 
@@ -17,8 +19,8 @@ A lightweight, self-hosted, **experimental** Google Drive ↔ filesystem synchro
 ## Build and run
 
 ```sh
-go build -trimpath -ldflags='-s -w' -o gdsync .
-./gdsync -listen 127.0.0.1:8787
+go build -trimpath -ldflags='-s -w' -o syncria .
+./syncria -listen 127.0.0.1:9764
 ```
 
 Open http://localhost:8787 and set a password of at least 12 characters.
@@ -26,20 +28,20 @@ Open http://localhost:8787 and set a password of at least 12 characters.
 For server / NAS use, choose a data directory you back up, mount the NAS shares in the host OS, and use:
 
 ```sh
-./gdsync -data /var/lib/gdsync -listen 127.0.0.1:8787
+./syncria -data /var/lib/gdsync -listen 127.0.0.1:9764
 ```
 
-**Never publish the listener directly on the internet**. Put a TLS-enabled, authenticated reverse proxy in front of it if you need remote management. On Windows run `gdsync.exe`; create the local directories before adding a mapping. For Windows file shares, prefer an existing UNC path with service-account permissions, rather than relying on a drive letter only available in an interactive user session.
+**Never publish the listener directly on the internet**. Put a TLS-enabled, authenticated reverse proxy in front of it if you need remote management. On Windows run `syncria.exe`; create the local directories before adding a mapping. For Windows file shares, prefer an existing UNC path with service-account permissions, rather than relying on a drive letter only available in an interactive user session.
 
 ## Google authentication (per-installation setup)
 
 1. In Google Cloud Console, create/select a project and enable the **Google Drive API**.
 2. Configure the OAuth consent screen. Add your Google accounts as test users while the app is in testing status, or complete Google's app verification for broader distribution.
 3. Create an **OAuth client of type Web application** and register `http://localhost:8787/oauth/callback` (or your HTTPS dashboard domain plus `/oauth/callback`) as an **Authorized redirect URI**.
-4. Under OAuth configuration in the GDSync web UI, enter the client ID, client secret, and dashboard URL (scheme + host + optional port, without trailing slash). Save, then click **Connect Google account**.
+4. Under OAuth configuration in the Syncria web UI, enter the client ID, client secret, and dashboard URL (scheme + host + optional port, without trailing slash). Save, then click **Connect Google account**.
 5. Repeat Connect Google account for each family member and create independent mappings.
 
-GDSync requests the **full Google Drive scope**, which Google classifies as **restricted**. A publicly distributed OAuth app must meet Google's restricted-scope verification requirements. The owner of an installation must currently provide their own OAuth credentials; there is no embedded shared client secret.
+Syncria requests the **full Google Drive scope**, which Google classifies as **restricted**. A publicly distributed OAuth app must meet Google's restricted-scope verification requirements. The owner of an installation must currently provide their own OAuth credentials; there is no embedded shared client secret.
 
 ## Sync behavior
 
