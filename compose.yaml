@@ -1,0 +1,17 @@
+services:
+  syncria:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: syncria:local
+    container_name: syncria
+    restart: unless-stopped
+    ports:
+      # Loopback-only by default. Set SYNCRIA_BIND_IP to the LAN host IP for LAN access.
+      - "${SYNCRIA_BIND_IP:-127.0.0.1}:9764:9764"
+    volumes:
+      # Persists OAuth tokens, credentials, sync state and local recovery data.
+      - "${SYNCRIA_DATA_DIR:-./data}:/data"
+      # Map a host directory or mounted NAS share into the container.
+      - "${SYNCRIA_SYNC_DIR:-./sync}:/sync"
+    stop_grace_period: 1m
