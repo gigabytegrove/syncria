@@ -1,0 +1,10 @@
+.git
+.github
+dist
+data
+sync
+*.zip
+*.log
+*.tmp
+state.json
+README.md
