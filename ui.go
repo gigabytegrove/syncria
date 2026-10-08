@@ -70,5 +70,29 @@ async function loadFolder(path,label){let seq=++pickSeq;let drive=pickerType==='
 function pickerUp(){if(parent)loadFolder(parent,parent==='root'?'Entire My Drive':undefined);}
 function selectFolder(){if(!folder)return;if(pickerType==='drive'){$('remoteValue').value=folder;$('selectedDriveLabel').textContent=folderName||folder;}else{$('localValue').value=folder;$('selectedLocalLabel').textContent=folder;}closePicker();}
 async function createFolder(){if(pickerType!=='local'||!folder)return;let name=prompt('New folder name');if(name===null)return;name=name.trim();if(!name)return;let p=new URLSearchParams({parent:folder,name});try{let res=await fetch('/api/browse/local/create',{method:'POST',body:p});if(!res.ok)throw Error((await res.text()).trim());await loadFolder(folder);}catch(e){$('pickerStatus').textContent='Could not create folder: '+e.message;}}
+// The in-place updater restarts the server without navigating away.
+// Poll the live binary version and refresh only after the backend changed.
+const loadedVersion={{printf "%q" .Version}};
+let versionCheckBusy=false,versionRefreshPending=false;
+async function checkRunningVersion(){
+ if(versionCheckBusy||document.hidden)return;
+ versionCheckBusy=true;
+ try{
+   const response=await fetch('/api/update/status?running='+Date.now(),{cache:'no-store',credentials:'same-origin'});
+   if(!response.ok)return;
+   const info=await response.json();
+   if(info.current && info.current!==loadedVersion && !versionRefreshPending){
+     versionRefreshPending=true;
+     const url=new URL(location.href);
+     url.searchParams.delete('msg');
+     url.searchParams.set('_syncria_reload',Date.now().toString());
+     location.replace(url.toString());
+   }
+ }catch(_e){ /* Server may be restarting; retry after it returns. */ }
+ finally{versionCheckBusy=false}
+}
+setInterval(checkRunningVersion,5000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkRunningVersion()});
+if(new URLSearchParams(location.search).get('msg')?.includes('Update staged'))checkRunningVersion();
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePicker()});if(location.hash){let page=location.hash.slice(1);if($('view-'+page))navigate(page)}
 </script></body></html>`
