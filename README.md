@@ -6,6 +6,12 @@ A lightweight, self-hosted, **experimental** Google Drive ↔ filesystem synchro
 
 > **Alpha warning:** This version has not been live-tested with Google Drive accounts. Make backups before enabling synchronization. Native Google Docs/Sheets/Slides, shortcuts, shared drives, files with duplicate names, and complicated rename/move scenarios are not fully supported. The agent **stops with a visible error** instead of silently processing unsupported Google-native formats. Do not use for your only copy of important data.
 
+## v0.3.0 dashboard replacement
+
+The original single-page dashboard markup has been deleted. The application now uses a separate `ui.go` template with a responsive sidebar, dedicated Overview, Sync relationships, Storage, Google accounts, Updates and Settings screens, connection-status cards, a modal Drive/local folder navigator, an isolated sync setup wizard, and network-share administration. The existing Go sync engine, saved accounts, credentials, and mappings remain compatible; this update is a **UI replacement**, not a configuration reset.
+
+The UI template includes regression tests in `ui_test.go`. Go compilation and tests must succeed in the self-hosted publisher before the release is offered for update. The default Docker deployment remains unprivileged; enabling NFS/SMB mounting requires the documented opt-in capabilities. Releasing v0.3.0 requires GitHub Release assets and GHCR images to publish successfully.
+
 ## One-time automatic publisher setup
 
 For recurring $0 releases, use the self-hosted publisher on a trusted dedicated Linux Docker host. It watches the source repository's `VERSION` file, not every commit. When the version changes, it runs Go tests, builds binaries, uploads a complete GitHub Release, and publishes a multiarchitecture GHCR image. Failed drafts can be resumed, and source-only changes do not trigger a release.
