@@ -27,7 +27,7 @@ func sendBrowse(w http.ResponseWriter,v browseResponse){
 }
 func browseStorageRoot() string {
  root:=os.Getenv("SYNCRIA_STORAGE_ROOT")
- if root=="" {if runtime.GOOS=="windows" {root=filepath.VolumeName(os.Getenv("SystemDrive"))+"\\"}else{root="/storage";if _,err:=os.Stat(root);err!=nil{root="/"}}}
+ if root=="" {if runtime.GOOS=="windows" {root=filepath.VolumeName(os.Getenv("SystemDrive"))+"\\"}else{root="/storage";if _,err:=os.Stat(root);err!=nil{if home,e:=os.UserHomeDir();e==nil{root=home}else{root="/nonexistent-syncria-storage"}}}}}
  abs,err:=filepath.Abs(root);if err!=nil{return root};return filepath.Clean(abs)
 }
 func contained(root,target string) bool {
