@@ -33,9 +33,21 @@ For server / NAS use, choose a data directory you back up, mount the NAS shares 
 
 **Never publish the listener directly on the internet**. Put a TLS-enabled, authenticated reverse proxy in front of it if you need remote management. On Windows run `syncria.exe`; create the local directories before adding a mapping. For Windows file shares, prefer an existing UNC path with service-account permissions, rather than relying on a drive letter only available in an interactive user session.
 
+## Offline Docker image deployment (no registry or CI required)
+
+For hosts without access to a container registry or paid CI runners, Syncria can be distributed as a prebuilt Docker image archive. Import the provided image archive onto the Docker host:
+
+```sh
+docker load -i syncria-docker-linux-amd64.tar.gz
+```
+
+Use an image reference of `syncria:offline` and `pull_policy: never` in Docker Compose. Persist `/data`; expose an existing host storage root under `/storage`. NAS folders and Google accounts are managed in the web interface. No GitHub Actions, registry login, source checkout, or local compilation is required to **deploy** an already-built archive. The archive must be loaded onto each Docker host and is currently built for Linux AMD64 only.
+
+This is an archive-based distribution, **not** an anonymously pullable GHCR image. A public image registry would require a publisher to push the built image, which has not been done. Archive delivery and future releases still require generating and distributing new image archives.
+
 ## Docker Compose (no build required)
 
-The published Docker image is `ghcr.io/gigabytegrove/syncria:latest` (linux/amd64 and linux/arm64). The workflow `.github/workflows/docker.yml` publishes it from main and tagged releases. The package must be publicly visible for anonymous `docker pull`, or users must authenticate to GHCR. Check that the workflow has completed successfully before deploying.
+The published Docker image is `ghcr.io/gigabytegrove/syncria:latest` (linux/amd64 and linux/arm64). The automated GitHub Actions image publishing workflow was removed because runner jobs are blocked by account billing. The GHCR image is not currently published. Until an image is published independently of Actions, use the offline image archive described above instead of `docker compose pull`.
 
 Create a Compose deployment using the repository's `compose.yaml` with the following environment values:
 
