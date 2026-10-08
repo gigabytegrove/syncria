@@ -88,7 +88,7 @@ func (a *App) removeShare(w http.ResponseWriter,r *http.Request,id string){
  redirect(w,r,"Storage connection disconnected")
 }
 func (a *App) shareAction(w http.ResponseWriter,r *http.Request){
- if r.Method!=http.MethodPost{http.Error(w,"POST required",405);return}
+ if !localPost(r){http.Error(w,"Same-origin POST required",405);return}
  if !a.authenticated(r){http.Error(w,"Unauthorized",401);return}
  if e:=r.ParseForm();e!=nil{http.Error(w,"Bad form data",400);return}
  switch r.FormValue("operation"){
