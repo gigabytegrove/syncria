@@ -14,11 +14,19 @@ The publisher needs Docker Buildx, git, curl, Python 3, and a classic GitHub tok
 
 **Do not mistake a source commit for a release.** A feature is deployable via the in-app updater only after the publisher runs successfully, a GitHub Release is published with the matching assets, and the image is anonymously pullable. The old `latest` image remains unchanged until a publisher pushes a new one.
 
+## Managed NFS and SMB connections (opt-in)
+
+From the dashboard, use **Storage connections → Connect network share**, choose SMB or NFS, enter the server and share/export path, and connect. Connected shares are stored under `/storage/syncria-shares/<connection ID>` and become available through the normal local destination browser. Syncria stores SMB credentials in a 0600 credentials file in its persistent data volume. Connection definitions are preserved across restarts, and the application attempts to remount them at startup. Disconnecting is blocked while a sync mapping uses that location.
+
+**Security:** Linux mounting requires elevated kernel privileges. The default container deliberately does not have these permissions. For trusted, isolated installations, enable mounting explicitly with `SYNCRIA_ENABLE_MOUNTS=1` plus the container's `SYS_ADMIN` capability and the host's appropriate mount security policy. Container runtimes with restrictive AppArmor/seccomp profiles may still reject the operation. Granting such permissions significantly expands container access and should not be done on a shared or untrusted Docker host. Alternatively, mount shares on the host and expose their parent directory under `/storage` without privilege elevation.
+
+For native Linux agent deployments, install `nfs-utils` or `nfs-common` and `cifs-utils` (depending on distribution), and run the agent under a controlled service with explicit rights to mount network filesystems. Do not expose the web interface directly to the public internet; use TLS and an access-controlled reverse proxy.
+
 ## Interactive sync location selection
 
 The web dashboard now includes authenticated folder browsers. Choose a connected Google account, click **Browse Drive folders** to select the whole **My Drive** root or navigate its folders, then click **Browse storage folders** to navigate an existing local destination. Each mapping remains paused until explicitly enabled. Folder lists use the linked Google account and the agent's filesystem; no third-party browser service is involved.
 
-**Docker storage boundary:** The storage browser starts at `/storage` and can navigate child folders, including shares already mounted beneath the configured host root. It cannot create a new NFS/SMB mount from inside an unprivileged Docker container; host mount management is a separate feature and is not implemented by the folder browser. If a new NAS share is mounted under an exposed host root using the correct bind propagation, its directories become selectable in Syncria. The browser refuses paths outside the configured storage root and excludes symlink escapes.
+**Docker storage boundary:** The storage browser starts at `/storage` and can navigate child folders. Managed NFS/SMB connections are now configurable under **Storage connections**. Network mount management is **disabled by default** because it requires Linux kernel mount privileges and relevant network filesystem support. Enable it only on a trusted single-purpose instance; Docker users must explicitly grant mount permissions and set `SYNCRIA_ENABLE_MOUNTS=1`. Without these permissions, the app reports a mount error rather than silently saving an unusable connection. If a new NAS share is mounted under an exposed host root using the correct bind propagation, its directories become selectable in Syncria. The browser refuses paths outside the configured storage root and excludes symlink escapes.
 
 **Distribution:** The GitHub source has changed, but previously published GHCR image tags are not automatically rebuilt or published. Deploying a new web UI requires a new image build and publisher-authorized push. Do not assume `latest` contains these features until the digest changes.
 
