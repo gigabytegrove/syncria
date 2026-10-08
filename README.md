@@ -6,6 +6,14 @@ A lightweight, self-hosted, **experimental** Google Drive ↔ filesystem synchro
 
 > **Alpha warning:** This version has not been live-tested with Google Drive accounts. Make backups before enabling synchronization. Native Google Docs/Sheets/Slides, shortcuts, shared drives, files with duplicate names, and complicated rename/move scenarios are not fully supported. The agent **stops with a visible error** instead of silently processing unsupported Google-native formats. Do not use for your only copy of important data.
 
+## One-time automatic publisher setup
+
+For recurring $0 releases, use the self-hosted publisher on a trusted dedicated Linux Docker host. It watches the source repository's `VERSION` file, not every commit. When the version changes, it runs Go tests, builds binaries, uploads a complete GitHub Release, and publishes a multiarchitecture GHCR image. Failed drafts can be resumed, and source-only changes do not trigger a release.
+
+On the existing checkout of `gigabytegrove/syncria` on the publishing host, run `git pull --ff-only`, then `sudo bash scripts/install-publisher.sh`. Provide the GitHub username and a classic token authorized for public repo releases and GHCR publishing **once**. The installer stores credentials in root-only `/etc/syncria-publisher.env`, creates a systemd service/timer, and checks for new versions every 15 minutes. To publish immediately, run `sudo systemctl start syncria-publisher`. Diagnose failures with `sudo journalctl -u syncria-publisher -n 100 --no-pager`.
+
+**Security:** This service runs automated builds from a trusted repository with access to Docker and a publishing token. Do not enable it for source you do not control. No billing account, GitHub-hosted Actions runner, or paid CI is required.
+
 ## Zero-cost versioned releases (publisher host)
 
 No GitHub Actions runner, hosted build account, credit card, or paid CI service is required. The repository contains `scripts/publish-release.sh`, which uses temporary Docker Go builders on a publisher host, creates a **GitHub Release** with versioned binaries and `SHA256SUMS`, pushes a multi-architecture GHCR image, then makes the GitHub Release visible. The updater reads published GitHub Releases, **not** source commits. Only run this script for changes ready to distribute.
