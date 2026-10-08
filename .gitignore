@@ -1,0 +1,6 @@
+/gdsync
+/gdsync.exe
+/dist/
+/state.json
+*.log
+*.tmp
