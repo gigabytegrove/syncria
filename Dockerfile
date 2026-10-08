@@ -2,10 +2,11 @@
 FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS build
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
+ARG APP_VERSION=0.1.0-alpha
 WORKDIR /src
 COPY go.mod ./
 COPY *.go ./
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/syncria .
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w -X main.appVersion=$APP_VERSION" -o /out/syncria .
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates tzdata && mkdir -p /data /sync
