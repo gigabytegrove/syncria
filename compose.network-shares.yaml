@@ -1,0 +1,11 @@
+# OPT-IN ONLY: Allows Syncria to mount SMB/NFS shares from its web UI.
+# This grants elevated Linux mount capability. Use only on a trusted host.
+# Combine with compose.yaml as: docker compose -f compose.yaml -f compose.network-shares.yaml up -d
+services:
+  syncria:
+    environment:
+      SYNCRIA_ENABLE_MOUNTS: "1"
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
