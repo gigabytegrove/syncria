@@ -19,14 +19,40 @@ for target in linux/amd64 linux/arm64 windows/amd64 darwin/amd64; do
 done
 (cd "$tmp/dist" && sha256sum syncria-* > SHA256SUMS)
 gitsha="$(git rev-parse HEAD)"
-code="$(curl -sS -o "$tmp/tag.json" -w '%{http_code}' -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" -d "{\"ref\":\"refs/tags/$version\",\"sha\":\"$gitsha\"}" https://api.github.com/repos/gigabytegrove/syncria/git/refs)"
-if test "$code" != 201; then cat "$tmp/tag.json" >&2; exit 1; fi
-code="$(curl -sS -o "$tmp/release.json" -w '%{http_code}' -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" -d "{\"tag_name\":\"$version\",\"name\":\"Syncria $version\",\"draft\":true}" https://api.github.com/repos/gigabytegrove/syncria/releases)"
-if test "$code" != 201; then cat "$tmp/release.json" >&2; exit 1; fi
+# Repeatable after a failed upload: never retag a different commit.
+tag_status="$(curl -sS -o "$tmp/tag.json" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/gigabytegrove/syncria/git/ref/tags/$version")"
+if test "$tag_status" = 200; then
+  existing_sha="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["object"]["sha"])' "$tmp/tag.json")"
+  test "$existing_sha" = "$gitsha" || { echo "Release tag exists at another commit" >&2; exit 1; }
+elif test "$tag_status" = 404; then
+  code="$(curl -sS -o "$tmp/tag.json" -w '%{http_code}' -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" -d "{\"ref\":\"refs/tags/$version\",\"sha\":\"$gitsha\"}" https://api.github.com/repos/gigabytegrove/syncria/git/refs)"
+  if test "$code" != 201; then cat "$tmp/tag.json" >&2; exit 1; fi
+else
+  cat "$tmp/tag.json" >&2; echo "Cannot inspect release tag" >&2; exit 1
+fi
+release_status="$(curl -sS -o "$tmp/release.json" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/gigabytegrove/syncria/releases/tags/$version")"
+if test "$release_status" = 404; then
+  code="$(curl -sS -o "$tmp/release.json" -w '%{http_code}' -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" -d "{\"tag_name\":\"$version\",\"name\":\"Syncria $version\",\"draft\":true}" https://api.github.com/repos/gigabytegrove/syncria/releases)"
+  if test "$code" != 201; then cat "$tmp/release.json" >&2; exit 1; fi
+elif test "$release_status" != 200; then
+  cat "$tmp/release.json" >&2; echo "Cannot inspect existing release" >&2; exit 1
+fi
+python3 - "$tmp/release.json" <<'PY'
+import json,sys
+r=json.load(open(sys.argv[1]))
+if not r["draft"]:
+    raise SystemExit("Release already published. Bump VERSION instead of overwriting it.")
+PY
 release_id="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["id"])' "$tmp/release.json")"
 upload_url="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["upload_url"].split("{")[0])' "$tmp/release.json")"
 for file in "$tmp"/dist/*; do
   name="$(basename "$file")"
+  if python3 - "$tmp/release.json" "$name" <<'PY'
+import json,sys
+r=json.load(open(sys.argv[1]))
+sys.exit(0 if any(a["name"]==sys.argv[2] for a in r.get("assets",[])) else 1)
+PY
+  then continue; fi
   code="$(curl -sS -o "$tmp/asset.json" -w '%{http_code}' -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/octet-stream" --data-binary "@$file" "$upload_url?name=$name")"
   if test "$code" != 201; then cat "$tmp/asset.json" >&2; exit 1; fi
 done
