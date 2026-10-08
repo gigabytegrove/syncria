@@ -25,4 +25,14 @@ PY
   echo "Resuming incomplete draft release $version"
 elif test "$status" != 404; then echo "Cannot determine release status (HTTP $status)" >&2; exit 1
 fi
+# First complete a previously staged GitHub binary release, without rebuilding or GHCR.
+# This also recovers v0.3.4 drafts whose tag predates publisher fixes.
+if bash scripts/finish-draft-release.sh "$version"; then
+  exit 0
+else
+  recovery_status=$?
+  if test "$recovery_status" != 10; then
+    echo "Existing GitHub release needs attention; attempting asset publisher" >&2
+  fi
+fi
 bash scripts/publish-release.sh "$version"
