@@ -14,6 +14,7 @@ import (
  "path/filepath"
  "runtime"
  "strconv"
+ "sync"
  "strings"
  "time"
 )
@@ -37,6 +38,23 @@ func githubRetryAfter(resp *http.Response) time.Duration {
  if wait>24*time.Hour{wait=24*time.Hour}
  return wait
 }
+var githubThrottle struct {
+ sync.Mutex
+ until time.Time
+}
+func githubBlockedUntil() time.Time {
+ githubThrottle.Lock()
+ defer githubThrottle.Unlock()
+ return githubThrottle.until
+}
+func recordGitHubThrottle(resp *http.Response){
+ wait:=githubRetryAfter(resp)
+ if wait<=0{return}
+ githubThrottle.Lock()
+ until:=time.Now().Add(wait)
+ if until.After(githubThrottle.until){githubThrottle.until=until}
+ githubThrottle.Unlock()
+}
 func releaseRequest(ctx context.Context, endpoint, accept string) (*http.Response,error) {
  request:=func(token string)(*http.Response,error){
   req,err:=http.NewRequestWithContext(ctx,http.MethodGet,endpoint,nil);if err!=nil{return nil,err}
@@ -45,16 +63,19 @@ func releaseRequest(ctx context.Context, endpoint, accept string) (*http.Respons
   if token!=""{req.Header.Set("Authorization","Bearer "+token)}
   return (&http.Client{Timeout:15*time.Minute}).Do(req)
  }
+ if until:=githubBlockedUntil();time.Now().Before(until){
+  return nil,fmt.Errorf("GitHub API cooldown active until %s",until.Format(time.RFC3339))
+ }
  token:=strings.TrimSpace(os.Getenv("SYNCRIA_GITHUB_TOKEN"))
  resp,err:=request(token)
  if err!=nil{return nil,err}
- // Only retry without a rejected credential for HTTP 401. HTTP 403 may
- // signal exhausted quotas; retrying anonymously makes that worse.
+ if resp.StatusCode==403 || resp.StatusCode==429 {recordGitHubThrottle(resp)}
  if token!="" && resp.StatusCode==http.StatusUnauthorized {
   resp.Body.Close()
-  return request("")
+  resp,err=request("")
+  if err==nil&&(resp.StatusCode==403||resp.StatusCode==429){recordGitHubThrottle(resp)}
  }
- return resp,nil
+ return resp,err
 }
 func githubAPIError(resp *http.Response, operation string) error {
  var body struct{Message string `json:"message"`}
