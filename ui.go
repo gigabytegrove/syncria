@@ -62,9 +62,9 @@ function wizardNext(){let f=$('syncWizard');if(!f.querySelector('[name=name]').r
 function wizardBack(){$('wizard1').classList.add('active');$('wizard2').classList.remove('active');$('stepMarker1').classList.add('active');$('stepMarker2').classList.remove('active');}
 function resetDrive(){$('remoteValue').value='root';$('selectedDriveLabel').textContent='Entire My Drive';}
 function toggleConnection(force){$('connectionPanel').classList.toggle('hidden',force===undefined?!$('connectionPanel').classList.contains('hidden'):!force);if(!$('connectionPanel').classList.contains('hidden'))$('connectionPanel').scrollIntoView({behavior:'smooth'});}
-let shareDiscoveryTimer=0,shareDiscoverySequence=0;
+let shareDiscoveryTimer=0,shareDiscoverySequence=0,shareDiscoveryAbort=null;
 function protocolChanged(){
- shareDiscoverySequence++;clearTimeout(shareDiscoveryTimer);
+ shareDiscoverySequence++;clearTimeout(shareDiscoveryTimer);if(shareDiscoveryAbort){shareDiscoveryAbort.abort();shareDiscoveryAbort=null;}
  const nfs=$('shareProtocol').value==='nfs';
  $('smbFields').classList.toggle('hidden',nfs);
  $('sharePathTitle').textContent=nfs?'NFS export path':'SMB share name';
@@ -76,6 +76,7 @@ function protocolChanged(){
 function queueShareDiscovery(){
  ++shareDiscoverySequence;
  clearTimeout(shareDiscoveryTimer);
+ if(shareDiscoveryAbort){shareDiscoveryAbort.abort();shareDiscoveryAbort=null;}
  $('discoveredShares').replaceChildren();$('shareDiscoveryList').replaceChildren();
  $('shareDiscoveryStatus').textContent='';
  const host=$('shareServer').value.trim();
@@ -88,10 +89,12 @@ async function discoverShares(){
  const host=$('shareServer').value.trim(),protocol=$('shareProtocol').value,sequence=++shareDiscoverySequence;
  if(!host)return;
  $('shareDiscoveryStatus').textContent='Discovering '+protocol.toUpperCase()+' shares…';
+ if(shareDiscoveryAbort)shareDiscoveryAbort.abort();
+ const controller=new AbortController();shareDiscoveryAbort=controller;
  try{
   const body=new URLSearchParams({server:host,protocol:protocol});
   if(protocol==='smb'){body.set('username',document.querySelector('#smbFields [name=username]').value);body.set('password',document.querySelector('#smbFields [name=password]').value);}
-  const res=await fetch('/api/shares/discover',{method:'POST',body,credentials:'same-origin',cache:'no-store'});
+  const res=await fetch('/api/shares/discover',{method:'POST',body,credentials:'same-origin',cache:'no-store',signal:controller.signal});
   const data=await res.json();
   if(sequence!==shareDiscoverySequence||$('shareServer').value.trim()!==host||$('shareProtocol').value!==protocol)return;
   if(!res.ok)throw Error(data.error||'Discovery failed');
@@ -103,7 +106,8 @@ async function discoverShares(){
    $('shareDiscoveryList').appendChild(button);
   }
   $('shareDiscoveryStatus').textContent=data.shares.length?data.shares.length+' shares discovered. Select one below.':'No exports advertised. Enter the path manually if you know it.';
- }catch(e){if(sequence!==shareDiscoverySequence)return;$('shareDiscoveryStatus').textContent=e.message;}
+ }catch(e){if(sequence!==shareDiscoverySequence||e.name==='AbortError')return;$('shareDiscoveryStatus').textContent=e.message+' You can still enter the share or export manually.';}
+ finally{if(shareDiscoveryAbort===controller)shareDiscoveryAbort=null;}
 }
 async function checkUpdate(){
  if(!$('latestVersion'))return;
