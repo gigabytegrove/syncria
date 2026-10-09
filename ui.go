@@ -65,12 +65,14 @@ function toggleConnection(force){$('connectionPanel').classList.toggle('hidden',
 function protocolChanged(){shareDiscoverySequence++;clearTimeout(shareDiscoveryTimer);$('shareDiscoveryStatus').textContent='';$('discoveredShares').replaceChildren();$('shareDiscoveryList').replaceChildren();let nfs=$('shareProtocol').value==='nfs';$('smbFields').classList.toggle('hidden',nfs);$('sharePathTitle').textContent=nfs?'NFS export path':'SMB share name';$('sharePath').placeholder=nfs?'/volume1/shared':'Shared';}
 let shareDiscoveryTimer=0,shareDiscoverySequence=0;
 function queueShareDiscovery(){
+ shareDiscoverySequence++;
  clearTimeout(shareDiscoveryTimer);
  const host=$('shareServer').value.trim();
  $('discoveredShares').replaceChildren();
  $('shareDiscoveryList').replaceChildren();
  $('shareDiscoveryStatus').textContent='';
  if($('shareProtocol').value!=='smb'||!host)return;
+ if(!/^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$/.test(host) && !host.includes(':'))return;
  shareDiscoveryTimer=setTimeout(discoverShares,450);
 }
 async function discoverShares(){
