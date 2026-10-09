@@ -1330,6 +1330,7 @@ func main() {
 	mux.HandleFunc("/api/browse/local/create", a.createLocalFolder)
 	mux.HandleFunc("/api/shares/action", a.shareAction)
 	mux.HandleFunc("/api/shares/discover", a.shareDiscover)
+	mux.HandleFunc("/api/dashboard/status", a.dashboardStatus)
 	mux.HandleFunc("/action", a.action)
 	mux.HandleFunc("/oauth/start", a.oauthStart)
 	mux.HandleFunc("/oauth/callback", a.oauthCallback)
