@@ -1211,20 +1211,15 @@ var ui = template.Must(template.New("app").Parse(newUI))
 func (a *App) updateStatus(w http.ResponseWriter,r *http.Request){
  if r.Method!=http.MethodGet{http.Error(w,"Method not allowed",http.StatusMethodNotAllowed);return}
  if !a.authenticated(r){http.Error(w,"Unauthorized",http.StatusUnauthorized);return}
- ctx,cancel:=context.WithTimeout(r.Context(),15*time.Second);defer cancel()
  w.Header().Set("Content-Type","application/json; charset=utf-8")
  w.Header().Set("Cache-Control","no-store")
  w.Header().Set("X-Content-Type-Options","nosniff")
- tag,err:=latestTag(ctx)
- if err!=nil{_ = json.NewEncoder(w).Encode(map[string]any{"current":appVersion,"error":err.Error()});return}
- newer:=newerVersion(tag,appVersion)
- if newer {
-   if _,releaseErr:=releaseForTag(ctx,tag);releaseErr!=nil{
-     _=json.NewEncoder(w).Encode(map[string]any{"current":appVersion,"latest":tag,"available":false,"pending":true,"message":releaseErr.Error()})
-     return
-   }
+ if r.URL.Query().Get("running")!=""{
+  _=json.NewEncoder(w).Encode(map[string]any{"current":appVersion})
+  return
  }
- _=json.NewEncoder(w).Encode(map[string]any{"current":appVersion,"latest":tag,"available":newer,"pending":false})
+ status:=cachedUpdateStatus(r.Context())
+ _=json.NewEncoder(w).Encode(status)
 }
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
