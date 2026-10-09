@@ -7,6 +7,7 @@ import (
  "fmt"
  "net"
  "net/http"
+ "strconv"
  "os"
  "os/exec"
  "sort"
@@ -20,14 +21,21 @@ func validateDiscoveryIP(server string) (string,error) {
  // Link-local scopes need an explicit interface and are not supported here.
  return ip.String(),nil
 }
+func checkDiscoveryPort(ctx context.Context,host string,port int,timeout time.Duration) error {
+ probe,cancel:=context.WithTimeout(ctx,timeout);defer cancel()
+ conn,err:=(&net.Dialer{}).DialContext(probe,"tcp",net.JoinHostPort(host,strconv.Itoa(port)))
+ if err!=nil{return fmt.Errorf("TCP port %d is not reachable; check the server, firewall, or network",port)}
+ return conn.Close()
+}
 func discoverSMBShares(ctx context.Context,server string)([]string,error){
  return discoverSMBSharesAuthenticated(ctx,server,"","")
 }
 func discoverSMBSharesAuthenticated(ctx context.Context,server,username,password string)([]string,error){
  host,err:=validateDiscoveryIP(server);if err!=nil{return nil,err}
  if _,err=exec.LookPath("smbclient");err!=nil{return nil,errors.New("SMB discovery tool missing from this runtime image; rebuild the image with samba-client")}
- ctx,cancel:=context.WithTimeout(ctx,10*time.Second);defer cancel()
- args:=[]string{"-L","//"+host,"-g"}
+ if err:=checkDiscoveryPort(ctx,host,445,3*time.Second);err!=nil{return nil,fmt.Errorf("SMB discovery unavailable: %w",err)}
+ ctx,cancel:=context.WithTimeout(ctx,20*time.Second);defer cancel()
+ args:=[]string{"-L","//"+host,"-g","-t","8"}
  if username=="" {args=append(args,"-N")}else{
   // Credential files prevent exposing passwords in process arguments.
   file,err:=os.CreateTemp("","syncria-smb-discover-*");if err!=nil{return nil,err}
@@ -39,7 +47,7 @@ func discoverSMBSharesAuthenticated(ctx context.Context,server,username,password
   args=append(args,"-A",name)
  }
  output,err:=exec.CommandContext(ctx,"smbclient",args...).CombinedOutput()
- if ctx.Err()!=nil{return nil,errors.New("SMB discovery timed out")}
+ if ctx.Err()!=nil{return nil,errors.New("SMB enumeration did not respond within 20 seconds; verify SMB port 445 and server permissions")}
  if err!=nil{return nil,errors.New("SMB share listing unavailable; check credentials or enter a known share")}
  found:=map[string]bool{}
  for _,line:=range strings.Split(string(output),"\n"){
@@ -54,9 +62,17 @@ func discoverSMBSharesAuthenticated(ctx context.Context,server,username,password
 func discoverNFSExports(ctx context.Context,server string)([]string,error){
  host,err:=validateDiscoveryIP(server);if err!=nil{return nil,err}
  if _,err=exec.LookPath("showmount");err!=nil{return nil,errors.New("NFS discovery tool missing from runtime image; install nfs-utils")}
- c,cancel:=context.WithTimeout(ctx,10*time.Second);defer cancel()
+ // NFSv3 export enumeration uses rpcbind (111) and mountd. NFSv4-only
+ // systems may expose port 2049 without advertising exports via mountd.
+ if err:=checkDiscoveryPort(ctx,host,111,3*time.Second);err!=nil{
+  if checkDiscoveryPort(ctx,host,2049,3*time.Second)==nil{
+   return nil,errors.New("NFS port 2049 is reachable, but rpcbind port 111 is unavailable; this may be an NFSv4-only server. Enter its export path manually")
+  }
+  return nil,fmt.Errorf("NFS export discovery unavailable: %w",err)
+ }
+ c,cancel:=context.WithTimeout(ctx,18*time.Second);defer cancel()
  output,err:=exec.CommandContext(c,"showmount","-e",host).CombinedOutput()
- if c.Err()!=nil{return nil,errors.New("NFS export discovery timed out")}
+ if c.Err()!=nil{return nil,errors.New("NFS mountd did not answer within 18 seconds. Check RPC/mountd firewall rules or enter an NFSv4 export path manually")}
  if err!=nil{return nil,errors.New("NFS exports not advertised over mountd; NFSv4-only servers may require a manual export path")}
  found:=map[string]bool{}
  for _,line:=range strings.Split(string(output),"\n"){
