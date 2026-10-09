@@ -1321,6 +1321,7 @@ func main() {
 	mux.HandleFunc("/assets/syncria-logo.svg", serveBrandLogo)
 	mux.HandleFunc("/api/browse/drive", a.browseDrive)
 	mux.HandleFunc("/api/update/status", a.updateStatus)
+	mux.HandleFunc("/api/update/manual", a.manualUpdate)
 	mux.HandleFunc("/api/browse/local", a.browseLocal)
 	mux.HandleFunc("/api/browse/local/create", a.createLocalFolder)
 	mux.HandleFunc("/api/shares/action", a.shareAction)
