@@ -2,6 +2,8 @@ package main
 import (
  "strings"
  "context"
+ "net"
+ "time"
  "testing"
 )
 func TestNoAutomaticPageReload(t *testing.T) {
@@ -28,5 +30,20 @@ func TestNFSDiscoveryRejectsPublicAndMalformedTargets(t *testing.T){
 func TestShareDiscoverySupportsBothProtocols(t *testing.T){
  for _,part:=range []string{"Discover shares / exports","Discover with credentials","protocol:protocol","method:'POST'"}{
   if !strings.Contains(newUI,part){t.Errorf("UI missing %s",part)}
+ }
+}
+
+func TestDiscoveryTCPProbe(t *testing.T){
+ listener,err:=net.Listen("tcp","127.0.0.1:0");if err!=nil{t.Fatal(err)}
+ addr:=listener.Addr().(*net.TCPAddr)
+ if err:=checkDiscoveryPort(context.Background(),"127.0.0.1",addr.Port,time.Second);err!=nil{t.Fatal(err)}
+ listener.Close()
+ if err:=checkDiscoveryPort(context.Background(),"127.0.0.1",addr.Port,200*time.Millisecond);err==nil{
+  t.Fatal("closed discovery port should fail quickly")
+ }
+}
+func TestShareDiscoveryCanAbortStaleRequests(t *testing.T){
+ if !strings.Contains(newUI,"shareDiscoveryAbort.abort()")||!strings.Contains(newUI,"signal:controller.signal"){
+  t.Fatal("share discovery should cancel outdated requests")
  }
 }
