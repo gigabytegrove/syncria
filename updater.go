@@ -13,6 +13,7 @@ import (
  "os"
  "path/filepath"
  "runtime"
+ "strconv"
  "strings"
  "time"
 )
@@ -24,9 +25,19 @@ type releaseAsset struct { Name string `json:"name"`; URL string `json:"url"` }
 type releaseInfo struct { Tag string `json:"tag_name"`; Assets []releaseAsset `json:"assets"` }
 type githubTag struct { Name string `json:"name"` }
 
+// githubRetryAfter honors secondary limits and primary rate-limit reset headers.
+func githubRetryAfter(resp *http.Response) time.Duration {
+ if resp.StatusCode!=403 && resp.StatusCode!=429{return 0}
+ wait:=time.Duration(0)
+ if seconds,err:=strconv.Atoi(resp.Header.Get("Retry-After"));err==nil&&seconds>0{wait=time.Duration(seconds)*time.Second}
+ if reset,err:=strconv.ParseInt(resp.Header.Get("X-RateLimit-Reset"),10,64);err==nil && resp.Header.Get("X-RateLimit-Remaining")=="0"{
+  until:=time.Until(time.Unix(reset,0));if until>wait{wait=until}
+ }
+ if wait==0{wait=time.Hour}
+ if wait>24*time.Hour{wait=24*time.Hour}
+ return wait
+}
 func releaseRequest(ctx context.Context, endpoint, accept string) (*http.Response,error) {
- // Public releases should not require credentials. An incorrectly configured
- // token can cause GitHub 403 responses even for otherwise public content.
  request:=func(token string)(*http.Response,error){
   req,err:=http.NewRequestWithContext(ctx,http.MethodGet,endpoint,nil);if err!=nil{return nil,err}
   req.Header.Set("Accept",accept)
@@ -37,7 +48,9 @@ func releaseRequest(ctx context.Context, endpoint, accept string) (*http.Respons
  token:=strings.TrimSpace(os.Getenv("SYNCRIA_GITHUB_TOKEN"))
  resp,err:=request(token)
  if err!=nil{return nil,err}
- if token!=""&&(resp.StatusCode==http.StatusUnauthorized||resp.StatusCode==http.StatusForbidden){
+ // Only retry without a rejected credential for HTTP 401. HTTP 403 may
+ // signal exhausted quotas; retrying anonymously makes that worse.
+ if token!="" && resp.StatusCode==http.StatusUnauthorized {
   resp.Body.Close()
   return request("")
  }
@@ -47,9 +60,10 @@ func githubAPIError(resp *http.Response, operation string) error {
  var body struct{Message string `json:"message"`}
  _=json.NewDecoder(io.LimitReader(resp.Body,4096)).Decode(&body)
  detail:=strings.TrimSpace(body.Message)
- if resp.StatusCode==http.StatusForbidden && resp.Header.Get("X-RateLimit-Remaining")=="0"{
-  detail="GitHub API rate limit reached; retry after the limit resets"
+ if resp.StatusCode==http.StatusForbidden && resp.Header.Get("X-RateLimit-Remaining")=="0" {
+  detail="GitHub API rate limit reached; waiting for the reset window"
  }
+ if resp.StatusCode==http.StatusTooManyRequests{detail="GitHub API throttled requests"}
  if detail==""{return fmt.Errorf("%s returned HTTP %d",operation,resp.StatusCode)}
  return fmt.Errorf("%s returned HTTP %d: %s",operation,resp.StatusCode,detail)
 }
