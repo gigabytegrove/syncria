@@ -1,6 +1,7 @@
 package main
 import (
  "strings"
+ "context"
  "testing"
 )
 func TestNoAutomaticPageReload(t *testing.T) {
@@ -15,6 +16,6 @@ func TestShareDiscoveryControl(t *testing.T) {
 }
 func TestSMBShareDiscoveryRejectsPublicIP(t *testing.T) {
  for _,host:=range []string{"8.8.8.8","example.com","", "not-an-ip"} {
-  if _,err:=discoverSMBShares(t.Context(),host);err==nil {t.Fatalf("accepted untrusted discovery target %q",host)}
+  if _,err:=discoverSMBShares(context.Background(),host);err==nil {t.Fatalf("accepted untrusted discovery target %q",host)}
  }
 }
