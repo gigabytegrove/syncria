@@ -45,7 +45,7 @@ code{color:#076bd3}
 <section id="wizard" class="panel hidden"><div class="panel-head"><h2>New sync relationship</h2><button type="button" class="secondary" onclick="document.getElementById('wizard').classList.add('hidden')">Close</button></div><div class="step-indicator"><span id="stepMarker1" class="active">1 · Google Drive</span><span id="stepMarker2">2 · Storage & schedule</span></div>
 <form method="post" action="/action" id="syncWizard"><input type="hidden" name="action" value="add_job"><div class="step active" id="wizard1"><label class="field">Relationship name<input name="name" placeholder="Family backups" required></label><label class="field">Google account<select name="account" id="syncAccount" required onchange="resetDrive()">{{range .Accounts}}<option value="{{.ID}}">{{.Email}}</option>{{end}}</select></label><div class="selected"><div><span class="card-label">Google Drive source</span><strong id="selectedDriveLabel">Entire My Drive</strong></div><button class="secondary" type="button" onclick="openPicker('drive')">Browse folders</button></div><input type="hidden" name="remote" id="remoteValue" value="root"><button class="primary" type="button" onclick="wizardNext()">Continue →</button></div>
 <div class="step" id="wizard2"><div class="selected"><div><span class="card-label">Local or network destination</span><strong id="selectedLocalLabel">Choose a destination</strong></div><button class="secondary" type="button" onclick="openPicker('local')">Browse storage</button></div><input type="hidden" name="local" id="localValue" required><label class="field">Sync frequency<select name="interval"><option value="5">Every 5 minutes</option><option value="15">Every 15 minutes</option><option value="30">Every 30 minutes</option><option value="60">Every hour</option><option value="360">Every 6 hours</option><option value="1440">Daily</option></select></label><p class="muted">New relationships are created paused. Review the source and destination before enabling synchronization.</p><div class="row"><button type="button" class="secondary" onclick="wizardBack()">← Back</button><button class="primary" {{if not .Accounts}}disabled{{end}}>Create relationship</button></div></div></form></section></section>
-<section class="view" id="view-storage"><p class="lead">Choose local destinations or connect NFS and SMB network storage.</p><div class="row" style="margin-bottom:19px"><button class="primary" type="button" onclick="toggleConnection()">+ Add network connection</button><button class="secondary" type="button" onclick="openPicker('local')">Browse available folders</button></div><section class="panel hidden" id="connectionPanel"><div class="panel-head"><h2>Connect network storage</h2><button class="secondary" type="button" onclick="toggleConnection(false)">Close</button></div><p>Linux mounting requires opt-in kernel mount permissions. Syncria reports mount errors rather than silently accepting failed connections.</p><form method="post" action="/api/shares/action"><input type="hidden" name="operation" value="connect"><div class="settings-grid"><label class="field">Connection name<input name="label" placeholder="Media NAS" required maxlength="128"></label><label class="field">Protocol<select name="protocol" id="shareProtocol" onchange="protocolChanged()"><option value="smb">SMB / Windows</option><option value="nfs">NFS / Linux</option></select></label><label class="field">Hostname or IP<input name="server" placeholder="192.168.0.20" required></label><label class="field"><span id="sharePathTitle">SMB share name</span><input name="export" id="sharePath" placeholder="Shared" required></label></div><div class="settings-grid" id="smbFields"><label class="field">SMB username<input name="username" autocomplete="username"></label><label class="field">SMB password<input type="password" name="password" autocomplete="new-password"></label></div><button class="primary">Connect share</button></form></section>
+<section class="view" id="view-storage"><p class="lead">Choose local destinations or connect NFS and SMB network storage.</p><div class="row" style="margin-bottom:19px"><button class="primary" type="button" onclick="toggleConnection()">+ Add network connection</button><button class="secondary" type="button" onclick="openPicker('local')">Browse available folders</button></div><section class="panel hidden" id="connectionPanel"><div class="panel-head"><h2>Connect network storage</h2><button class="secondary" type="button" onclick="toggleConnection(false)">Close</button></div><p>Linux mounting requires opt-in kernel mount permissions. Syncria reports mount errors rather than silently accepting failed connections.</p><form method="post" action="/api/shares/action"><input type="hidden" name="operation" value="connect"><div class="settings-grid"><label class="field">Connection name<input name="label" placeholder="Media NAS" required maxlength="128"></label><label class="field">Protocol<select name="protocol" id="shareProtocol" onchange="protocolChanged()"><option value="smb">SMB / Windows</option><option value="nfs">NFS / Linux</option></select></label><label class="field">Hostname or IP<input name="server" id="shareServer" placeholder="192.168.0.20" required oninput="queueShareDiscovery()"></label><label class="field"><span id="sharePathTitle">SMB share name</span><input name="export" id="sharePath" placeholder="Shared" list="discoveredShares" required><datalist id="discoveredShares"></datalist><span id="shareDiscoveryStatus" class="muted" aria-live="polite"></span></label></div><div class="settings-grid" id="smbFields"><label class="field">SMB username<input name="username" autocomplete="username"></label><label class="field">SMB password<input type="password" name="password" autocomplete="new-password"></label></div><button class="primary">Connect share</button></form></section>
 <section class="panel"><h2>Network shares</h2>{{range .Shares}}<div class="entry"><div><strong>{{.Label}}</strong> {{if .Mounted}}<span class="status">Mounted</span>{{else}}<span class="status off">Disconnected</span>{{end}}<p>{{.Protocol}} · {{.Server}} / {{.Export}}</p><p>{{.Local}}</p></div><div class="row"><form class="inline" method="post" action="/api/shares/action"><input type="hidden" name="operation" value="reconnect"><input type="hidden" name="id" value="{{.ID}}"><button class="secondary">Reconnect</button></form><form class="inline" method="post" action="/api/shares/action" onsubmit="return confirm('Disconnect network storage?')"><input type="hidden" name="operation" value="disconnect"><input type="hidden" name="id" value="{{.ID}}"><button class="danger">Disconnect</button></form></div></div>{{else}}<div class="empty"><strong>No managed shares</strong>Connect a network share above or browse an existing local mount.</div>{{end}}</section></section>
 <section class="view" id="view-accounts"><p class="lead">Connect multiple Google accounts, then choose folders independently for each sync relationship.</p><section class="panel"><div class="panel-head"><h2>Google accounts</h2><a class="primary" style="text-decoration:none" href="/oauth/start">+ Connect Google account</a></div>{{range .Accounts}}<div class="entry"><div><strong>{{.Email}}</strong><p>Authorized with Google Drive</p></div><div class="row"><span class="status">Connected</span><form method="post" action="/action" class="inline" onsubmit="return confirm('Disconnect account?')"><input type="hidden" name="action" value="remove_account"><input type="hidden" name="id" value="{{.ID}}"><button class="danger">Disconnect</button></form></div></div>{{else}}<div class="empty"><strong>No accounts connected</strong>Connect a Google account to start.</div>{{end}}</section></section>
 <section class="view" id="view-updates"><p class="lead">Install verified versioned releases without losing your persistent configuration.</p><section class="panel"><div class="panel-head"><h2>Software updates</h2><span class="pill">Installed: {{.Version}}</span></div><div class="selected"><div><span class="card-label">Latest GitHub version tag</span><strong id="latestVersion">Checking releases…</strong><span class="muted" id="updateMessage"></span></div><button class="secondary" type="button" onclick="checkUpdate()">Check again</button></div><div class="row"><form method="post" action="/action" onsubmit="return confirm('Install latest verified release and restart Syncria?')"><input type="hidden" name="action" value="update_install"><button id="installUpdateButton" class="primary" disabled>Install latest</button></form><form method="post" action="/action" onsubmit="return confirm('Rollback to previous version?')"><input type="hidden" name="action" value="update_rollback"><button class="secondary">Rollback</button></form></div><p style="margin-top:18px">Updates are blocked while synchronization is active. Versions are discovered from GitHub tags. Installation is enabled when verified binaries and checksums are published.</p></section></section>
@@ -62,7 +62,30 @@ function wizardNext(){let f=$('syncWizard');if(!f.querySelector('[name=name]').r
 function wizardBack(){$('wizard1').classList.add('active');$('wizard2').classList.remove('active');$('stepMarker1').classList.add('active');$('stepMarker2').classList.remove('active');}
 function resetDrive(){$('remoteValue').value='root';$('selectedDriveLabel').textContent='Entire My Drive';}
 function toggleConnection(force){$('connectionPanel').classList.toggle('hidden',force===undefined?!$('connectionPanel').classList.contains('hidden'):!force);if(!$('connectionPanel').classList.contains('hidden'))$('connectionPanel').scrollIntoView({behavior:'smooth'});}
-function protocolChanged(){let nfs=$('shareProtocol').value==='nfs';$('smbFields').classList.toggle('hidden',nfs);$('sharePathTitle').textContent=nfs?'NFS export path':'SMB share name';$('sharePath').placeholder=nfs?'/volume1/shared':'Shared';}
+function protocolChanged(){shareDiscoverySequence++;clearTimeout(shareDiscoveryTimer);$('shareDiscoveryStatus').textContent='';$('discoveredShares').replaceChildren();let nfs=$('shareProtocol').value==='nfs';$('smbFields').classList.toggle('hidden',nfs);$('sharePathTitle').textContent=nfs?'NFS export path':'SMB share name';$('sharePath').placeholder=nfs?'/volume1/shared':'Shared';}
+let shareDiscoveryTimer=0,shareDiscoverySequence=0;
+function queueShareDiscovery(){
+ clearTimeout(shareDiscoveryTimer);
+ const host=$('shareServer').value.trim();
+ $('discoveredShares').replaceChildren();
+ $('shareDiscoveryStatus').textContent='';
+ if($('shareProtocol').value!=='smb'||!host)return;
+ shareDiscoveryTimer=setTimeout(discoverShares,450);
+}
+async function discoverShares(){
+ const host=$('shareServer').value.trim(),sequence=++shareDiscoverySequence;
+ if(!host||$('shareProtocol').value!=='smb')return;
+ $('shareDiscoveryStatus').textContent='Discovering SMB shares…';
+ try{
+  const res=await fetch('/api/shares/discover?server='+encodeURIComponent(host),{credentials:'same-origin',cache:'no-store'});
+  const data=await res.json();
+  if(sequence!==shareDiscoverySequence||$('shareServer').value.trim()!==host)return;
+  if(!res.ok)throw Error(data.error||'Discovery failed');
+  $('discoveredShares').replaceChildren();
+  for(const name of data.shares||[]){const option=document.createElement('option');option.value=name;$('discoveredShares').appendChild(option);}
+  $('shareDiscoveryStatus').textContent=(data.shares||[]).length?data.shares.length+' shares discovered. Select a share or enter its name.':'No browseable shares were advertised. You can enter a known share manually.';
+ }catch(e){if(sequence!==shareDiscoverySequence)return;$('shareDiscoveryStatus').textContent=e.message+'. You can enter a known share manually.';}
+}
 async function checkUpdate(){
  if(!$('latestVersion'))return;
  $('latestVersion').textContent='Checking GitHub tags…';
@@ -84,29 +107,8 @@ async function loadFolder(path,label){let seq=++pickSeq;let drive=pickerType==='
 function pickerUp(){if(parent)loadFolder(parent,parent==='root'?'Entire My Drive':undefined);}
 function selectFolder(){if(!folder)return;if(pickerType==='drive'){$('remoteValue').value=folder;$('selectedDriveLabel').textContent=folderName||folder;}else{$('localValue').value=folder;$('selectedLocalLabel').textContent=folder;}closePicker();}
 async function createFolder(){if(pickerType!=='local'||!folder)return;let name=prompt('New folder name');if(name===null)return;name=name.trim();if(!name)return;let p=new URLSearchParams({parent:folder,name});try{let res=await fetch('/api/browse/local/create',{method:'POST',body:p});if(!res.ok)throw Error((await res.text()).trim());await loadFolder(folder);}catch(e){$('pickerStatus').textContent='Could not create folder: '+e.message;}}
-// The in-place updater restarts the server without navigating away.
-// Poll the live binary version and refresh only after the backend changed.
-const loadedVersion={{printf "%q" .Version}};
-let versionCheckBusy=false,versionRefreshPending=false;
-async function checkRunningVersion(){
- if(versionCheckBusy||document.hidden)return;
- versionCheckBusy=true;
- try{
-   const response=await fetch('/api/update/status?running='+Date.now(),{cache:'no-store',credentials:'same-origin'});
-   if(!response.ok)return;
-   const info=await response.json();
-   if(info.current && info.current!==loadedVersion && !versionRefreshPending){
-     versionRefreshPending=true;
-     const url=new URL(location.href);
-     url.searchParams.delete('msg');
-     url.searchParams.set('_syncria_reload',Date.now().toString());
-     location.replace(url.toString());
-   }
- }catch(_e){ /* Server may be restarting; retry after it returns. */ }
- finally{versionCheckBusy=false}
-}
-setInterval(checkRunningVersion,5000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkRunningVersion()});
-if(new URLSearchParams(location.search).get('msg')?.includes('Update staged'))checkRunningVersion();
+// Never navigate away from an active UI session in response to background polling.
+// The Updates screen checks the installed version on demand. The server restart
+// during an explicit installation is handled by the existing update workflow.
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePicker()});if(location.hash){let page=location.hash.slice(1);if($('view-'+page))navigate(page)}
 </script></body></html>`
