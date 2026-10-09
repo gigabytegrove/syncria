@@ -24,12 +24,34 @@ type releaseAsset struct { Name string `json:"name"`; URL string `json:"url"` }
 type releaseInfo struct { Tag string `json:"tag_name"`; Assets []releaseAsset `json:"assets"` }
 type githubTag struct { Name string `json:"name"` }
 
-func releaseRequest(ctx context.Context, url, accept string) (*http.Response,error) {
- req,err:=http.NewRequestWithContext(ctx,"GET",url,nil);if err!=nil{return nil,err}
- req.Header.Set("Accept",accept)
- req.Header.Set("User-Agent","Syncria-Updater/"+appVersion)
- if tok:=os.Getenv("SYNCRIA_GITHUB_TOKEN");tok!=""{req.Header.Set("Authorization","Bearer "+tok)}
- return (&http.Client{Timeout:15*time.Minute}).Do(req)
+func releaseRequest(ctx context.Context, endpoint, accept string) (*http.Response,error) {
+ // Public releases should not require credentials. An incorrectly configured
+ // token can cause GitHub 403 responses even for otherwise public content.
+ request:=func(token string)(*http.Response,error){
+  req,err:=http.NewRequestWithContext(ctx,http.MethodGet,endpoint,nil);if err!=nil{return nil,err}
+  req.Header.Set("Accept",accept)
+  req.Header.Set("User-Agent","Syncria-Updater/"+appVersion)
+  if token!=""{req.Header.Set("Authorization","Bearer "+token)}
+  return (&http.Client{Timeout:15*time.Minute}).Do(req)
+ }
+ token:=strings.TrimSpace(os.Getenv("SYNCRIA_GITHUB_TOKEN"))
+ resp,err:=request(token)
+ if err!=nil{return nil,err}
+ if token!=""&&(resp.StatusCode==http.StatusUnauthorized||resp.StatusCode==http.StatusForbidden){
+  resp.Body.Close()
+  return request("")
+ }
+ return resp,nil
+}
+func githubAPIError(resp *http.Response, operation string) error {
+ var body struct{Message string `json:"message"`}
+ _=json.NewDecoder(io.LimitReader(resp.Body,4096)).Decode(&body)
+ detail:=strings.TrimSpace(body.Message)
+ if resp.StatusCode==http.StatusForbidden && resp.Header.Get("X-RateLimit-Remaining")=="0"{
+  detail="GitHub API rate limit reached; retry after the limit resets"
+ }
+ if detail==""{return fmt.Errorf("%s returned HTTP %d",operation,resp.StatusCode)}
+ return fmt.Errorf("%s returned HTTP %d: %s",operation,resp.StatusCode,detail)
 }
 func versionParts(tag string)([3]int,bool){
  var p [3]int
@@ -45,7 +67,7 @@ func newerVersion(a,b string)bool{
 }
 func latestTag(ctx context.Context)(string,error){
  resp,err:=releaseRequest(ctx,tagsAPI,"application/vnd.github+json");if err!=nil{return "",err};defer resp.Body.Close()
- if resp.StatusCode!=200{return "",fmt.Errorf("GitHub tag lookup returned HTTP %d",resp.StatusCode)}
+ if resp.StatusCode!=200{return "",githubAPIError(resp,"GitHub tag lookup")}
  var tags []githubTag
  if err=json.NewDecoder(io.LimitReader(resp.Body,1<<20)).Decode(&tags);err!=nil{return "",err}
  best:=""
@@ -56,7 +78,7 @@ func latestTag(ctx context.Context)(string,error){
 func releaseForTag(ctx context.Context,tag string)(releaseInfo,error){
  resp,err:=releaseRequest(ctx,releaseForTagAPI+tag,"application/vnd.github+json");if err!=nil{return releaseInfo{},err};defer resp.Body.Close()
  if resp.StatusCode==404{return releaseInfo{},fmt.Errorf("%s tag exists, but its release binaries are not published yet",tag)}
- if resp.StatusCode!=200{return releaseInfo{},fmt.Errorf("GitHub release for %s returned HTTP %d",tag,resp.StatusCode)}
+ if resp.StatusCode!=200{return releaseInfo{},githubAPIError(resp,"GitHub release lookup")}
  var r releaseInfo
  if err=json.NewDecoder(io.LimitReader(resp.Body,2<<20)).Decode(&r);err!=nil{return r,err}
  if _,ok:=assetFor(r,assetName());!ok{return r,fmt.Errorf("%s has no binary for this platform",tag)}
