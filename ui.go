@@ -33,7 +33,7 @@ code{color:#076bd3}
 <button type="button" data-view="accounts">◎ &nbsp; Google accounts</button>
 <button type="button" data-view="updates">↻ &nbsp; Updates</button>
 <button type="button" data-view="settings">⚙ &nbsp; Settings</button>
-</nav></div><div class="sidebar-bottom">Syncria <strong>v{{.Version}}</strong><p>Google Drive ↔ your storage</p></div></aside>
+</nav></div><div class="sidebar-bottom">Syncria <strong>v<span id="sidebarVersion">{{.Version}}</span></strong><p>Google Drive ↔ your storage</p></div></aside>
 <div class="content"><div class="topline"><div><div class="eyebrow">Storage synchronization</div><h1 id="pageTitle">Overview</h1></div>{{if .Logged}}<form method="post" action="/action"><input type="hidden" name="action" value="logout"><button class="logout" type="submit">Sign out</button></form>{{end}}</div>
 {{if .Message}}<div class="notice">{{.Message}}</div>{{end}}
 {{if not .Configured}}<section class="panel" style="max-width:550px"><h2>Welcome to Syncria</h2><p>Create the administrator password to protect your dashboard.</p><form method="post" action="/action"><input type="hidden" name="action" value="setup"><label class="field">Administrator password<input type="password" name="password" minlength="12" required autocomplete="new-password"></label><button class="primary">Secure dashboard</button></form></section>
@@ -120,6 +120,7 @@ async function refreshDashboardStatus(){
   if(!res.ok)return;
   const data=await res.json();
   if($('installedVersion')&&data.current)$('installedVersion').textContent=data.current;
+  if($('sidebarVersion')&&data.current)$('sidebarVersion').textContent=data.current;
   for(const job of data.jobs||[]){
    for(const el of document.querySelectorAll('[data-job-enabled]')){
     if(el.dataset.jobEnabled!==job.id)continue;
