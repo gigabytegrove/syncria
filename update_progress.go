@@ -16,7 +16,17 @@ import (
 
 // UpdateProgress is stored in the existing Syncria /data volume. It is
 // deliberately independent of the web browser and the container lifecycle.
+type UpdateEvent struct {
+ At time.Time `json:"at"`
+ Phase string `json:"phase"`
+ Detail string `json:"detail"`
+}
+// All update evidence is persisted alongside the binary, not in the browser.
 type UpdateProgress struct {
+ Asset string `json:"asset,omitempty"`
+ VerifiedBytes int64 `json:"verified_bytes,omitempty"`
+ VerifiedTotal int64 `json:"verified_total,omitempty"`
+ Events []UpdateEvent `json:"events,omitempty"`
  Phase string `json:"phase"`
  Operation string `json:"operation,omitempty"`
  From string `json:"from,omitempty"`
@@ -53,11 +63,20 @@ func (a *App) setUpdateProgress(phase,message,target string,percent int,download
  a.updateMu.Lock()
  defer a.updateMu.Unlock()
  p:=a.updateProgress
+ oldPhase,oldMessage:=p.Phase,p.Message
  p.Phase=phase;p.Message=message
+ if oldPhase!=phase || (oldMessage!=message && phase!="downloading" && phase!="verifying") {
+  p.Events=append(p.Events,UpdateEvent{At:time.Now().UTC(),Phase:phase,Detail:message})
+  if len(p.Events)>45 {p.Events=p.Events[len(p.Events)-45:]}
+ }
  if target!=""{p.Target=target}
  if percent>=0{p.Percent=percent}
  if downloaded>=0{p.Downloaded=downloaded}
  if total>=0{p.Total=total}
+ if phase=="verifying"&&downloaded>=0 {p.VerifiedBytes=downloaded}
+ if phase=="verifying"&&total>=0 {p.VerifiedTotal=total}
+ if phase!="verifying"&&downloaded>=0{p.Downloaded=downloaded}
+ if phase!="verifying"&&total>=0{p.Total=total}
  p.Error=detail
  p.Active=phase!="complete"&&phase!="failed"&&phase!="idle"
  if err:=a.writeUpdateProgressLocked(p);err!=nil{log.Printf("cannot save Syncria update progress: %v",err)}
@@ -70,8 +89,11 @@ func (a *App) beginUpdate(operation string) error {
  busy:=false
  a.runs.Range(func(_, _ any)bool{busy=true;return false})
  if busy{return errors.New("an active sync must finish before updating")}
- p:=UpdateProgress{Phase:"checking",Operation:operation,From:appVersion,Message:"Starting update",Percent:2,Active:true,StartedAt:time.Now().UTC()}
- if operation=="rollback"{p.Phase="staging";p.Message="Preparing previous verified binary";p.Percent=70}
+ now:=time.Now().UTC()
+ p:=UpdateProgress{Phase:"checking",Operation:operation,From:appVersion,Message:"Checking release metadata",Percent:-1,Active:true,StartedAt:now,
+ Events:[]UpdateEvent{{At:now,Phase:"checking",Detail:"Checking release metadata from GitHub Releases"}}}
+ if operation=="rollback"{p.Phase="staging";p.Message="Restoring the saved previous executable";p.Percent=-1}
+ if operation=="manual"{p.Phase="receiving";p.Message="Receiving the selected executable and SHA256SUMS";p.Percent=-1}
  if err:=a.writeUpdateProgressLocked(p);err!=nil{return fmt.Errorf("cannot persist update progress: %w",err)}
  a.updateBusy=true
  return nil
@@ -102,10 +124,12 @@ func (a *App) reconcileUpdateOnStartup() {
  if json.Unmarshal(b,&p)!=nil{return}
  if p.Active {
   if p.Phase=="restarting" && ((p.Operation=="install"&&p.Target==appVersion)||(p.Operation=="rollback"&&p.From!=appVersion)) {
-   p.Phase="complete";p.Percent=100;p.Message="Syncria "+appVersion+" started successfully";p.Error="";p.Active=false
+   p.Phase="complete";p.Percent=100;p.Message="Verified running version "+appVersion+"; update successful";p.Error="";p.Active=false
+   p.Events=append(p.Events,UpdateEvent{At:time.Now().UTC(),Phase:"complete",Detail:"Application responded as "+appVersion+" after restart"})
   }else{
    p.Phase="failed";p.Active=false
-   p.Error="The update was interrupted or the expected version did not start."
+   p.Error="The update was interrupted or the expected version did not start. Inspect startup logs before trying again."
+   p.Events=append(p.Events,UpdateEvent{At:time.Now().UTC(),Phase:"failed",Detail:p.Error})
    p.Message="Update did not complete"
   }
   if err:=a.writeUpdateProgressLocked(p);err!=nil{log.Printf("cannot reconcile update progress: %v",err)}
@@ -136,41 +160,60 @@ func (a *App) updateProgressAPI(w http.ResponseWriter,r *http.Request) {
  _=json.NewEncoder(w).Encode(a.updateProgressSnapshot())
  go a.runUpdate(operation)
 }
+// Update stages represent observed actions. Only download and SHA-256 hashing
+// report percentages: both have exact byte counters. Network handshakes,
+// file renames and the process restart have no honest percentage estimate.
+func (a *App) updateAsset(name string){
+ a.updateMu.Lock();defer a.updateMu.Unlock()
+ p:=a.updateProgress;p.Asset=name
+ if err:=a.writeUpdateProgressLocked(p);err!=nil{log.Printf("update asset state: %v",err)}
+}
+func (a *App) updateEvent(phase,detail string){
+ a.updateMu.Lock();defer a.updateMu.Unlock()
+ p:=a.updateProgress
+ p.Events=append(p.Events,UpdateEvent{At:time.Now().UTC(),Phase:phase,Detail:detail})
+ if len(p.Events)>45{p.Events=p.Events[len(p.Events)-45:]}
+ if err:=a.writeUpdateProgressLocked(p);err!=nil{log.Printf("update event state: %v",err)}
+}
 func (a *App) runUpdate(operation string) {
  defer func(){
-  if x:=recover();x!=nil{a.finishUpdate("failed","Update interrupted",fmt.Sprint(x))}
+  if x:=recover();x!=nil{a.finishUpdate("failed","Updater panicked; restart not attempted",fmt.Sprint(x))}
  }()
  ctx,cancel:=context.WithTimeout(context.Background(),15*time.Minute)
  defer cancel()
  dir:=filepath.Dir(a.file)
  if operation=="rollback" {
-  if _,err:=rollbackBinary(dir);err!=nil{a.finishUpdate("failed","Rollback failed",err.Error());return}
+  a.setUpdateProgress("staging","Restoring the previously saved executable","",-1,-1,-1,"")
+  if _,err:=rollbackBinary(dir);err!=nil{a.finishUpdate("failed","Rollback installation failed",err.Error());return}
+  a.updateEvent("staging","Previous executable restored; requesting supervisor restart")
  }else{
-  a.setUpdateProgress("checking","Checking latest published release","",5,0,0,"")
+  a.setUpdateProgress("checking","Reading published release metadata from GitHub","",-1,-1,-1,"")
   rel,err:=latestRelease(ctx)
-  if err!=nil{a.finishUpdate("failed","Release check failed",err.Error());return}
+  if err!=nil{a.finishUpdate("failed","Release lookup failed",err.Error());return}
   if !newerVersion(rel.Tag,appVersion){
-   a.finishUpdate("complete","Syncria is already running the latest published release","")
+   a.finishUpdate("complete","Syncria "+appVersion+" is already the latest published version","")
    return
   }
-  a.setUpdateProgress("downloading","Downloading "+rel.Tag,rel.Tag,10,0,0,"")
-  _,err=updateBinaryWithProgress(ctx,dir,rel,func(phase string,downloaded,total int64){
+  a.setUpdateProgress("manifest","Release "+rel.Tag+" found; obtaining SHA256SUMS",rel.Tag,-1,0,0,"")
+  a.updateEvent("manifest","Platform executable: "+assetName())
+  a.updateAsset(assetName())
+  _,err=updateBinaryWithProgress(ctx,dir,rel,func(phase string,bytes,total int64){
    switch phase {
+   case "manifest":
+    a.setUpdateProgress("manifest","Receiving SHA256SUMS from "+rel.Tag,rel.Tag,-1,-1,-1,"")
    case "downloading":
-    percent:=10
-    if total>0{percent+=int(downloaded*60/total);if percent>70{percent=70}}
-    a.setUpdateProgress(phase,"Downloading "+rel.Tag,rel.Tag,percent,downloaded,total,"")
+    a.setUpdateProgress("downloading","Downloading "+assetName()+" from "+rel.Tag,rel.Tag,-1,bytes,total,"")
    case "verifying":
-    a.setUpdateProgress(phase,"Checking SHA-256 integrity",rel.Tag,80,-1,-1,"")
+    a.setUpdateProgress("verifying","Calculating SHA-256 of "+assetName(),rel.Tag,-1,bytes,total,"")
    case "staging":
-    a.setUpdateProgress(phase,"Saving rollback and installing verified binary",rel.Tag,92,-1,-1,"")
+    a.setUpdateProgress("staging","Saving rollback executable and installing "+assetName(),rel.Tag,-1,-1,-1,"")
    }
   })
-  if err!=nil{a.finishUpdate("failed","Update failed",err.Error());return}
+  if err!=nil{a.finishUpdate("failed","Verified installation was not completed",err.Error());return}
+  a.updateEvent("staging","SHA-256 matched release manifest; verified binary committed to /data/runtime/current")
  }
- a.setUpdateProgress("restarting","Syncria is restarting and confirming the new version","",97,-1,-1,"")
+ a.setUpdateProgress("restarting","Verified executable staged; requesting supervised restart","",-1,-1,-1,"")
  time.Sleep(700*time.Millisecond)
  restartSyncria(dir)
- // A supervised or successfully spawned process exits and cannot return.
- a.finishUpdate("failed","Restart failed","Syncria could not start the staged executable")
+ a.finishUpdate("failed","Restart request failed","The runtime did not start the staged executable. Inspect Syncria logs.")
 }
