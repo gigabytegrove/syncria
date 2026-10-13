@@ -174,7 +174,7 @@ function startWizard(){
  $('nasSourceFolderValue').value='.';$('selectedNASSourceLabel').textContent='Share root';
  document.querySelectorAll('#nasTargets input[type=hidden]').forEach(el=>el.value='.');
  document.querySelectorAll('#nasTargets small[id^=nas-label-]').forEach(el=>el.textContent='Share root');
- relationshipTypeChanged();nasDestChanged();showSyncStep(1);
+ sourceProviderChanged();relationshipTypeChanged();scheduleModeChanged();nasDestChanged();showSyncStep(1);
 }
 function closeSyncWizard(){$('wizard').classList.add('hidden');syncReviewed=false;}
 function relationshipTypeChanged(){
