@@ -403,57 +403,77 @@ async function checkUpdate(force=false){
 }
 setInterval(pollUpdateProgress,1200);
 function openPicker(type){
- if(type!=='drive'&&type!=='nas'){alert('Select a cloud or connected NAS folder. Local Docker folders are not sync destinations.');return;}
- if(type==='nas'&&!$('nasId').value){alert('Choose a NAS connection first.');return;}
- pickerType=type;folder='';parent='';folderName='';$('picker').classList.add('open');
- $('pickerTitle').textContent=type==='drive'?'Browse Google Drive':'Browse NAS directly';
- $('pickerNew').classList.toggle('hidden',type!=='nas');
- loadFolder(type==='drive'?'root':'.');
+ const nas=type==='nas-source'||type==='nas-target';
+ if(!nas&&type!=='drive'&&type!=='dropbox')return;
+ if(nas){
+  const id=type==='nas-source' ? $('nasSourceId').value:selectedNASTargetID;
+  if(!id){alert('Choose a NAS connection before browsing folders.');return;}
+ }
+ pickerType=type;folder=null;parent=null;folderName='';
+ $('picker').classList.add('open');
+ $('pickerTitle').textContent=type==='drive'?'Browse Google Drive':type==='dropbox'?'Browse Dropbox':'Browse NAS folders';
+ $('pickerNew').classList.toggle('hidden',!nas);
+ const initial=type==='drive'?'root':type==='dropbox'?'':type==='nas-source'?$('nasSourceFolderValue').value:$('nas-folder-'+selectedNASTargetID).value;
+ loadFolder(initial);
 }
 function closePicker(){pickSeq++;$('picker').classList.remove('open');}
 async function loadFolder(selected,label){
- let seq=++pickSeq,drive=pickerType==='drive';
- $('pickerStatus').textContent='Reading remote folders…';$('pickerSelect').disabled=true;
+ const sequence=++pickSeq;
+ $('pickerStatus').textContent='Listing remote folders…';$('pickerSelect').disabled=true;
  $('folderList').replaceChildren();
- const endpoint=drive?
-  '/api/browse/drive?account='+encodeURIComponent($('syncAccount').value)+'&parent='+encodeURIComponent(selected||'root'):
-  '/api/browse/nas?id='+encodeURIComponent($('nasId').value)+'&path='+encodeURIComponent(selected||'.');
+ const q=encodeURIComponent(selected??'');
+ let endpoint='';
+ if(pickerType==='drive')endpoint='/api/browse/drive?account='+encodeURIComponent($('syncAccount').value)+'&parent='+q;
+ else if(pickerType==='dropbox')endpoint='/api/browse/dropbox?account='+encodeURIComponent($('syncDropboxAccount').value)+'&path='+q;
+ else{
+  const id=pickerType==='nas-source'?$('nasSourceId').value:selectedNASTargetID;
+  endpoint='/api/browse/nas?id='+encodeURIComponent(id)+'&path='+q;
+ }
  try{
-  const resp=await fetch(endpoint,{credentials:'same-origin',cache:'no-store'});
-  if(!resp.ok)throw Error((await resp.text()).trim());
-  const data=await resp.json();if(seq!==pickSeq)return;
-  folder=data.path;parent=data.parent||'';
-  folderName=label||(drive?(folder==='root'?'Entire My Drive':folder):(folder==='.'?'Share root':folder));
+  const response=await fetch(endpoint,{credentials:'same-origin',cache:'no-store'});
+  if(!response.ok)throw Error((await response.text()).trim());
+  const data=await response.json();if(sequence!==pickSeq)return;
+  folder=data.path;parent=data.parent===undefined?null:data.parent;
+  folderName=label||(pickerType==='drive'?(folder==='root'?'Entire My Drive':folder):
+   pickerType==='dropbox'?(folder===''?'Entire Dropbox':folder):(folder==='.'?'Share root':folder));
   $('pickerPath').textContent=folderName;
-  $('pickerUp').disabled=!parent;$('pickerSelect').disabled=false;
+  $('pickerUp').disabled=parent===null;
+  $('pickerSelect').disabled=false;
   for(const item of data.entries||[]){
-   const btn=document.createElement('button');
-   btn.type='button';btn.className='folder-row';btn.textContent='📁  '+item.name;
-   btn.addEventListener('click',()=>loadFolder(item.id,item.name));
-   $('folderList').appendChild(btn);
+   const button=document.createElement('button');
+   button.className='folder-row';button.type='button';button.textContent='📁 '+item.name;
+   button.addEventListener('click',()=>loadFolder(item.id,item.name));
+   $('folderList').appendChild(button);
   }
-  $('pickerStatus').textContent=data.message||((data.entries||[]).length+' remote folders. Choose this folder or browse deeper.');
+  $('pickerStatus').textContent=data.message||((data.entries||[]).length+' folders. Select this folder or browse deeper.');
  }catch(e){
-  if(seq!==pickSeq)return;
-  $('pickerStatus').textContent='Cannot browse: '+e.message;
+  if(sequence!==pickSeq)return;
+  $('pickerStatus').textContent='Folder listing failed: '+e.message;
  }
 }
-function pickerUp(){if(parent)loadFolder(parent);}
+function pickerUp(){if(parent!==null)loadFolder(parent);}
 function selectFolder(){
- if(!folder||!pickerType)return;
+ if(folder===null||!pickerType)return;
  syncReviewed=false;
- if(pickerType==='drive'){$('remoteValue').value=folder;$('selectedDriveLabel').textContent=folderName||folder;}
- else{$('nasFolderValue').value=folder;$('selectedNASLabel').textContent=folderName||folder;}
+ if(pickerType==='drive'||pickerType==='dropbox'){
+  $('remoteValue').value=folder;$('selectedDriveLabel').textContent=folderName||folder||'Entire Dropbox';
+ }else if(pickerType==='nas-source'){
+  $('nasSourceFolderValue').value=folder;$('selectedNASSourceLabel').textContent=folderName||'Share root';
+ }else if(pickerType==='nas-target'){
+  $('nas-folder-'+selectedNASTargetID).value=folder;
+  $('nas-label-'+selectedNASTargetID).textContent=folderName||'Share root';
+ }
  closePicker();
 }
 async function createFolder(){
- if(pickerType!=='nas'||!folder)return;
+ if((pickerType!=='nas-source'&&pickerType!=='nas-target')||folder===null)return;
  let name=prompt('New folder on NAS');if(name===null)return;
  name=name.trim();if(!name)return;
- const body=new URLSearchParams({id:$('nasId').value,parent:folder,name});
+ const id=pickerType==='nas-source'?$('nasSourceId').value:selectedNASTargetID;
  try{
-  const resp=await fetch('/api/browse/nas/create',{method:'POST',credentials:'same-origin',body});
-  if(!resp.ok)throw Error((await resp.text()).trim());
+  const body=new URLSearchParams({id,parent:folder,name});
+  const response=await fetch('/api/browse/nas/create',{method:'POST',body,credentials:'same-origin'});
+  if(!response.ok)throw Error((await response.text()).trim());
   await loadFolder(folder);
  }catch(e){$('pickerStatus').textContent='NAS folder creation failed: '+e.message;}
 }
