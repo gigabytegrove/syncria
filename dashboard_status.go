@@ -35,6 +35,7 @@ func (a *App) dashboardStatus(w http.ResponseWriter,r *http.Request) {
  type shareState struct {
   ID string `json:"id"`
   Mounted bool `json:"mounted"`
+  Direct bool `json:"direct"`
  }
  a.mu.Lock()
  jobs:=make([]jobState,0,len(a.cfg.Jobs))
@@ -48,7 +49,12 @@ func (a *App) dashboardStatus(w http.ResponseWriter,r *http.Request) {
  a.mu.Unlock()
  for i:=range jobs {_,jobs[i].Running=a.runs.Load(jobs[i].ID)}
  mounts:=make([]shareState,0,len(shares))
- for _,s:=range shares {mounts=append(mounts,shareState{ID:s.ID,Mounted:shareMounted(s.Local)})}
+ for _,s:=range shares {
+  direct:=s.Local==""
+  mounted:=false
+  if !direct{mounted=shareMounted(s.Local)}
+  mounts=append(mounts,shareState{ID:s.ID,Mounted:mounted,Direct:direct})
+ }
  w.Header().Set("Content-Type","application/json; charset=utf-8")
  _=json.NewEncoder(w).Encode(struct {
   Current string `json:"current"`
