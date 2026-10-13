@@ -49,7 +49,30 @@ type Item struct {
 	LocalMD5 string `json:"local_md5"`
 	Folder   bool   `json:"folder"`
 }
+type NASDestination struct {
+  ShareID string `json:"share_id"`
+  Folder string `json:"folder"`
+}
+type PendingDeletion struct {
+  Pair string `json:"pair"`
+  Path string `json:"path"`
+  MissingSide string `json:"missing_side"`
+  RecoveredAt string `json:"recovered_at,omitempty"`
+  RecoveryToken string `json:"recovery_token,omitempty"`
+  Expires time.Time `json:"expires"`
+  Folder bool `json:"folder,omitempty"`
+}
 type Job struct {
+    RelationshipType string `json:"relationship_type,omitempty"`
+    NASSourceID string `json:"nas_source_id,omitempty"`
+    NASSourceFolder string `json:"nas_source_folder,omitempty"`
+    NASDestinations []NASDestination `json:"nas_destinations,omitempty"`
+    PairStates map[string]map[string]Item `json:"pair_states,omitempty"`
+    ConflictPolicy string `json:"conflict_policy,omitempty"`
+    Direction string `json:"direction,omitempty"`
+    PropagateDeletions *bool `json:"propagate_deletions,omitempty"`
+    RecoveryEnabled *bool `json:"recovery_enabled,omitempty"`
+    PendingDeletions []PendingDeletion `json:"pending_deletions,omitempty"`
     NASShareID string `json:"nas_share_id,omitempty"`
     NASFolder string `json:"nas_folder,omitempty"`
     ScheduleMode string `json:"schedule_mode,omitempty"`
@@ -575,6 +598,14 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
 	for k, v := range j.State {
 		job.State[k] = v
 	}
+    job.PairStates=make(map[string]map[string]Item,len(j.PairStates))
+    for key,items:=range j.PairStates {
+      clone:=make(map[string]Item,len(items))
+      for rel,v:=range items {clone[rel]=v}
+      job.PairStates[key]=clone
+    }
+    job.PendingDeletions=append([]PendingDeletion(nil),j.PendingDeletions...)
+
     a.mu.Unlock()
     a.setSyncProgress(jobID,func(p *SyncProgress){*p=SyncProgress{Phase:"scanning",Running:true,Started:time.Now()}})
     job.progressHook=func(up,down,upBytes,downBytes int64){
@@ -592,7 +623,7 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     job.LastUploads, job.LastDownloads = 0, 0
     job.LastUploadBytes, job.LastDownloadBytes = 0, 0
     var err error
-    if job.Provider == "bridge" {
+    if job.Provider == "bridge" || job.Provider=="nas_bridge" {
         err = a.syncBridge(ctx,&job)
     } else {
         // Historical mount-path jobs are preserved for migration but never
@@ -614,6 +645,8 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
 		}
 		actual.LastSummary = job.LastSummary
 		actual.State = job.State
+        actual.PairStates = job.PairStates
+        actual.PendingDeletions = job.PendingDeletions
 		_ = a.save()
 	}
     a.mu.Unlock()
@@ -1341,12 +1374,12 @@ func (a *App) scheduler(ctx context.Context) {
 		jobs := append([]Job(nil), a.cfg.Jobs...)
 		a.mu.Unlock()
 		for _, j := range jobs {
-			if j.Enabled && j.Provider=="bridge" && j.ScheduleMode=="changes" {
+			if j.Enabled && (j.Provider=="bridge"||j.Provider=="nas_bridge") && j.ScheduleMode=="changes" {
              if _,loaded:=a.watchers.LoadOrStore(j.ID,true);!loaded{go a.watchChangedJob(ctx,j.ID)}
             }
             cadence:=j.Interval
             if j.ScheduleMode=="changes"{cadence=5}
-            if j.Enabled && j.Provider=="bridge" && (j.LastRun.IsZero() || time.Since(j.LastRun) >= time.Duration(cadence)*time.Minute) {
+            if j.Enabled && (j.Provider=="bridge"||j.Provider=="nas_bridge") && (j.LastRun.IsZero() || time.Since(j.LastRun) >= time.Duration(cadence)*time.Minute) {
 				id := j.ID
 				go func() {
 					if e := a.syncJob(ctx, id); e != nil && e.Error() != "job already running" {
