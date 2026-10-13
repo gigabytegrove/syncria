@@ -1286,8 +1286,8 @@ func (a *App) updateStatus(w http.ResponseWriter,r *http.Request){
   _=json.NewEncoder(w).Encode(map[string]any{"current":appVersion})
   return
  }
- status:=cachedUpdateStatus(r.Context())
- if r.URL.Query().Get("refresh")=="1" {status=refreshedUpdateStatus(r.Context())}
+ var status map[string]any
+ if r.URL.Query().Get("refresh")=="1" {status=refreshedUpdateStatus(r.Context())} else {status=cachedUpdateStatus(r.Context())}
  _=json.NewEncoder(w).Encode(status)
 }
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
