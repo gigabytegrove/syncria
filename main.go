@@ -1266,7 +1266,8 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 		Accounts                                      []Account
 		Jobs                                          []Job
 		Shares                                        []StorageShare
-	}{appVersion, r.URL.Query().Get("msg"), cfg.OAuthID, base, base + "/oauth/callback", cfg.PasswordHash != "", a.authenticated(r), cfg.Accounts, cfg.Jobs, cfg.Shares}
+        Metrics DashboardTotals
+	}{appVersion, r.URL.Query().Get("msg"), cfg.OAuthID, base, base + "/oauth/callback", cfg.PasswordHash != "", a.authenticated(r), cfg.Accounts, cfg.Jobs, cfg.Shares, summarizeMetrics(cfg.Jobs)}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -1350,6 +1351,8 @@ func main() {
 	mux.HandleFunc("/api/shares/action", a.shareAction)
 	mux.HandleFunc("/api/shares/discover", a.shareDiscover)
 	mux.HandleFunc("/api/dashboard/status", a.dashboardStatus)
+	mux.HandleFunc("/api/wizard/verify", a.verifyWizard)
+	mux.HandleFunc("/api/shares/verify", a.verifyNetworkStorage)
 	mux.HandleFunc("/action", a.action)
 	mux.HandleFunc("/oauth/start", a.oauthStart)
 	mux.HandleFunc("/oauth/callback", a.oauthCallback)
