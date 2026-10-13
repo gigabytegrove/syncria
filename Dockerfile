@@ -2,7 +2,7 @@
 FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS build
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
-ARG APP_VERSION=0.1.0-alpha
+ARG APP_VERSION=v0.4.0
 WORKDIR /src
 COPY go.mod ./
 COPY *.go ./
