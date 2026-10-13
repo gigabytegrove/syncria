@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-var appVersion = "v0.4.0"
+var appVersion = "v0.4.1"
 const folderMime = "application/vnd.google-apps.folder"
 const scope = "https://www.googleapis.com/auth/drive"
 
@@ -87,6 +87,9 @@ type Config struct {
 }
 type App struct {
 	mu     sync.Mutex
+    updateMu sync.Mutex
+    updateBusy bool
+    updateProgress UpdateProgress
 	runs   sync.Map
 	cfg    Config
 	file   string
@@ -1341,6 +1344,7 @@ func main() {
 			log.Fatal(e)
 		}
 	}
+	a.reconcileUpdateOnStartup()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go a.scheduler(ctx)
@@ -1350,6 +1354,7 @@ func main() {
 	mux.HandleFunc("/assets/syncria-logo.svg", serveBrandLogo)
 	mux.HandleFunc("/api/browse/drive", a.browseDrive)
 	mux.HandleFunc("/api/update/status", a.updateStatus)
+    mux.HandleFunc("/api/update/progress", a.updateProgressAPI)
 	mux.HandleFunc("/api/update/manual", a.manualUpdate)
 	mux.HandleFunc("/api/browse/local", a.browseLocal)
 	mux.HandleFunc("/api/browse/local/create", a.createLocalFolder)
