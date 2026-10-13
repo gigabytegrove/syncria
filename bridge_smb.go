@@ -66,12 +66,14 @@ func (a *App) dialSMB(ctx context.Context,s StorageShare)(*directSMB,error){
  host,err:=validateDiscoveryIP(s.Server);if err!=nil{return nil,err}
  username,password,err:=a.smbCredentials(s.ID);if err!=nil{return nil,err}
  target:=net.JoinHostPort(host,strconv.Itoa(445))
+ conn,err:=(&net.Dialer{Timeout:8*time.Second}).DialContext(ctx,"tcp",target)
+ if err!=nil{return nil,fmt.Errorf("NAS SMB port 445 is unavailable: %w",err)}
  d:=&smb2.Dialer{Initiator:&smb2.NTLMInitiator{User:username,Password:password}}
- session,err:=d.Dial(ctx,target)
- if err!=nil{return nil,fmt.Errorf("SMB authentication failed or port 445 unavailable: %w",err)}
- fs,err:=session.Mount(s.Export)
- if err!=nil{session.Logoff();return nil,fmt.Errorf("SMB share unavailable: %w",err)}
- return &directSMB{session:session,share:fs.WithContext(ctx)},nil
+ session,err:=d.DialConn(ctx,conn,target)
+ if err!=nil{_ =conn.Close();return nil,fmt.Errorf("SMB authentication failed: %w",err)}
+ fs,err:=session.WithContext(ctx).Mount(s.Export)
+ if err!=nil{_ =session.Logoff();_ =conn.Close();return nil,fmt.Errorf("SMB share unavailable: %w",err)}
+ return &directSMB{socket:conn,session:session,share:fs.WithContext(ctx)},nil
 }
 func (s *directSMB) Close(){
  if s.share!=nil{_ =s.share.Umount()}
