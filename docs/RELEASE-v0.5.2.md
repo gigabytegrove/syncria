@@ -13,7 +13,7 @@ Syncria should help you keep your files together, even if you have never used a 
 3. How should the sync work?
 4. Do these choices look right?
 
-The normal options are already selected. Your new sync still starts turned **off**, so it cannot begin copying files before you turn it on.
+The normal options are already selected. Your new sync still starts turned **off**, so it does not copy files automatically. You can click **Turn on sync** or **Sync now** when you're ready.
 
 **Clearer choices for keeping two NAS boxes matched.** You can choose “one way” or “both ways.” If both boxes have different copies of the same file, Syncria explains its five existing choices in ordinary words.
 
