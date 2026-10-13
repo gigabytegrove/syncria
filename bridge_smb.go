@@ -96,6 +96,9 @@ func (s *directSMB) scan(ctx context.Context,root string)(map[string]smbObject,e
   seen:=map[string]bool{}
   for _,info:=range infos {
    name:=info.Name()
+   // Internal recovery files remain on the NAS for Undo and are never
+   // treated as ordinary files or a fatal scan error.
+   if name==".syncria-recovery" {continue}
    if !safeName(name){return fmt.Errorf("Unsafe NAS item name %q",name)}
    folded:=strings.ToLower(name);if seen[folded]{return fmt.Errorf("Case-colliding NAS filenames under %q",dir)}
    seen[folded]=true
