@@ -123,7 +123,7 @@ func (b *bridgeDropboxEndpoint) Scan(ctx context.Context)(map[string]bridgeEntry
   actual=strings.TrimPrefix(actual,"/")
   if actual==""{continue}
   rel,err:=safeRemotePath(actual);if err!=nil{return nil,fmt.Errorf("Dropbox entry %q: %w",actual,err)}
-  if strings.HasPrefix(rel,".syncria-recovery/"){continue}
+  if rel==".syncria-recovery"||strings.HasPrefix(rel,".syncria-recovery/"){continue}
   lower:=strings.ToLower(rel)
   if seen[lower]{return nil,fmt.Errorf("Dropbox case collision at %s",rel)}
   seen[lower]=true
@@ -217,22 +217,51 @@ func (b *bridgeDropboxEndpoint) Put(ctx context.Context,rel string,input io.Read
  modified,_:=time.Parse(time.RFC3339Nano,metadata.ServerModified)
  return bridgeEntry{ID:metadata.ID,Size:size,Fingerprint:metadata.ContentHash,Modified:modified},nil
 }
+// Dropbox recovery is a remote move into a reserved account folder. This
+// works for regular files AND whole folders without relying on revision
+// retention periods or writing a file payload on the Syncria host.
+func (b *bridgeDropboxEndpoint) ensureRecoveryFolder(ctx context.Context,folder string)error {
+ var entry dropboxFile
+ err:=b.app.dropboxAPI(ctx,b.account,"files/get_metadata",
+  map[string]any{"path":folder},&entry)
+ if err==nil {
+  if entry.Tag!="folder"{return fmt.Errorf("Dropbox recovery path %q is not a folder",folder)}
+  return nil
+ }
+ var out struct{Metadata dropboxFile `json:"metadata"`}
+ if createErr:=b.app.dropboxAPI(ctx,b.account,"files/create_folder_v2",
+  map[string]any{"path":folder,"autorename":false},&out);createErr!=nil{
+  return fmt.Errorf("Dropbox recovery directory unavailable: %w",createErr)
+ }
+ return nil
+}
 func (b *bridgeDropboxEndpoint) StageDelete(ctx context.Context,rel,jobID string)(string,error){
- f,ok:=b.files[rel];if !ok{return "",errors.New("Dropbox item unavailable")}
- if f.Tag=="folder"{return "",errors.New("Dropbox folder recovery needs provider support; no deletion performed")}
- if f.Rev==""{return "",errors.New("Dropbox revision unavailable; cannot guarantee restore")}
+ if _,exists:=b.files[rel];!exists{return "",errors.New("Dropbox item not in the current scan")}
  full,err:=b.fullPath(rel);if err!=nil{return "",err}
- if err=b.app.dropboxAPI(ctx,b.account,"files/delete_v2",map[string]any{"path":full},nil);err!=nil{return "",err}
- return f.Rev,nil
+ if err=b.ensureRecoveryFolder(ctx,"/.syncria-recovery");err!=nil{return "",err}
+ jobFolder:="/.syncria-recovery/"+jobID
+ if err=b.ensureRecoveryFolder(ctx,jobFolder);err!=nil{return "",err}
+ token:=jobFolder+"/"+newID()
+ var output struct{Metadata dropboxFile `json:"metadata"`}
+ if err=b.app.dropboxAPI(ctx,b.account,"files/move_v2",
+  map[string]any{"from_path":full,"to_path":token,"autorename":false},&output);err!=nil{return "",err}
+ if output.Metadata.ID==""{return "",errors.New("Dropbox did not confirm the recovery move")}
+ return token,nil
 }
 func (b *bridgeDropboxEndpoint) Restore(ctx context.Context,rel,token string)error{
+ if !strings.HasPrefix(token,"/.syncria-recovery/"){return errors.New("Invalid Dropbox recovery token")}
  full,err:=b.fullPath(rel);if err!=nil{return err}
- return b.app.dropboxAPI(ctx,b.account,"files/restore",map[string]any{"path":full,"rev":token},nil)
+ var output struct{Metadata dropboxFile `json:"metadata"`}
+ return b.app.dropboxAPI(ctx,b.account,"files/move_v2",
+  map[string]any{"from_path":token,"to_path":full,"autorename":false},&output)
 }
 func (b *bridgeDropboxEndpoint) Purge(ctx context.Context,token string)error{
- // Dropbox retains deleted revisions per the account's own retention policy.
- // Syncria's ten-minute *Undo* authorization expires independently.
- return nil
+ if !strings.HasPrefix(token,"/.syncria-recovery/"){return errors.New("Invalid Dropbox recovery token")}
+ // Dropbox may retain an additional provider-managed deleted version.
+ // Syncria's 10-minute Undo window ends once the remote recovery item
+ // is removed from its reserved recovery location.
+ return b.app.dropboxAPI(ctx,b.account,"files/delete_v2",
+  map[string]any{"path":token},nil)
 }
 func (b *bridgeDropboxEndpoint) Delete(ctx context.Context,rel string)error{
  full,err:=b.fullPath(rel);if err!=nil{return err}
