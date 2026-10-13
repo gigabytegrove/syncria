@@ -136,6 +136,9 @@ type Config struct {
 	Shares       []StorageShare `json:"shares,omitempty"`
 }
 type App struct {
+    // Serialize remote writers, including a shared designated cloud NAS
+    // and its downstream NAS-to-NAS relationship.
+    bridgeSyncMu sync.Mutex
 	mu     sync.Mutex
     updateMu sync.Mutex
     updateBusy bool
@@ -654,7 +657,9 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     var err error
     switch job.Provider {
     case "bridge","nas_bridge":
+      a.bridgeSyncMu.Lock()
       err=a.syncBridge(ctx,&job)
+      a.bridgeSyncMu.Unlock()
     case "storage":
       err=a.executeStorage(ctx,&job)
     case "","google_drive":
