@@ -1226,7 +1226,12 @@ func (a *App) oauthCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, e.Error(), 500)
 		return
 	}
-	redirect(w, r, "Google account connected")
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+    _, verifyErr := a.folderChildren(ctx, profile.Sub, "root")
+    cancel()
+    message := "Google account connected and Drive access verified"
+    if verifyErr != nil {message = "Google account connected, but Drive verification failed: "+verifyErr.Error()}
+    http.Redirect(w,r,"/?msg="+url.QueryEscape(message)+"#accounts",http.StatusSeeOther)
 }
 
 var ui = template.Must(template.New("app").Parse(newUI))
