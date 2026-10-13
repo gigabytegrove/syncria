@@ -17,7 +17,7 @@ You don't need to know networking terms to use Syncria's everyday screens. Once 
 3. **My Syncs → Set up a sync:** Choose **where your files are now**, **where copies should go**, and **how often Syncria should check**. Read the final summary and save it.
 4. **Turn on sync:** New syncs start **off**, so nothing is copied until you decide to start.
 
-For pictures and explanations of common choices, read [Getting Started](docs/GETTING-STARTED.md).
+For examples and explanations of common choices, read [Getting Started](docs/GETTING-STARTED.md).
 
 ## What can Syncria do?
 
