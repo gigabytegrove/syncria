@@ -43,7 +43,7 @@ func TestDiscoveryTCPProbe(t *testing.T){
  }
 }
 func TestNASBrowserIgnoresStaleRequests(t *testing.T){
- if !strings.Contains(newUI,"pickSeq++")||!strings.Contains(newUI,"if(seq!==pickSeq)") {
+ if !strings.Contains(newUI,"pickSeq++")||!strings.Contains(newUI,"if(sequence!==pickSeq)") {
   t.Fatal("Remote folder browser must ignore stale responses after selecting another folder")
  }
 }
