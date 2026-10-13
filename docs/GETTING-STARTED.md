@@ -37,7 +37,7 @@ Open **My Syncs** and click **Set up a sync**. Answer four simple questions:
 
 **Does everything look right?** Read the summary and save.
 
-Your new sync starts **turned off**. Nothing is copied until you click **Turn on sync**. You can use **Sync now** to ask Syncria to check right away.
+Your new sync starts **turned off**. Files will not be copied automatically until you click **Turn on sync**. You can also click **Sync now** to start a copy immediately, even if the sync is turned off.
 
 ## Examples
 
