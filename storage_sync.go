@@ -93,8 +93,9 @@ func (a *App) executeStorage(ctx context.Context, j *Job) error {
     next := make(map[string]Item, len(union))
     for k,v := range j.State { next[k] = v }
     var uploaded, downloaded int64
-    for _, rel := range keys {
+    for i, rel := range keys {
         if err := ctx.Err(); err != nil { return err }
+        if j.itemHook!=nil{j.itemHook(int64(i+1),int64(len(keys)),rel)}
         src, hasSource := sources[rel]
         dst, hasTarget := targets[rel]
         prior, tracked := j.State[rel]
