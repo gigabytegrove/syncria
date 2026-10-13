@@ -12,6 +12,7 @@ import (
  "path"
  "strconv"
  "strings"
+ "time"
 
  smb2 "github.com/cloudsoda/go-smb2"
 )
@@ -81,6 +82,7 @@ type smbObject struct {
  File bool
  Size int64
  Fingerprint string
+ Modified time.Time
 }
 func (s *directSMB) scan(ctx context.Context,root string)(map[string]smbObject,error){
  root,err:=safeRemotePath(root);if err!=nil{return nil,err}
@@ -101,7 +103,7 @@ func (s *directSMB) scan(ctx context.Context,root string)(map[string]smbObject,e
    childRel:=path.Join(rel,name)
    child,err:=joinRemotePath(root,childRel);if err!=nil{return err}
    if len(found)>100000{return errors.New("NAS listing exceeds 100,000 objects")}
-   found[childRel]=smbObject{File:!info.IsDir(),Size:info.Size(),Fingerprint:fmt.Sprintf("%d:%d",info.Size(),info.ModTime().UnixNano())}
+   found[childRel]=smbObject{File:!info.IsDir(),Size:info.Size(),Fingerprint:fmt.Sprintf("%d:%d",info.Size(),info.ModTime().UnixNano()),Modified:info.ModTime()}
    if info.IsDir(){if err:=walk(child,childRel,depth+1);err!=nil{return err}}
   }
   return nil
