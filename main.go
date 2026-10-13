@@ -658,12 +658,13 @@ func (a *App) execute(ctx context.Context, j *Job) error {
 		all[k] = v
 	}
 	keys := sortedKeys(all, false)
-	for _, rel := range keys {
+	for i, rel := range keys {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
+		if j.itemHook!=nil{j.itemHook(int64(i),int64(len(keys)),rel)}
 		rv, hasR := remote[rel]
 		lv, hasL := local[rel]
 		pv, tracked := next[rel]
@@ -696,6 +697,7 @@ func (a *App) execute(ctx context.Context, j *Job) error {
 					delete(next, rel)
 					changed[rel] = true
 					count["local_recovery"]++
+                    if j.itemHook!=nil{j.itemHook(int64(i+1),int64(len(keys)),rel)}
 					continue
 				}
 				parent := j.RemoteID
@@ -714,6 +716,7 @@ func (a *App) execute(ctx context.Context, j *Job) error {
 			default:
 				delete(next, rel)
 			}
+            if j.itemHook!=nil{j.itemHook(int64(i+1),int64(len(keys)),rel)}
 			continue
 		}
 		switch {
@@ -723,6 +726,7 @@ func (a *App) execute(ctx context.Context, j *Job) error {
 			}
 			if lv.LocalMD5 == rv.MD5Checksum {
 				next[rel] = Item{ID: rv.ID, MD5: rv.MD5Checksum, LocalMD5: lv.LocalMD5}
+                if j.itemHook!=nil{j.itemHook(int64(i+1),int64(len(keys)),rel)}
 				continue
 			}
 			if !tracked {
@@ -806,6 +810,7 @@ func (a *App) execute(ctx context.Context, j *Job) error {
 			_ = a.save()
 		}
 		a.mu.Unlock()
+        if j.itemHook!=nil{j.itemHook(int64(i+1),int64(len(keys)),rel)}
 	}
 	j.State = next
 	parts := []string{}
