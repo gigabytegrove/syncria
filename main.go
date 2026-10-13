@@ -35,6 +35,13 @@ var appVersion = "v0.5.0-alpha"
 const folderMime = "application/vnd.google-apps.folder"
 const scope = "https://www.googleapis.com/auth/drive"
 
+type DropboxAccount struct {
+ ID string `json:"id"`
+ Email string `json:"email"`
+ RefreshToken string `json:"refresh_token"`
+ AccessToken string `json:"access_token"`
+ Expires time.Time `json:"expires"`
+}
 type Account struct {
 	ID           string    `json:"id"`
 	Email        string    `json:"email"`
@@ -64,6 +71,10 @@ type PendingDeletion struct {
 }
 type Job struct {
     RelationshipType string `json:"relationship_type,omitempty"`
+    CloudProvider string `json:"cloud_provider,omitempty"`
+    DropboxAccountID string `json:"dropbox_account_id,omitempty"`
+    CloudOriginHashes map[string]string `json:"cloud_origin_hashes,omitempty"`
+    CrossNASPropagation bool `json:"cross_nas_propagation,omitempty"`
     NASSourceID string `json:"nas_source_id,omitempty"`
     NASSourceFolder string `json:"nas_source_folder,omitempty"`
     NASDestinations []NASDestination `json:"nas_destinations,omitempty"`
@@ -109,6 +120,9 @@ type Config struct {
 	OAuthID      string    `json:"oauth_id"`
 	OAuthSecret  string    `json:"oauth_secret"`
 	BaseURL      string    `json:"base_url"`
+    DropboxOAuthID string `json:"dropbox_oauth_id,omitempty"`
+    DropboxOAuthSecret string `json:"dropbox_oauth_secret,omitempty"`
+    DropboxAccounts []DropboxAccount `json:"dropbox_accounts,omitempty"`
 	Accounts     []Account `json:"accounts"`
 	Jobs         []Job     `json:"jobs"`
 	Shares       []StorageShare `json:"shares,omitempty"`
@@ -606,6 +620,8 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
       job.PairStates[key]=clone
     }
     job.PendingDeletions=append([]PendingDeletion(nil),j.PendingDeletions...)
+    job.CloudOriginHashes=make(map[string]string,len(j.CloudOriginHashes))
+    for k,v:=range j.CloudOriginHashes{job.CloudOriginHashes[k]=v}
 
     a.mu.Unlock()
     a.setSyncProgress(jobID,func(p *SyncProgress){*p=SyncProgress{Phase:"scanning",Running:true,Started:time.Now()}})
@@ -648,6 +664,7 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
 		actual.State = job.State
         actual.PairStates = job.PairStates
         actual.PendingDeletions = job.PendingDeletions
+        actual.CloudOriginHashes=job.CloudOriginHashes
 		_ = a.save()
 	}
     a.mu.Unlock()
@@ -1450,6 +1467,8 @@ func main() {
 	mux.HandleFunc("/action", a.action)
 	mux.HandleFunc("/oauth/start", a.oauthStart)
 	mux.HandleFunc("/oauth/callback", a.oauthCallback)
+    mux.HandleFunc("/oauth/dropbox/start",a.dropboxOAuthStart)
+    mux.HandleFunc("/oauth/dropbox/callback",a.dropboxOAuthCallback)
 	server := &http.Server{Addr: *listen, Handler: mux, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 1 << 20}
 	log.Printf("Syncria %s listening on %s (data: %s, OS: %s)", appVersion, *listen, dir, runtime.GOOS)
 	if e := server.ListenAndServe(); e != nil && e != http.ErrServerClosed {
