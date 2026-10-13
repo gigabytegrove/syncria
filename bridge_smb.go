@@ -165,7 +165,18 @@ func (s *directSMB) put(ctx context.Context,root,rel string,source io.Reader,exp
  // Renaming a completed staging file is performed on the NAS. Existing
  // destination files are never removed first; if the NAS disallows
  // replacement the operation fails safely rather than deleting user data.
- if err=s.share.Rename(temp,dest);err!=nil{return fmt.Errorf("NAS commit failed (original preserved): %w",err)}
+ previous:=""
+ if _,e:=s.share.Stat(dest);e==nil {
+  previous=dest+".syncria-old-"+newID()
+  if err=s.share.Rename(dest,previous);err!=nil{return fmt.Errorf("Cannot safely preserve existing NAS file: %w",err)}
+ }
+ if err=s.share.Rename(temp,dest);err!=nil{
+  if previous!="" {
+   if restoreErr:=s.share.Rename(previous,dest);restoreErr!=nil{return fmt.Errorf("NAS commit failed and previous file could not be restored at %s: %v / %v",dest,err,restoreErr)}
+  }
+  return fmt.Errorf("NAS commit failed; original preserved: %w",err)
+ }
+ if previous!="" { _=s.share.Remove(previous) }
  complete=true
  return nil
 }
