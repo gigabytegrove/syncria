@@ -378,6 +378,7 @@ async function verifyConnectedAccount(id,button){
 }
 let updatePollingBusy=false,updateSubmitting=false,updateRunning=false,updateInstallAvailable=false;
 let lastUpdatePhase='idle',lastUpdateLog='',lastConfirmedUpdateStatus='';
+let manualUploadInProgress=false;
 const updatePhaseTitles={
  checking:'Checking published release',manifest:'Reading release checksums',
  receiving:'Receiving manual update',downloading:'Downloading exact executable',
@@ -447,7 +448,7 @@ function renderUpdateProgress(p){
  set('updateVerifiedBytes',verified>0||verificationTotal>0?formatBytes(verified)+(verificationTotal>0?' / '+formatBytes(verificationTotal):''):'Not started');
  const secs=Math.max(0,Number(p.elapsed_seconds||0));
  set('updateElapsed',Math.floor(secs/60)+'m '+Math.floor(secs%60)+'s');
- setUpdateProgressBar(phase,phase==='verifying'?verified:bytes,phase==='verifying'?verificationTotal:total);
+ if(!(manualUploadInProgress&&phase==='receiving')){setUpdateProgressBar(phase,phase==='verifying'?verified:bytes,phase==='verifying'?verificationTotal:total);}
  const error=$('updateError');
  if(error){
   error.classList.toggle('hidden',phase!=='failed');
@@ -552,7 +553,7 @@ async function submitManualUpdate(event){
  if(!confirm('Install the selected executable after verifying its SHA256SUMS?'))return false;
  navigate('updates');
  const form=event.currentTarget,button=$('manualUpdateButton');
- updateSubmitting=true;button.disabled=true;
+ updateSubmitting=true;manualUploadInProgress=true;button.disabled=true;
  $('updateFlow').classList.remove('hidden');
  $('updatePhaseTitle').textContent='Submitting manual update';
  $('updateProgressMessage').textContent='Uploading the selected executable to Syncria.';
@@ -573,7 +574,7 @@ async function submitManualUpdate(event){
  }catch(error){
   $('updatePhaseTitle').textContent='Manual update request failed';
   $('updateError').textContent=error.message;$('updateError').classList.remove('hidden');
- }finally{updateSubmitting=false;button.disabled=false;await pollUpdateProgress();}
+ }finally{manualUploadInProgress=false;updateSubmitting=false;button.disabled=false;await pollUpdateProgress();}
  return false;
 }
 setInterval(pollUpdateProgress,1000);
