@@ -2,16 +2,11 @@
 
 **Pronunciation:** Sink-Re-Ah. **Default local web UI:** `http://127.0.0.1:9764` (configurable with `-listen`). The repository and Go module are named `syncria`. Existing default data directories may retain the historical `gdsync` name to preserve configurations during upgrades. Restart the agent after upgrading; existing instances launched with an explicit `-listen` argument continue using that chosen port.
 
-A lightweight, self-hosted, **experimental** cloud and filesystem synchronization agent written in Go. Single binary, embedded browser UI, no external database, and no JavaScript build tool. Suitable for Windows and Linux (including servers with mounted NAS shares).
+A lightweight, self-hosted cloud and NAS synchronization agent written in Go. Single binary, embedded browser UI, no external database, and no JavaScript build tool. Suitable for Windows and Linux (including servers with mounted NAS shares).
 
-> **Alpha warning:** This version has not been live-tested with Google Drive accounts. Make backups before enabling synchronization. Native Google Docs/Sheets/Slides, shortcuts, shared drives, files with duplicate names, and complicated rename/move scenarios are not fully supported. The agent **stops with a visible error** instead of silently processing unsupported Google-native formats. Do not use for your only copy of important data.
+> **Data safety:** Keep an independent backup when enabling a new relationship. Google-native Docs/Sheets/Slides, shortcuts, shared drives, and complex rename/move cases may require separate handling. Syncria stops rather than treating unsupported cloud items as ordinary files. Remote account and NAS permissions are specific to your environment.
 
-## Syncria v0.5.0 — streaming bridge (development, not yet released)
-
-**Status:** Work in progress on branch `syncria-v0.5.0-work`. The latest
-published v0.4.1 release is not this build. **Do not enable these changes
-against irreplaceable data until tests and real SMB/Google/Dropbox transfer
-verification have completed.**
+## Syncria v0.5.0 — streaming cloud/NAS bridge
 
 Syncria is **not a storage server**. Its Docker deployment keeps only
 credentials, synchronization indexes, activity and updater state under
@@ -65,12 +60,10 @@ available in Syncria for 10 minutes when supported; the cloud provider
 may retain deleted revisions beyond that time under its own policy.
 No synchronized file content is stored in Syncria's `/data`.
 
-**Safe verification:** run `scripts/verify-v0.5.0.sh` on a trusted
-Docker builder. It clones the development branch into temporary storage,
-runs the Go tests and vet, and builds a throwaway executable. It does
-**not** connect to cloud/NAS endpoints, install a runtime update, or
-publish a GitHub release. End-to-end NAS and cloud tests are still
-needed before marking v0.5.0 stable.
+**Updates:** Open **Updates → Check again → Install latest** in the existing
+Syncria dashboard. Syncria verifies the published binary and checksum
+and restarts inside its existing container. GHCR images, Docker Compose
+and standalone binaries remain alternative installation methods.
 
 ## Zero1Local companion — coming soon
 
