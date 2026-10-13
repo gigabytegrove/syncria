@@ -124,7 +124,7 @@ func (a *App) reconcileUpdateOnStartup() {
  var p UpdateProgress
  if json.Unmarshal(b,&p)!=nil{return}
  if p.Active {
-  if p.Phase=="restarting" && ((p.Operation=="install"&&p.Target==appVersion)||(p.Operation=="rollback"&&p.From!=appVersion)) {
+  if p.Phase=="restarting" && ((p.Operation=="install"&&p.Target==appVersion)||(p.Operation=="rollback"&&p.From!=appVersion)||p.Operation=="manual") {
    p.Phase="complete";p.Percent=100;p.Message="Verified running version "+appVersion+"; update successful";p.Error="";p.Active=false
    p.Events=append(p.Events,UpdateEvent{At:time.Now().UTC(),Phase:"complete",Detail:"Application responded as "+appVersion+" after restart"})
   }else{
