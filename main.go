@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-var appVersion = "v0.4.1"
+var appVersion = "v0.5.0-alpha"
 const folderMime = "application/vnd.google-apps.folder"
 const scope = "https://www.googleapis.com/auth/drive"
 
@@ -50,6 +50,8 @@ type Item struct {
 	Folder   bool   `json:"folder"`
 }
 type Job struct {
+    NASShareID string `json:"nas_share_id,omitempty"`
+    NASFolder string `json:"nas_folder,omitempty"`
     ScheduleMode string `json:"schedule_mode,omitempty"`
     progressHook func(up,down,upBytes,downBytes int64) `json:"-"`
     itemHook func(processed,total int64,current string) `json:"-"`
@@ -590,7 +592,9 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     job.LastUploads, job.LastDownloads = 0, 0
     job.LastUploadBytes, job.LastDownloadBytes = 0, 0
     var err error
-    if job.Provider == "storage" {
+    if job.Provider == "bridge" {
+        err = a.syncBridge(ctx,&job)
+    } else if job.Provider == "storage" {
         err = a.executeStorage(ctx, &job)
     } else if job.Provider == "" || job.Provider == "google_drive" {
         err = a.execute(ctx, &job)
@@ -1003,7 +1007,10 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		redirect(w, r, "OAuth settings saved")
-	case "add_job":
+    case "add_bridge":
+        a.addBridge(w,r)
+        return
+    case "add_job":
         provider := strings.TrimSpace(r.FormValue("provider"))
         if provider == "" {provider = "google_drive"}
         if provider != "google_drive" && provider != "storage" {
@@ -1392,7 +1399,8 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go a.scheduler(ctx)
-	go a.restoreShares()
+    // Legacy kernel mount management is not part of the streaming bridge.
+    // Old connection definitions remain in config for explicit migration.
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.home)
 	mux.HandleFunc("/assets/syncria-logo.svg", serveBrandLogo)
@@ -1400,7 +1408,10 @@ func main() {
 	mux.HandleFunc("/api/update/status", a.updateStatus)
     mux.HandleFunc("/api/update/progress", a.updateProgressAPI)
 	mux.HandleFunc("/api/update/manual", a.manualUpdate)
-	mux.HandleFunc("/api/browse/local", a.browseLocal)
+    mux.HandleFunc("/api/browse/local", a.browseLocal)
+    mux.HandleFunc("/api/browse/nas", a.browseNAS)
+    mux.HandleFunc("/api/browse/nas/create", a.createNASFolder)
+    mux.HandleFunc("/api/nas/action", a.directNASAction)
 	mux.HandleFunc("/api/browse/local/create", a.createLocalFolder)
 	mux.HandleFunc("/api/shares/action", a.shareAction)
 	mux.HandleFunc("/api/shares/discover", a.shareDiscover)
