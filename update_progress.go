@@ -93,8 +93,14 @@ func (a *App) beginUpdate(operation string) error {
  now:=time.Now().UTC()
  p:=UpdateProgress{Phase:"checking",Operation:operation,From:appVersion,Message:"Checking release metadata",Percent:-1,Active:true,StartedAt:now,
  Events:[]UpdateEvent{{At:now,Phase:"checking",Detail:"Checking release metadata from GitHub Releases"}}}
- if operation=="rollback"{p.Phase="staging";p.Message="Restoring the saved previous executable";p.Percent=-1}
- if operation=="manual"{p.Phase="receiving";p.Message="Receiving the selected executable and SHA256SUMS";p.Percent=-1}
+ if operation=="rollback"{
+  p.Phase="staging";p.Message="Restoring the saved previous executable";p.Percent=-1
+  p.Events[0].Phase=p.Phase;p.Events[0].Detail=p.Message
+ }
+ if operation=="manual"{
+  p.Phase="receiving";p.Message="Receiving the selected executable and SHA256SUMS";p.Percent=-1
+  p.Events[0].Phase=p.Phase;p.Events[0].Detail=p.Message
+ }
  if err:=a.writeUpdateProgressLocked(p);err!=nil{return fmt.Errorf("cannot persist update progress: %w",err)}
  a.updateBusy=true
  return nil
