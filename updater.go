@@ -28,13 +28,20 @@ type githubTag struct { Name string `json:"name"` }
 
 // githubRetryAfter honors secondary limits and primary rate-limit reset headers.
 func githubRetryAfter(resp *http.Response) time.Duration {
- if resp.StatusCode!=403 && resp.StatusCode!=429{return 0}
+ // A generic 403 is not a rate limit. In particular a revoked optional
+ // GitHub token can return 403. Treating it as a one-hour cooldown prevents
+ // anonymous fallback and poisons every subsequent update check.
+ if resp.StatusCode!=http.StatusForbidden && resp.StatusCode!=http.StatusTooManyRequests{return 0}
+ limited:=resp.StatusCode==http.StatusTooManyRequests||resp.Header.Get("X-RateLimit-Remaining")=="0"
+ seconds,hasRetry:=strconv.Atoi(resp.Header.Get("Retry-After"))
+ if hasRetry==nil && seconds>0 {limited=true}
+ if !limited{return 0}
  wait:=time.Duration(0)
- if seconds,err:=strconv.Atoi(resp.Header.Get("Retry-After"));err==nil&&seconds>0{wait=time.Duration(seconds)*time.Second}
- if reset,err:=strconv.ParseInt(resp.Header.Get("X-RateLimit-Reset"),10,64);err==nil && resp.Header.Get("X-RateLimit-Remaining")=="0"{
+ if hasRetry==nil && seconds>0 {wait=time.Duration(seconds)*time.Second}
+ if reset,err:=strconv.ParseInt(resp.Header.Get("X-RateLimit-Reset"),10,64);err==nil&&resp.Header.Get("X-RateLimit-Remaining")=="0"{
   until:=time.Until(time.Unix(reset,0));if until>wait{wait=until}
  }
- if wait==0{wait=time.Hour}
+ if wait<=0 {wait=time.Minute}
  if wait>24*time.Hour{wait=24*time.Hour}
  return wait
 }
@@ -69,13 +76,15 @@ func releaseRequest(ctx context.Context, endpoint, accept string) (*http.Respons
  token:=strings.TrimSpace(os.Getenv("SYNCRIA_GITHUB_TOKEN"))
  resp,err:=request(token)
  if err!=nil{return nil,err}
- if resp.StatusCode==403 || resp.StatusCode==429 {recordGitHubThrottle(resp)}
- if token!="" && resp.StatusCode==http.StatusUnauthorized {
+ // An invalid or insufficiently scoped optional token must not prevent
+ // access to a publicly readable Syncria release. Retry once anonymously.
+ if token!="" && (resp.StatusCode==http.StatusUnauthorized || resp.StatusCode==http.StatusForbidden) {
   resp.Body.Close()
   resp,err=request("")
-  if err==nil&&(resp.StatusCode==403||resp.StatusCode==429){recordGitHubThrottle(resp)}
+  if err!=nil{return nil,err}
  }
- return resp,err
+ recordGitHubThrottle(resp)
+ return resp,nil
 }
 func githubAPIError(resp *http.Response, operation string) error {
  var body struct{Message string `json:"message"`}
