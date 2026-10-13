@@ -1,10 +1,8 @@
 name: Publish Syncria v0.5.1 for in-app updater
 
+# The v0.5.1 updater release has already been published and verified.
+# Later manual GHCR retries must not retrigger a tag/create release on push.
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/publish-v051.yml'
   workflow_dispatch:
 
 permissions:
@@ -115,6 +113,6 @@ jobs:
           push: true
           build-args: APP_VERSION=v0.5.1
           tags: |
-            ghcr.io/gigabytegrove/syncria:0.5.0
+            ghcr.io/gigabytegrove/syncria:0.5.1
             ghcr.io/gigabytegrove/syncria:v0.5.1
             ghcr.io/gigabytegrove/syncria:latest
