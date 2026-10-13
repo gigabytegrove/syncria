@@ -15,6 +15,7 @@ import (
  "sort"
  "strconv"
  "strings"
+ "time"
 )
 
 // A bridgeEndpoint exposes network operations without revealing local OS
@@ -23,6 +24,7 @@ type bridgeEntry struct {
  ID string
  Fingerprint string
  Size int64
+ Modified time.Time
  Folder bool
 }
 type bridgeEndpoint interface {
@@ -40,7 +42,7 @@ func (b *bridgeSMBEndpoint) Close(){if b.client!=nil{b.client.Close()}}
 func (b *bridgeSMBEndpoint) Scan(ctx context.Context)(map[string]bridgeEntry,error){
  files,err:=b.client.scan(ctx,b.root);if err!=nil{return nil,err}
  out:=make(map[string]bridgeEntry,len(files))
- for rel,f:=range files{out[rel]=bridgeEntry{Size:f.Size,Fingerprint:f.Fingerprint,Folder:!f.File}}
+ for rel,f:=range files{out[rel]=bridgeEntry{Size:f.Size,Fingerprint:f.Fingerprint,Folder:!f.File,Modified:f.Modified}}
  return out,nil
 }
 func (b *bridgeSMBEndpoint) Mkdir(ctx context.Context,rel string)(bridgeEntry,error){
@@ -56,7 +58,7 @@ func (b *bridgeSMBEndpoint) Put(ctx context.Context,rel string,source io.Reader,
  if err:=b.client.put(ctx,b.root,rel,source,size,expectedMD5,onBytes);err!=nil{return bridgeEntry{},err}
  target,err:=joinRemotePath(b.root,rel);if err!=nil{return bridgeEntry{},err}
  st,err:=b.client.share.Stat(target);if err!=nil{return bridgeEntry{},err}
- return bridgeEntry{Size:st.Size(),Fingerprint:fmt.Sprintf("%d:%d",st.Size(),st.ModTime().UnixNano())},nil
+ return bridgeEntry{Size:st.Size(),Fingerprint:fmt.Sprintf("%d:%d",st.Size(),st.ModTime().UnixNano()),Modified:st.ModTime()},nil
 }
 
 type bridgeDriveEndpoint struct {
@@ -75,7 +77,8 @@ func (b *bridgeDriveEndpoint) Scan(ctx context.Context)(map[string]bridgeEntry,e
   size,_:=strconv.ParseInt(f.Size,10,64)
   if f.MimeType==folderMime{b.folders[rel]=f.ID;out[rel]=bridgeEntry{ID:f.ID,Folder:true};continue}
   if f.MD5Checksum==""{return nil,fmt.Errorf("Google Drive file %q lacks a checksum; sync safely stopped",rel)}
-  out[rel]=bridgeEntry{ID:f.ID,Fingerprint:f.MD5Checksum,Size:size}
+  modified,_:=time.Parse(time.RFC3339Nano,f.ModifiedTime)
+  out[rel]=bridgeEntry{ID:f.ID,Fingerprint:f.MD5Checksum,Size:size,Modified:modified}
  }
  return out,nil
 }
