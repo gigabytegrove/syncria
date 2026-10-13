@@ -107,6 +107,7 @@ func (a *App) beginUpdate(operation string) error {
 }
 func (a *App) finishUpdate(phase,message,detail string) {
  a.setUpdateProgress(phase,message,"",func()int{if phase=="complete"{return 100};return -1}(),-1,-1,detail)
+ if detail!=""{a.updateEvent(phase,detail)}
  a.updateMu.Lock()
  a.updateBusy=false
  a.updateMu.Unlock()
