@@ -15,7 +15,7 @@ You don't need to know networking terms to use Syncria's everyday screens. Once 
 1. **Cloud Accounts:** If your files are in Google Drive or Dropbox, connect the account you use. If you're only copying between NAS boxes, skip this step.
 2. **My NAS Boxes:** Add the storage box you want to use. You'll need its network address, shared folder name, username and password.
 3. **My Syncs → Set up a sync:** Choose **where your files are now**, **where copies should go**, and **how often Syncria should check**. Read the final summary and save it.
-4. **Turn on sync:** New syncs start **off**, so nothing is copied until you decide to start.
+4. **Turn on sync:** New syncs start **off**, so they will not copy anything automatically. You can turn a sync on or choose **Sync now** when you're ready.
 
 For examples and explanations of common choices, read [Getting Started](docs/GETTING-STARTED.md).
 
