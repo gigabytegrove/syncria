@@ -22,23 +22,45 @@ This is a product roadmap, **not** a declaration that Google Drive sync or Zero1
 
 The original single-page dashboard markup has been deleted. The application now uses a separate `ui.go` template with a responsive sidebar, dedicated Overview, Sync relationships, Storage, Google accounts, Updates and Settings screens, connection-status cards, a modal Drive/local folder navigator, an isolated sync setup wizard, and network-share administration. The existing Go sync engine, saved accounts, credentials, and mappings remain compatible; this update is a **UI replacement**, not a configuration reset.
 
-The UI template includes regression tests in `ui_test.go`. Go compilation and tests must succeed in the self-hosted publisher before the release is offered for update. The default Docker deployment remains unprivileged; enabling NFS/SMB mounting requires the documented opt-in capabilities. Releasing v0.3.0 requires GitHub Release assets and GHCR images to publish successfully.
+The UI template includes regression tests in `ui_test.go`. Release builds must pass compilation and tests before binaries are published. The default Docker deployment remains unprivileged; enabling NFS/SMB mounting requires the documented opt-in capabilities. Only published release binaries are offered by the embedded updater.
 
-## One-time automatic publisher setup
+## In-app updates — no host updater service
 
-For recurring $0 releases, use the self-hosted publisher on a trusted dedicated Linux Docker host. It watches the source repository's `VERSION` file, not every commit. When the version changes, it runs Go tests, builds binaries, uploads a complete GitHub Release, and publishes a multiarchitecture GHCR image. Failed drafts can be resumed, and source-only changes do not trigger a release.
+Syncria updates **from inside the running application**, including Docker deployments.
+Open **Updates → Check again → Install latest**. The authenticated Go application
+checks published GitHub Releases, downloads the binary for its own OS/CPU, verifies
+it against the release `SHA256SUMS`, stages it in persistent `/data/runtime`,
+and activates it using the **existing launcher process in the same container**.
+Existing accounts, mappings, job history, storage mounts and runtime backups are
+preserved. **Rollback** also runs inside the application. No host systemd unit,
+sidecar, Docker socket, Docker management integration, or auxiliary update
+container is required.
 
-On the existing checkout of `gigabytegrove/syncria` on the publishing host, run `git pull --ff-only`, then `sudo bash scripts/install-publisher.sh`. Provide the GitHub username and a classic token authorized for public repo releases and GHCR publishing **once**. The installer stores credentials in root-only `/etc/syncria-publisher.env`, creates a systemd service/timer, and checks for new versions every 15 minutes. To publish immediately, run `sudo systemctl start syncria-publisher`. Diagnose failures with `sudo journalctl -u syncria-publisher -n 100 --no-pager`.
+A **source commit is not an installable release**. The updater deliberately does
+not execute arbitrary source code or build compilers inside the running production
+application. It will offer a new version only after a trusted maintainer publishes
+that version's platform binaries and checksum manifest as a GitHub Release.
 
-**Security:** This service runs automated builds from a trusted repository with access to Docker and a publishing token. Do not enable it for source you do not control. No billing account, GitHub-hosted Actions runner, or paid CI is required.
+Release creation is a **one-time maintainer/build action**, not an installed
+updater or scheduled host service. When explicitly publishing a version, a
+maintainer may run `scripts/publish-release.sh vMAJOR.MINOR.PATCH` from a
+trusted checkout with their own GitHub publishing credentials and local Docker
+toolchain. This builds and publishes the release **once**; it installs **nothing
+persistent** on the runtime host. Set `SYNCRIA_PUBLISH_GHCR=1` only when a
+multiarchitecture container image is also needed. Runtime installations
+do not need the maintainer's write credentials.
 
-## Zero-cost versioned releases (publisher host)
+The earlier optional `syncria-publisher.service`, timer, and
+`/etc/syncria-publisher.env` design was removed. On hosts where that optional
+legacy service was installed, stop and disable its timer and service, remove
+only their dedicated unit files and credentials, and reload systemd. This does
+not touch a running Syncria Docker container or its volumes.
 
-No GitHub Actions runner, hosted build account, credit card, or paid CI service is required. The repository contains `scripts/publish-release.sh`, which uses temporary Docker Go builders on a publisher host, creates a **GitHub Release** with versioned binaries and `SHA256SUMS`, pushes a multi-architecture GHCR image, then makes the GitHub Release visible. The updater reads published GitHub Releases, **not** source commits. Only run this script for changes ready to distribute.
-
-The publisher needs Docker Buildx, git, curl, Python 3, and a classic GitHub token authorized for public repository releases and GHCR package publishing. Use a trusted host such as `dockeradm` with `GITHUB_USER` set to the GitHub publisher's username, and run `bash scripts/publish-release.sh v0.2.0` from the checked-out source tree. The script prompts for a token without echoing it, and does not include NAS data, configuration, or OAuth state in build input.
-
-**Do not mistake a source commit for a release.** A feature is deployable via the in-app updater only after the publisher runs successfully, a GitHub Release is published with the matching assets, and the image is anonymously pullable. The old `latest` image remains unchanged until a publisher pushes a new one.
+**Release requirements:** for in-app installation, the GitHub Release must
+contain `syncria-<os>-<arch>` (plus `.exe` on Windows) and `SHA256SUMS`. A
+container image is not required for ordinary app updates; rebuilding a container
+is still appropriate when changing the base OS or launcher. The updater checks
+that synchronization is idle before installing.
 
 ## Managed NFS and SMB connections (opt-in)
 
@@ -136,7 +158,7 @@ This is an archive-based distribution, **not** an anonymously pullable GHCR imag
 
 ## Docker Compose (no build required)
 
-The published Docker image is `ghcr.io/gigabytegrove/syncria:latest` (linux/amd64 and linux/arm64). The automated GitHub Actions image publishing workflow was removed because runner jobs are blocked by account billing. The GHCR image is not currently published. Until an image is published independently of Actions, use the offline image archive described above instead of `docker compose pull`.
+The configured Docker image is `ghcr.io/gigabytegrove/syncria:latest` (linux/amd64 and linux/arm64). GitHub source commits do not automatically rebuild or publish this image. Use `docker compose pull` only after confirming that an image was actually published; ordinary application upgrades use the Updates screen and do not require an image pull.
 
 Create a Compose deployment using the repository's `compose.yaml` with the following environment values:
 
@@ -149,9 +171,9 @@ docker compose pull
 docker compose up -d
 ```
 
-Do not add a `build:` block. All Google account and Google Drive sync mappings are created and changed from the Syncria dashboard. For example, the host path `/mnt/nas1/photos` appears at `/storage/nas1/photos` inside the container.
+The runtime deployment does not need a `build:` block for normal application updates. All accounts and relationships are created and changed from the Syncria dashboard. For example, the host path `/mnt/nas1/photos` appears at `/storage/nas1/photos` inside the container.
 
-**Docker isolation limitation:** the app cannot mount arbitrary host paths or unmounted SMB/NFS shares from its web UI. The storage root must already exist on the Docker host and contain the shares. Adding genuinely new SMB/NFS network mounts from the UI requires additional mount-management features not implemented yet. Do not grant Docker socket or privileged access to work around this.
+**Docker isolation limitation:** the app cannot access arbitrary host paths outside the configured storage root. Existing host-mounted SMB/NFS shares are selectable within that root. Syncria also offers opt-in managed mounts on Linux, requiring explicit OS mount capabilities; the default container deliberately lacks those privileges. Never grant Docker socket access for updating Syncria.
 
 The image includes the runtime launcher and uses `/data/runtime/current` for built-in app updates, so future app updates do not require a new container image. Security updates to the base image or launcher still require an image pull/recreate.
 
