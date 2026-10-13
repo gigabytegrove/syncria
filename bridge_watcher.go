@@ -3,7 +3,6 @@ package main
 import (
  "bufio"
  "context"
- "errors"
  "io"
  "log"
  "os"
@@ -119,4 +118,3 @@ func (a *App) monitorSMBChanges(ctx context.Context,share StorageShare,folder st
  }
 }
 
-var _=errors.New
