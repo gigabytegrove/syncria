@@ -285,7 +285,7 @@ func (a *App) browseDropbox(w http.ResponseWriter,r *http.Request){
  ctx,cancel:=context.WithTimeout(r.Context(),30*time.Second);defer cancel()
  files,err:=a.dropboxList(ctx,id,root,false);if err!=nil{http.Error(w,err.Error(),502);return}
  response:=browseResponse{Path:root,Entries:[]browseEntry{}}
- if root!=""{parent:=path.Dir(root);if parent=="/"{parent=""};response.Parent=parent}
+ if root!=""{parent:=path.Dir(root);if parent=="/"{parent="/"};response.Parent=parent}
  for _,f:=range files{
   if f.Tag!="folder"||!safeName(f.Name){continue}
   response.Entries=append(response.Entries,browseEntry{Name:f.Name,ID:f.PathDisplay,Kind:"folder"})
