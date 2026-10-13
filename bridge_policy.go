@@ -64,6 +64,28 @@ func validNASPolicy(s string)bool{
  return false
 }
 func enabledByDefault(flag *bool)bool{return flag==nil||*flag}
+func isFirstCloudTarget(j *Job,key string)bool{
+ if j.Provider!="bridge"{return false}
+ provider:=j.CloudProvider;if provider==""{provider="google_drive"}
+ account:=j.AccountID;if provider=="dropbox"{account=j.DropboxAccountID}
+ dests:=j.NASDestinations
+ if len(dests)==0&&j.NASShareID!=""{dests=[]NASDestination{{ShareID:j.NASShareID,Folder:j.NASFolder}}}
+ if len(dests)==0{return false}
+ return key==relationPairKey(provider+":"+account+":"+j.RemoteID,dests[0])
+}
+func recordCloudOrigin(j *Job,key,rel,fingerprint string){
+ if !isFirstCloudTarget(j,key)||j.CrossNASPropagation{return}
+ if j.CloudOriginHashes==nil{j.CloudOriginHashes=map[string]string{}}
+ j.CloudOriginHashes[rel]=fingerprint
+}
+func suppressCrossNASTransfer(j *Job,key,rel string,cloud bridgeEntry,hasCloud bool,oneWay bool)bool{
+ if !oneWay||j.Provider!="bridge"||j.CrossNASPropagation||isFirstCloudTarget(j,key){return false}
+ previous:=j.CloudOriginHashes[rel]
+ if previous==""{return false}
+ if !hasCloud{return previous=="__deleted__"}
+ return previous==cloud.Fingerprint
+}
+
 func relationPairKey(source string,dest NASDestination)string {
  return source+"|"+dest.ShareID+"|"+dest.Folder
 }
@@ -96,6 +118,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
   if isPending(j,key,rel){continue}
   if j.itemHook!=nil{j.itemHook(int64(i),int64(len(ordered)),rel)}
   l,hasL:=left[rel];r,hasR:=right[rel];prior,tracked:=prev[rel]
+  if suppressCrossNASTransfer(j,key,rel,l,hasL,oneWay){continue}
   if !hasL&&!hasR{delete(next,rel);continue}
   if hasL&&hasR&&l.Folder!=r.Folder{return fmt.Errorf("Folder/file type conflict: %s",rel)}
   if tracked&&(!hasL||!hasR){
@@ -138,6 +161,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    }
    delete(next,rel)
    j.PairStates[key]=next
+   if j.Provider=="bridge"&&hasL==false{recordCloudOrigin(j,key,rel,"__deleted__")}
    if err=a.checkpointBridge(j);err!=nil{return err}
    continue
   }
@@ -153,6 +177,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    l,err=bridgeCopy(ctx,secondary,primary,rel,"",func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
    if err!=nil{return err}
    recordTransfer(j,false,bytes);countBack++
+   recordCloudOrigin(j,key,rel,l.Fingerprint)
   }else if !hasR{
    var bytes int64
    lChecksum:=""
@@ -191,6 +216,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     l,err=bridgeCopy(ctx,secondary,primary,rel,"",func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes,j.LastDownloadBytes+n)}})
     if err!=nil{return err}
     recordTransfer(j,false,bytes);countBack++
+   recordCloudOrigin(j,key,rel,l.Fingerprint)
    }
   }
   next[rel]=Item{ID:l.ID,MD5:l.Fingerprint,LocalMD5:r.Fingerprint}
