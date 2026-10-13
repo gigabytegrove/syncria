@@ -133,6 +133,7 @@ type driveFile struct {
 	MD5Checksum string   `json:"md5Checksum"`
 	Parents     []string `json:"parents"`
 	Size        string   `json:"size"`
+    ModifiedTime string `json:"modifiedTime"`
 }
 type tokenResponse struct {
 	AccessToken      string `json:"access_token"`
@@ -304,7 +305,7 @@ func (a *App) folderChildren(ctx context.Context, acc, parent string) ([]driveFi
 	for {
 		q := url.Values{}
 		q.Set("q", fmt.Sprintf("'%s' in parents and trashed = false", strings.ReplaceAll(parent, "'", "\\'")))
-		q.Set("fields", "nextPageToken,files(id,name,mimeType,md5Checksum,parents,size)")
+		q.Set("fields", "nextPageToken,files(id,name,mimeType,md5Checksum,parents,size,modifiedTime)")
 		q.Set("pageSize", "1000")
 		if page != "" {
 			q.Set("pageToken", page)
@@ -325,7 +326,7 @@ func (a *App) folderChildren(ctx context.Context, acc, parent string) ([]driveFi
 	return items, nil
 }
 func safeName(n string) bool {
-	return n != "" && n != "." && n != ".." && !strings.ContainsAny(n, "/\\\x00") && n != ".sync-agent-trash" && n != ".DS_Store"
+	return n != "" && n != "." && n != ".." && !strings.ContainsAny(n, "/\\\x00") && n != ".sync-agent-trash" && n != ".syncria-recovery" && n != ".DS_Store"
 }
 func (a *App) remoteTree(ctx context.Context, acc, root string) (map[string]driveFile, error) {
 	res := map[string]driveFile{}
