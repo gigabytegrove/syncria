@@ -71,12 +71,13 @@ func (a *App) setUpdateProgress(phase,message,target string,percent int,download
  }
  if target!=""{p.Target=target}
  if percent>=0{p.Percent=percent}
- if downloaded>=0{p.Downloaded=downloaded}
- if total>=0{p.Total=total}
- if phase=="verifying"&&downloaded>=0 {p.VerifiedBytes=downloaded}
- if phase=="verifying"&&total>=0 {p.VerifiedTotal=total}
- if phase!="verifying"&&downloaded>=0{p.Downloaded=downloaded}
- if phase!="verifying"&&total>=0{p.Total=total}
+ if phase=="verifying"{
+  if downloaded>=0 {p.VerifiedBytes=downloaded}
+  if total>=0 {p.VerifiedTotal=total}
+ }else if phase=="downloading"{
+  if downloaded>=0{p.Downloaded=downloaded}
+  if total>=0{p.Total=total}
+ }
  p.Error=detail
  p.Active=phase!="complete"&&phase!="failed"&&phase!="idle"
  if err:=a.writeUpdateProgressLocked(p);err!=nil{log.Printf("cannot save Syncria update progress: %v",err)}
