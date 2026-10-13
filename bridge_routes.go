@@ -103,6 +103,24 @@ func relationshipOverlap(left,right NASDestination)bool{
  a:=path.Join("/",left.Folder);b:=path.Join("/",right.Folder)
  return pathsOverlap(a,b)
 }
+// An intentionally designated cloud NAS may also be the primary/source
+// of an independent NAS-to-NAS relationship. No other overlap is permitted.
+func sameNASFolder(x,y NASDestination)bool{
+ return x.ShareID==y.ShareID&&path.Clean("/"+x.Folder)==path.Clean("/"+y.Folder)
+}
+func allowedDesignatedNASOverlap(newJob,existing Job,folder NASDestination)bool{
+ if newJob.Provider=="bridge"&&existing.Provider=="nas_bridge"{
+  return len(newJob.NASDestinations)>0&&sameNASFolder(newJob.NASDestinations[0],folder)&&
+   sameNASFolder(NASDestination{ShareID:existing.NASSourceID,Folder:existing.NASSourceFolder},folder)
+ }
+ if newJob.Provider=="nas_bridge"&&existing.Provider=="bridge"{
+  existingDest:=existing.NASDestinations
+  if len(existingDest)==0&&existing.NASShareID!="" {existingDest=[]NASDestination{{ShareID:existing.NASShareID,Folder:existing.NASFolder}}}
+  return len(existingDest)>0&&sameNASFolder(existingDest[0],folder)&&
+   sameNASFolder(NASDestination{ShareID:newJob.NASSourceID,Folder:newJob.NASSourceFolder},folder)
+ }
+ return false
+}
 func (a *App) addBridge(w http.ResponseWriter,r *http.Request){
  name:=strings.TrimSpace(r.FormValue("name"))
  if name==""||len(name)>128{redirect(w,r,"Relationship name must be 1–128 characters");return}
@@ -193,13 +211,25 @@ func (a *App) addBridge(w http.ResponseWriter,r *http.Request){
   if err!=nil{redirect(w,r,"NAS destination cannot be scanned: "+err.Error());return}
  }
  a.mu.Lock()
- // Prevent simultaneous jobs from writing overlapping NAS directories.
+ // Overlapping storage is allowed ONLY for a cloud relationship's
+ // designated NAS and the source NAS of its explicit NAS-to-NAS relationship.
+ // Every other overlap is rejected to prevent simultaneous writers.
+ allNew:=append([]NASDestination(nil),selected...)
+ if j.Provider=="nas_bridge" {allNew=append(allNew,NASDestination{ShareID:j.NASSourceID,Folder:j.NASSourceFolder})}
  for _,existing:=range a.cfg.Jobs{
   if existing.Provider!="bridge"&&existing.Provider!="nas_bridge"{continue}
   previous:=append([]NASDestination(nil),existing.NASDestinations...)
   if len(previous)==0&&existing.NASShareID!=""{previous=append(previous,NASDestination{ShareID:existing.NASShareID,Folder:existing.NASFolder})}
   if existing.Provider=="nas_bridge"{previous=append(previous,NASDestination{ShareID:existing.NASSourceID,Folder:existing.NASSourceFolder})}
-  for _,d:=range selected{for _,p:=range previous{if relationshipOverlap(d,p){a.mu.Unlock();redirect(w,r,"A NAS destination overlaps another synchronization relationship");return}}}
+  for _,d:=range allNew {
+   for _,p:=range previous{
+    if !relationshipOverlap(d,p){continue}
+    if sameNASFolder(d,p)&&allowedDesignatedNASOverlap(j,existing,d){continue}
+    a.mu.Unlock()
+    redirect(w,r,"A NAS folder overlaps an existing relationship other than its explicitly designated NAS-to-NAS source")
+    return
+   }
+  }
  }
  a.cfg.Jobs=append(a.cfg.Jobs,j)
  err=a.save();a.mu.Unlock()
