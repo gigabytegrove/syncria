@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-var appVersion = "v0.5.0"
+var appVersion = "v0.5.1"
 const folderMime = "application/vnd.google-apps.folder"
 const scope = "https://www.googleapis.com/auth/drive"
 
@@ -1023,23 +1023,17 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
         redirect(w,r,"Latest GitHub release: "+release.Tag+"; running "+appVersion)
         return
     case "update_install", "update_rollback":
-        if runtime.GOOS=="windows"{redirect(w,r,"In-app restart not yet supported on Windows; download the release manually");return}
-        active:=false
-        a.runs.Range(func(k,v any)bool{active=true;return false})
-        if active{redirect(w,r,"Update blocked while synchronization is running");return}
-        dataDir:=filepath.Dir(a.file)
-        if action=="update_install"{
-            ctx,cancel:=context.WithTimeout(r.Context(),15*time.Minute)
-            rel,e:=latestRelease(ctx)
-            if e==nil && strings.TrimPrefix(rel.Tag,"v")==strings.TrimPrefix(appVersion,"v"){cancel();redirect(w,r,"Already on latest release "+rel.Tag);return}
-            if e==nil{_,e=updateBinary(ctx,dataDir,rel)}
-            cancel()
-            if e!=nil{redirect(w,r,"Update failed: "+e.Error());return}
-        }else{
-            if _,e:=rollbackBinary(dataDir);e!=nil{redirect(w,r,"Rollback failed: "+e.Error());return}
+        // Backward-compatible form action. Both old and new update buttons
+        // start the SAME tracked updater with exactly the same status API.
+        // Redirect to the live Updates workspace, not a generic toast.
+        operation:="install"
+        if action=="update_rollback"{operation="rollback"}
+        if err:=a.beginUpdate(operation);err!=nil{
+          redirect(w,r,"Update could not start: "+err.Error())
+          return
         }
-        redirect(w,r,"Update staged. Syncria is restarting; refresh shortly.")
-        go func(){time.Sleep(500*time.Millisecond);restartSyncria(dataDir)}()
+        go a.runUpdate(operation)
+        http.Redirect(w,r,"/#updates",http.StatusSeeOther)
         return
     case "logout":
 		http.SetCookie(w, &http.Cookie{Name: "gdsync_session", MaxAge: -1, Path: "/", HttpOnly: true})
