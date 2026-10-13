@@ -971,68 +971,59 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 		}
 		redirect(w, r, "OAuth settings saved")
 	case "add_job":
-		acc := r.FormValue("account")
-		name := strings.TrimSpace(r.FormValue("name"))
-		local := strings.TrimSpace(r.FormValue("local"))
-		remote := strings.TrimSpace(r.FormValue("remote"))
-		if remote == "" || remote == "whole" {
-			remote = "root"
-		}
-		if remote != "root" && !validDriveID(remote) {
-			redirect(w, r, "Invalid Drive folder ID")
-			return
-		}
-		if local == "" || name == "" {
-			redirect(w, r, "Job name and local path required")
-			return
-		}
-		path, e := filepath.Abs(local)
-		if e != nil {
-			redirect(w, r, e.Error())
-			return
-		}
-		storageRoot, rootErr := resolvedPath(browseStorageRoot())
-		if rootErr != nil {
-			redirect(w, r, "Storage root is unavailable")
-			return
-		}
-		realPath, resolveErr := resolvedPath(path)
-		if resolveErr != nil || !contained(storageRoot, realPath) {
-			redirect(w, r, "Choose a directory from available storage")
-			return
-		}
-		path = realPath
-		st, e := os.Stat(path)
-		if e != nil || !st.IsDir() {
-			redirect(w, r, "Local directory must exist and be accessible")
-			return
-		}
-		interval, e := strconv.Atoi(r.FormValue("interval"))
-		if e != nil || interval < 1 || interval > 1440 {
-			redirect(w, r, "Interval must be 1 to 1440 minutes")
-			return
-		}
-		a.mu.Lock()
-		if a.account(acc) == nil {
-			a.mu.Unlock()
-			redirect(w, r, "Select an account")
-			return
-		}
-		for _, j := range a.cfg.Jobs {
-			if strings.EqualFold(j.Local, path) && j.Enabled {
-				a.mu.Unlock()
-				redirect(w, r, "Directory is already mapped by an enabled job")
-				return
-			}
-		}
-		a.cfg.Jobs = append(a.cfg.Jobs, Job{ID: newID(), Name: name, AccountID: acc, RemoteID: remote, Local: path, Interval: interval, Enabled: false, State: map[string]Item{}})
-		e = a.save()
-		a.mu.Unlock()
-		if e != nil {
-			http.Error(w, e.Error(), 500)
-			return
-		}
-		redirect(w, r, "Job created paused. Enable when ready")
+        provider := strings.TrimSpace(r.FormValue("provider"))
+        if provider == "" {provider = "google_drive"}
+        if provider != "google_drive" && provider != "storage" {
+            redirect(w,r,"Unsupported synchronization provider")
+            return
+        }
+        name := strings.TrimSpace(r.FormValue("name"))
+        if name == "" || len(name)>128 {
+            redirect(w,r,"Relationship name must be 1 to 128 characters")
+            return
+        }
+        local, e := a.checkedStoragePath(strings.TrimSpace(r.FormValue("local")))
+        if e != nil {redirect(w,r,e.Error());return}
+        remote := strings.TrimSpace(r.FormValue("remote"))
+        acc := r.FormValue("account")
+        if provider == "storage" {
+            remote, e = a.checkedStoragePath(remote)
+            if e != nil {redirect(w,r,e.Error());return}
+            if pathsOverlap(remote,local) {redirect(w,r,"Source and destination must not overlap");return}
+            acc = ""
+        } else {
+            if remote == "" || remote == "whole" {remote = "root"}
+            if remote != "root" && !validDriveID(remote) {
+                redirect(w,r,"Invalid Google Drive folder")
+                return
+            }
+        }
+        interval, e := strconv.Atoi(r.FormValue("interval"))
+        if e != nil || interval<1 || interval>1440 {
+            redirect(w,r,"Interval must be 1 to 1440 minutes")
+            return
+        }
+        a.mu.Lock()
+        if provider == "google_drive" && a.account(acc) == nil {
+            a.mu.Unlock()
+            redirect(w,r,"Select a connected Google account")
+            return
+        }
+        for _, j := range a.cfg.Jobs {
+            if pathsOverlap(j.Local,local) ||
+                (provider == "storage" && pathsOverlap(j.Local,remote)) ||
+                (j.Provider == "storage" && (pathsOverlap(j.RemoteID,local) ||
+                   (provider == "storage" && pathsOverlap(j.RemoteID,remote)))) {
+                a.mu.Unlock()
+                redirect(w,r,"Storage folder overlaps an existing sync relationship")
+                return
+            }
+        }
+        a.cfg.Jobs = append(a.cfg.Jobs, Job{ID:newID(),Provider:provider,Name:name,AccountID:acc,RemoteID:remote,Local:local,Interval:interval,Enabled:false,State:map[string]Item{}})
+        e = a.save()
+        a.mu.Unlock()
+        if e != nil {http.Error(w,e.Error(),500);return}
+        redirect(w,r,"Relationship created paused. Review and enable when ready")
 	case "toggle_job", "run_job", "delete_job":
 		id := r.FormValue("id")
 		a.mu.Lock()
