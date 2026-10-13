@@ -1308,7 +1308,7 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 	cfg.Jobs = append([]Job(nil), a.cfg.Jobs...)
 	cfg.Shares = append([]StorageShare(nil), a.cfg.Shares...)
 	a.mu.Unlock()
-	for i:=range cfg.Shares {cfg.Shares[i].Mounted=shareMounted(cfg.Shares[i].Local)}
+	for i:=range cfg.Shares {if cfg.Shares[i].Local!="" {cfg.Shares[i].Mounted=shareMounted(cfg.Shares[i].Local)}}
 	base := cfg.BaseURL
 	if base == "" {
 		base = "http://localhost:9764"
@@ -1408,7 +1408,6 @@ func main() {
 	mux.HandleFunc("/api/update/status", a.updateStatus)
     mux.HandleFunc("/api/update/progress", a.updateProgressAPI)
 	mux.HandleFunc("/api/update/manual", a.manualUpdate)
-    mux.HandleFunc("/api/browse/local", a.browseLocal)
     mux.HandleFunc("/api/browse/nas", a.browseNAS)
     mux.HandleFunc("/api/browse/nas/create", a.createNASFolder)
     mux.HandleFunc("/api/nas/action", a.directNASAction)
