@@ -161,7 +161,11 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    }
    delete(next,rel)
    j.PairStates[key]=next
-   if j.Provider=="bridge"&&hasL==false{recordCloudOrigin(j,key,rel,"__deleted__")}
+   // A NAS-origin deletion removes the cloud copy on the first relationship.
+   // Do not mirror it to another NAS when cross-NAS propagation is off.
+   // A deletion originating in cloud (hasL=false) still propagates to every
+   // explicitly selected destination that has deletion propagation enabled.
+   if j.Provider=="bridge"&&hasL {recordCloudOrigin(j,key,rel,"__deleted__")}
    if err=a.checkpointBridge(j);err!=nil{return err}
    continue
   }
