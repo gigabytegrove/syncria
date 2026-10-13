@@ -6,12 +6,7 @@ services:
     ports:
       - "${SYNCRIA_BIND_IP:-127.0.0.1}:9764:9764"
     volumes:
+      # Configuration, credentials, update history and sync indexes only.
+      # No application file payloads and no NAS bind mounts.
       - "${SYNCRIA_DATA_DIR:-./data}:/data"
-      # One storage root only. Folder mappings are set in the Syncria UI.
-      - type: bind
-        source: ${SYNCRIA_STORAGE_ROOT:-/mnt}
-        target: /storage
-        bind:
-          create_host_path: false
-          propagation: rslave
     stop_grace_period: 1m
