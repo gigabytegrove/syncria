@@ -3,6 +3,7 @@ package main
 import (
  "context"
  "errors"
+ "os/exec"
  "fmt"
  "net/http"
  "net/url"
@@ -139,7 +140,13 @@ func (a *App) addBridge(w http.ResponseWriter,r *http.Request){
  if err!=nil||interval<1||interval>1440{redirect(w,r,"Interval must be between 1 and 1440 minutes");return}
  mode:=r.FormValue("schedule_mode")
  if mode==""{mode="interval"}
- if mode!="interval"{redirect(w,r,"Remote change-triggered scheduling is not yet supported by the selected endpoints; use a polling interval");return}
+ if mode!="interval"&&mode!="changes"{redirect(w,r,"Choose a scheduled interval or on-change NAS notifications");return}
+ if mode=="changes"{
+  if _,err:=exec.LookPath("smbclient");err!=nil{
+   redirect(w,r,"Remote NAS change notifications require smbclient in Syncria's container")
+   return
+  }
+ }
  var selected []NASDestination
  used:=map[string]bool{}
  for _,id:=range r.Form["nas_ids"]{
