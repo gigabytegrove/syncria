@@ -118,7 +118,10 @@ func (a *App) updateProgressAPI(w http.ResponseWriter,r *http.Request) {
  if !a.authenticated(r){http.Error(w,"Unauthorized",http.StatusUnauthorized);return}
  if r.Method==http.MethodGet {
   w.Header().Set("Content-Type","application/json; charset=utf-8")
-  _=json.NewEncoder(w).Encode(a.updateProgressSnapshot())
+  _=json.NewEncoder(w).Encode(struct {
+   UpdateProgress
+   Current string `json:"current"`
+  }{a.updateProgressSnapshot(),appVersion})
   return
  }
  if r.Method!=http.MethodPost{w.Header().Set("Allow","GET, POST");http.Error(w,"Method not allowed",http.StatusMethodNotAllowed);return}
