@@ -175,6 +175,7 @@ async function refreshDashboardStatus(){
  dashboardPollBusy=true;
  try{
   const res=await fetch('/api/dashboard/status',{cache:'no-store',credentials:'same-origin'});
+  if(res.status===401){location.replace('/?msg=Session%20expired');return;}
   if(!res.ok)return;
   const data=await res.json();
   if($('installedVersion')&&data.current)$('installedVersion').textContent=data.current;
@@ -239,5 +240,6 @@ async function refreshDashboardStatus(){
 refreshDashboardStatus();
 setInterval(refreshDashboardStatus,15000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDashboardStatus()});
+window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePicker()});if(location.hash){let page=location.hash.slice(1);if($('view-'+page))navigate(page)}
 </script></body></html>`
