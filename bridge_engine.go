@@ -187,7 +187,19 @@ func (a *App) executeBridge(ctx context.Context,j *Job,cloud,network bridgeEndpo
   }else{
    switch{
    case hasCloud&&hasNAS:
-    if !tracked{return fmt.Errorf("Initial conflict at %s; both sides contain a file (neither will be overwritten)",rel)}
+    if !tracked{
+     if c.Size==n.Size {
+      same,checkErr:=bridgeSameContent(ctx,network,rel,c.Fingerprint)
+      if checkErr!=nil{return fmt.Errorf("Cannot verify existing NAS content at %s: %w",rel,checkErr)}
+      if same {
+       next[rel]=Item{ID:c.ID,MD5:c.Fingerprint,LocalMD5:n.Fingerprint}
+       j.State=next
+       if j.itemHook!=nil{j.itemHook(int64(index+1),int64(len(ordered)),rel)}
+       continue
+      }
+     }
+     return fmt.Errorf("Initial conflict at %s; cloud and NAS contain different files. Neither will be overwritten",rel)
+    }
     cloudChanged:=prior.MD5!=c.Fingerprint||prior.ID!=c.ID
     nasChanged:=prior.LocalMD5!=n.Fingerprint
     if cloudChanged&&nasChanged{return fmt.Errorf("Both sides changed %s; choose a resolution before syncing",rel)}
@@ -217,6 +229,14 @@ func (a *App) executeBridge(ctx context.Context,j *Job,cloud,network bridgeEndpo
  j.State=next
  j.LastSummary=fmt.Sprintf("%d files to NAS, %d files to cloud",toNAS,toCloud)
  return nil
+}
+func bridgeSameContent(ctx context.Context,endpoint bridgeEndpoint,rel,want string)(bool,error){
+ if want==""{return false,nil}
+ reader,_,err:=endpoint.Open(ctx,rel);if err!=nil{return false,err}
+ defer reader.Close()
+ digest:=md5.New()
+ if _,err=io.Copy(digest,reader);err!=nil{return false,err}
+ return strings.EqualFold(hex.EncodeToString(digest.Sum(nil)),want),nil
 }
 func bridgeCopy(ctx context.Context,src,dst bridgeEndpoint,rel,checksum string,notify func(int64))(bridgeEntry,error){
  reader,size,err:=src.Open(ctx,rel);if err!=nil{return bridgeEntry{},err}
