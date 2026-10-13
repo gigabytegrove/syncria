@@ -148,62 +148,144 @@ const $=id=>document.getElementById(id);
 let currentView='overview',pickerType='',folder='',parent='',folderName='',pickSeq=0;
 function navigate(view){if(!$('view-'+view))return;currentView=view;document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+view));document.querySelectorAll('.nav button').forEach(el=>el.classList.toggle('active',el.dataset.view===view));$('pageTitle').textContent=({'overview':'Overview','sync':'Sync relationships','storage':'Storage connections','accounts':'Accounts','activity':'Activity & stats','updates':'Updates','settings':'Settings'})[view]||view;history.replaceState(null,'','#'+view);if(view==='updates')checkUpdate();}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.view)));
-let syncReviewed=false,syncStep=1;
+let syncReviewed=false,syncStep=1,selectedNASTargetID='';
 function showSyncStep(step){
  syncStep=step;if(step!==4)syncReviewed=false;
  for(let i=1;i<=4;i++){$('wizard'+i).classList.toggle('active',i===step);$('stepMarker'+i).classList.toggle('active',i===step);}
  $('wizard').scrollIntoView({behavior:'smooth',block:'start'});
 }
-function setWizardStatus(message,bad=false){let el=$('syncWizardStatus');if(!el)return;el.textContent=message;el.classList.toggle('bad',bad);el.classList.toggle('good',!bad);}
+function setWizardStatus(message,bad=false){
+ const el=$('syncWizardStatus');if(!el)return;
+ el.textContent=message;el.classList.toggle('bad',bad);el.classList.toggle('good',!bad);
+}
 function startWizard(){
  navigate('sync');$('syncWizard').reset();
- $('nasFolderValue').value='.';$('selectedNASLabel').textContent='Share root';
+ $('createSyncButton').disabled=false;$('wizard').classList.remove('hidden');
  $('remoteValue').value='root';$('selectedDriveLabel').textContent='Entire My Drive';
- $('createSyncButton').disabled=false;
- sourceProviderChanged();$('wizard').classList.remove('hidden');showSyncStep(1);
+ $('nasSourceFolderValue').value='.';$('selectedNASSourceLabel').textContent='Share root';
+ document.querySelectorAll('#nasTargets input[type=hidden]').forEach(el=>el.value='.');
+ document.querySelectorAll('#nasTargets small[id^=nas-label-]').forEach(el=>el.textContent='Share root');
+ relationshipTypeChanged();nasDestChanged();showSyncStep(1);
 }
 function closeSyncWizard(){$('wizard').classList.add('hidden');syncReviewed=false;}
-function sourceProviderChanged(){
- syncReviewed=false;$('remoteValue').value='root';
- $('selectedDriveLabel').textContent='Entire My Drive';
- setWizardStatus('Choose the connected Google account and verify access.');
+function relationshipTypeChanged(){
+ syncReviewed=false;
+ const cloud=$('relationshipType').value==='cloud';
+ $('cloudSourceFields').classList.toggle('hidden',!cloud);
+ $('nasSourceFields').classList.toggle('hidden',cloud);
+ $('nasDirectionFields').classList.toggle('hidden',cloud);
+ $('crossNASField').classList.toggle('hidden',!cloud);
+ $('syncAccount').required=cloud&&$('sourceProvider').value==='google_drive';
+ $('syncDropboxAccount').required=cloud&&$('sourceProvider').value==='dropbox';
+ $('nasSourceId').required=!cloud;
+ nasDirectionChanged();
+ setWizardStatus(cloud?'Choose your Google Drive or Dropbox account.':'Choose the primary NAS for independent NAS-to-NAS synchronization.');
 }
-function resetDrive(){$('remoteValue').value='root';$('selectedDriveLabel').textContent='Entire My Drive';syncReviewed=false;}
-function nasChanged(){syncReviewed=false;$('nasFolderValue').value='.';$('selectedNASLabel').textContent='Share root';}
+function sourceProviderChanged(){
+ syncReviewed=false;
+ const google=$('sourceProvider').value==='google_drive';
+ $('googleSourceFields').classList.toggle('hidden',!google);
+ $('dropboxSourceFields').classList.toggle('hidden',google);
+ $('syncAccount').required=google&&$('relationshipType').value==='cloud';
+ $('syncDropboxAccount').required=!google&&$('relationshipType').value==='cloud';
+ resetDrive();
+}
+function resetDrive(){
+ $('remoteValue').value=$('sourceProvider').value==='dropbox'?'':'root';
+ $('selectedDriveLabel').textContent=$('sourceProvider').value==='dropbox'?'Entire Dropbox':'Entire My Drive';
+ syncReviewed=false;
+}
+function nasSourceChanged(){
+ $('nasSourceFolderValue').value='.';$('selectedNASSourceLabel').textContent='Share root';syncReviewed=false;
+}
+function nasDestChanged(){
+ syncReviewed=false;
+ const chosen=selectedNASDestinations();
+ $('nasDestStatus').textContent=chosen.length?chosen.length+' NAS destination(s) selected. Each can use a different folder.':'Select at least one NAS destination.';
+}
+function selectedNASDestinations(){
+ return [...document.querySelectorAll('#nasTargets input[name=nas_ids]:checked')].map(el=>({id:el.value,
+  folder:$('nas-folder-'+el.value)?.value||'.',
+  label:el.closest('.nas-target')?.querySelector('strong')?.textContent||el.value
+ }));
+}
+function browseNASDestination(id){
+ const checkbox=[...document.querySelectorAll('#nasTargets input[name=nas_ids]')].find(el=>el.value===id);
+ if(checkbox&&!checkbox.checked){checkbox.checked=true;nasDestChanged();}
+ selectedNASTargetID=id;openPicker('nas-target');
+}
+function nasDirectionChanged(){
+ const nas=$('relationshipType').value==='nas',bi=$('nasDirection').value==='bidirectional';
+ $('nasConflictFields').classList.toggle('hidden',!(nas&&bi));
+}
 async function verifyWizard(kind,data){
- const body=new URLSearchParams({kind:kind,...data});
+ const body=new URLSearchParams({kind,...data});
  const res=await fetch('/api/wizard/verify',{method:'POST',body,credentials:'same-origin',cache:'no-store'});
- let result;try{result=await res.json();}catch(_){throw Error('Connection verification failed (HTTP '+res.status+')');}
- if(!res.ok||!result.ok)throw Error(result.message||'Connection unavailable');
+ let result;try{result=await res.json();}catch(_){throw Error('Source verification failed (HTTP '+res.status+')');}
+ if(!res.ok||!result.ok)throw Error(result.message||'Source unavailable');
  return result.message;
 }
+async function verifyNAS(id,pathValue){
+ const response=await fetch('/api/browse/nas?id='+encodeURIComponent(id)+'&path='+encodeURIComponent(pathValue||'.'),{credentials:'same-origin',cache:'no-store'});
+ if(!response.ok)throw Error('NAS '+id+': '+(await response.text()).trim());
+ return response.json();
+}
+async function verifySource(){
+ if($('relationshipType').value==='nas'){
+  if(!$('nasSourceId').reportValidity())throw Error('Select the primary NAS');
+  await verifyNAS($('nasSourceId').value,$('nasSourceFolderValue').value);
+  return 'Primary NAS verified.';
+ }
+ const provider=$('sourceProvider').value;
+ if(provider==='dropbox'){
+  if(!$('syncDropboxAccount').reportValidity())throw Error('Select a Dropbox account');
+  const url='/api/browse/dropbox?account='+encodeURIComponent($('syncDropboxAccount').value)+'&path='+encodeURIComponent($('remoteValue').value);
+  const resp=await fetch(url,{credentials:'same-origin',cache:'no-store'});
+  if(!resp.ok)throw Error((await resp.text()).trim());
+  return 'Dropbox account and folder verified.';
+ }
+ if(!$('syncAccount').reportValidity())throw Error('Select a Google account');
+ return verifyWizard('drive',{account:$('syncAccount').value,folder:$('remoteValue').value});
+}
 async function wizardNext(){
- if(!$('syncName').reportValidity()||!$('syncAccount').reportValidity())return;
- const button=$('verifySourceButton');button.disabled=true;setWizardStatus('Checking Google Drive account and folder access…');
- try{let message=await verifyWizard('drive',{account:$('syncAccount').value,folder:$('remoteValue').value});
-  setWizardStatus(message);showSyncStep(2);
- }catch(e){setWizardStatus(e.message,true);}
- finally{button.disabled=false;}
+ if(!$('syncName').reportValidity())return;
+ const btn=$('verifySourceButton');btn.disabled=true;setWizardStatus('Verifying source…');
+ try{setWizardStatus(await verifySource());showSyncStep(2);}
+ catch(e){setWizardStatus(e.message,true);}
+ finally{btn.disabled=false;}
 }
 async function wizardReview(){
- if(!$('nasId').reportValidity())return;
  const btn=$('verifyTargetButton');btn.disabled=true;
  try{
-  const id=$('nasId').value,path=$('nasFolderValue').value||'.';
-  const res=await fetch('/api/browse/nas?id='+encodeURIComponent(id)+'&path='+encodeURIComponent(path),{credentials:'same-origin',cache:'no-store'});
-  if(!res.ok)throw Error('NAS destination inaccessible: '+(await res.text()).trim());
-  await verifyWizard('drive',{account:$('syncAccount').value,folder:$('remoteValue').value});
-  setWizardStatus('Cloud and NAS verified. No data is being stored by Syncria.');
+  const targets=selectedNASDestinations();
+  if(targets.length<1)throw Error('Choose at least one destination NAS');
+  if($('relationshipType').value==='nas'){
+   const source=$('nasSourceId').value,pathValue=$('nasSourceFolderValue').value;
+   for(const target of targets){
+    const p=pathValue.replace(/\/$/,'')||'.',q=target.folder.replace(/\/$/,'')||'.';
+    if(source===target.id&&(p===q||p==='.'||q==='.'||p.startsWith(q+'/')||q.startsWith(p+'/')))throw Error('The source folder overlaps destination '+target.label);
+   }
+  }
+  for(const target of targets)await verifyNAS(target.id,target.folder);
+  await verifySource();
+  $('nasDestStatus').textContent='Verified '+targets.length+' NAS destination(s).';
   showSyncStep(3);
- }catch(e){setWizardStatus(e.message,true);alert(e.message);}finally{btn.disabled=false;}
+ }catch(e){$('nasDestStatus').textContent=e.message;alert('Verification failed: '+e.message);}
+ finally{btn.disabled=false;}
 }
 function wizardFinalize(){
  if(syncStep!==3)return;
+ const nas=$('relationshipType').value==='nas';
  $('reviewName').textContent=$('syncName').value.trim();
- $('reviewProvider').textContent='Google Drive';
- $('reviewSource').textContent=$('syncAccount').selectedOptions[0]?.textContent+' / '+$('selectedDriveLabel').textContent;
- $('reviewTarget').textContent=($('nasId').selectedOptions[0]?.textContent||'NAS')+' / '+$('selectedNASLabel').textContent;
+ $('reviewProvider').textContent=nas?'NAS':$('sourceProvider').selectedOptions[0]?.textContent;
+ $('reviewSource').textContent=nas?$('nasSourceId').selectedOptions[0]?.textContent+' / '+$('selectedNASSourceLabel').textContent:
+  ($('sourceProvider').value==='dropbox' ? $('syncDropboxAccount').selectedOptions[0]?.textContent:$('syncAccount').selectedOptions[0]?.textContent)+' / '+$('selectedDriveLabel').textContent;
+ $('reviewTarget').textContent=selectedNASDestinations().map(x=>x.label+' ('+x.folder+')').join(', ');
  $('reviewInterval').textContent=$('syncInterval').selectedOptions[0]?.textContent||'';
+ $('reviewDirection').textContent=nas?($('nasDirection').value==='one_way'?'One-way · Primary → Destination(s)':'Bidirectional · '+$('conflictPolicy').selectedOptions[0]?.textContent):
+  ('Cloud ↔ NAS'+($('crossNASField').querySelector('input').checked?' · Cross-NAS propagation enabled':' · Cross-NAS propagation off'));
+ $('reviewDeletion').textContent=($('propagateDeletions').checked?'Propagate deletions':'Do not propagate deletions')+
+  ($('recoveryEnabled').checked?' · 10-minute Undo enabled':' · Undo disabled');
  showSyncStep(4);syncReviewed=true;
 }
 function submitSyncWizard(event){
@@ -216,8 +298,20 @@ function toggleDirectNAS(force){
  panel.classList.toggle('hidden',!open);
  if(open)panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
-function startAccountWizard(){navigate('accounts');$('accountWizard').classList.remove('hidden');showAccountStep(1);$('accountWizard').scrollIntoView({behavior:'smooth'});}
-function showAccountStep(step){for(let i=1;i<=2;i++){$('accountStep'+i).classList.toggle('active',i===step);$('accountMarker'+i).classList.toggle('active',i===step);}}
+function startAccountWizard(provider){
+ navigate('accounts');$('accountWizard').classList.remove('hidden');
+ if(provider)$('accountProvider').value=provider;
+ accountProviderChanged();showAccountStep(1);$('accountWizard').scrollIntoView({behavior:'smooth'});
+}
+function accountProviderChanged(){
+ const dropbox=$('accountProvider').value==='dropbox';
+ $('googleAccountAuthorize').classList.toggle('hidden',dropbox);
+ $('dropboxAccountAuthorize').classList.toggle('hidden',!dropbox);
+}
+function showAccountStep(step){
+ for(let i=1;i<=2;i++){$('accountStep'+i).classList.toggle('active',i===step);$('accountMarker'+i).classList.toggle('active',i===step);}
+ accountProviderChanged();
+}
 async function verifyConnectedAccount(id,button){
  button.disabled=true;button.textContent='Verifying…';
  try{const result=await verifyWizard('drive',{account:id,folder:'root'});button.textContent='Verified';button.title=result;}
