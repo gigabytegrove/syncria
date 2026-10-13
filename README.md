@@ -70,6 +70,50 @@ From the dashboard, use **Storage connections → Connect network share**, choos
 
 For native Linux agent deployments, install `nfs-utils` or `nfs-common` and `cifs-utils` (depending on distribution), and run the agent under a controlled service with explicit rights to mount network filesystems. Do not expose the web interface directly to the public internet; use TLS and an access-controlled reverse proxy.
 
+## Version v0.4.1 — setup workflow, transfer visibility, updater progress
+
+The **New sync** setup flow is four distinct stages: **1. Source** (Google Drive
+or a local/NAS folder), **2. Destination** (an accessible local/NAS folder),
+**3. Schedule**, and **4. Review**. Relationships still start **paused** so
+the operator explicitly chooses when a new job begins.
+
+Schedules include 5, 10, 15 and 30 minutes, hourly, every six hours, daily,
+and **on filesystem changes** on Linux. On-change scheduling requires
+`inotifywait`, included in the Docker image starting with v0.4.1. It triggers
+on local path events but **does not guarantee detection of changes written by
+other hosts to NFS/SMB shares or Google Drive**. Therefore on-change jobs also
+run a five-minute reconciliation scan. No new service or updater container is
+needed.
+
+Each relationship displays its live current stage, processed entries, files
+uploaded/downloaded, and transferred bytes. A determinate entry-processing
+bar is displayed when the total is known; otherwise the bar is indeterminate,
+rather than fabricating a percentage. Live progress is transient; persisted
+per-job totals remain after restarts.
+
+The built-in **Software updates** screen now starts a background operation
+inside the Syncria process and polls an authenticated endpoint for stages:
+check, download (real received bytes and known Content-Length), SHA-256
+verification, installation, restart and successful version confirmation.
+Progress is durably recorded under the existing `/data/runtime` directory
+and reconciled by Syncria itself on boot. Failures are displayed in the
+interface. The UI never automatically navigates away or forces a reload.
+The update requires a **published v0.4.1 GitHub release**; a source commit
+alone cannot appear in the in-app updater.
+
+**Storage permissions:** existing local disks and host-mounted NAS folders
+exposed under `/storage` work without privileged Docker permissions.
+Creating new Linux SMB/NFS mounts **inside** an isolated container requires
+explicit mount capabilities and is hidden when managed mounting is disabled;
+the app does not request a Docker socket. NAS connections not yet exposed
+under `/storage` cannot be configured as regular filesystem sync targets
+without a mount or a future native network-storage adapter.
+
+**Provider status:** Google Drive and local or mounted filesystem folders are
+implemented sources. Dropbox is identified as unsupported and cannot yet be
+selected. The UI does not pretend a provider can be synchronized before its
+authorization and sync engine exist.
+
 ## Version v0.4.0 — verified setup and transfer statistics
 
 The administrator navigation is rendered **only after authentication**. The running
