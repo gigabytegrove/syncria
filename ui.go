@@ -102,112 +102,81 @@ const $=id=>document.getElementById(id);
 let currentView='overview',pickerType='',folder='',parent='',folderName='',pickSeq=0;
 function navigate(view){if(!$('view-'+view))return;currentView=view;document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+view));document.querySelectorAll('.nav button').forEach(el=>el.classList.toggle('active',el.dataset.view===view));$('pageTitle').textContent=({'overview':'Overview','sync':'Sync relationships','storage':'Storage connections','accounts':'Accounts','activity':'Activity & stats','updates':'Updates','settings':'Settings'})[view]||view;history.replaceState(null,'','#'+view);if(view==='updates')checkUpdate();}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.view)));
-let syncReviewed=false,syncStep=1,shareVerified=false,shareStep=1;
-function showSyncStep(step){syncStep=step;if(step!==4)syncReviewed=false;for(let i=1;i<=4;i++){$('wizard'+i).classList.toggle('active',i===step);$('stepMarker'+i).classList.toggle('active',i===step);}if($('wizard'))$('wizard').scrollIntoView({behavior:'smooth',block:'start'});}
-function setWizardStatus(message,bad=false){let el=$('syncWizardStatus');if(!el)return;el.textContent=message;el.classList.toggle('bad',bad);el.classList.toggle('good',!bad);}
-function startWizard(){navigate('sync');$('syncWizard').reset();$('localValue').value='';$('selectedLocalLabel').textContent='Choose a destination';$('selectedSourceLabel').textContent='Choose a source folder';sourceProviderChanged();scheduleModeChanged();$('createSyncButton').disabled=false;$('wizard').classList.remove('hidden');showSyncStep(1);}
-function closeSyncWizard(){$('wizard').classList.add('hidden');syncReviewed=false;}
-function sourceProviderChanged(){syncReviewed=false;const drive=$('sourceProvider').value==='google_drive';$('googleSourceFields').classList.toggle('hidden',!drive);$('storageSourceFields').classList.toggle('hidden',drive);$('syncAccount').required=drive;$('remoteValue').value=drive?'root':'';$('selectedDriveLabel').textContent='Entire My Drive';$('selectedSourceLabel').textContent='Choose a source folder';setWizardStatus(drive?'Select your Google account, then verify Drive access.':'Select the source folder from available storage.');}
-function resetDrive(){$('remoteValue').value='root';$('selectedDriveLabel').textContent='Entire My Drive';syncReviewed=false;}
-async function verifyWizard(kind,data){const body=new URLSearchParams({kind:kind,...data});const res=await fetch('/api/wizard/verify',{method:'POST',body,credentials:'same-origin',cache:'no-store'});let result;try{result=await res.json();}catch(_){throw Error('Verification request failed (HTTP '+res.status+')');}if(!res.ok||!result.ok)throw Error(result.message||'Verification failed');return result.message;}
-async function verifySource(){const provider=$('sourceProvider').value,remote=$('remoteValue').value;if(provider==='storage'){if(!remote)throw Error('Choose a source storage folder');return verifyWizard('storage',{path:remote});}const acc=$('syncAccount').value;if(!acc)throw Error('Connect or select a Google account first');return verifyWizard('drive',{account:acc,folder:remote});}
-async function wizardNext(){if(!$('syncName').reportValidity())return;const btn=$('verifySourceButton');btn.disabled=true;setWizardStatus('Checking source access…');try{const result=await verifySource();setWizardStatus(result);showSyncStep(2);}catch(e){setWizardStatus(e.message,true);}finally{btn.disabled=false;}}
-async function wizardReview(){
- const btn=$('verifyTargetButton');btn.disabled=true;syncReviewed=false;
- const destination=$('localValue').value;
- try {
-  if(!destination)throw Error('Choose a destination storage folder');
-  setWizardStatus('Verifying source and destination…');
-  await verifySource();
-  await verifyWizard('storage',{path:destination});
-  if($('sourceProvider').value==='storage'){
-   const source=$('remoteValue').value,trim=s=>s.replace(/[\\/]+$/,'');
-   const x=trim(source),y=trim(destination);
-   if(x===y||x.startsWith(y+'/')||y.startsWith(x+'/')||x.startsWith(y+'\\')||y.startsWith(x+'\\'))throw Error('Source and destination cannot overlap');
-  }
-  setWizardStatus('Source and destination verified.');
-  showSyncStep(3);
- }catch(e){setWizardStatus(e.message,true);alert('Cannot continue: '+e.message);}
- finally{btn.disabled=false;}
+let syncReviewed=false,syncStep=1;
+function showSyncStep(step){
+ syncStep=step;if(step!==4)syncReviewed=false;
+ for(let i=1;i<=4;i++){$('wizard'+i).classList.toggle('active',i===step);$('stepMarker'+i).classList.toggle('active',i===step);}
+ $('wizard').scrollIntoView({behavior:'smooth',block:'start'});
 }
-function scheduleModeChanged(){
- const changes=$('scheduleMode').value==='changes';
- $('scheduleIntervalField').classList.toggle('hidden',changes);
- if(changes){
-  $('syncInterval').value='5';
-  $('scheduleExplanation').textContent='Local Linux changes trigger a sync when detected. A 5-minute scan reconciles missed notifications and remote NAS / cloud changes. Remote NAS file changes may not emit inotify notifications.';
- }else{
-  $('scheduleExplanation').textContent='Syncria checks for changes at the selected interval.';
- }
+function setWizardStatus(message,bad=false){let el=$('syncWizardStatus');if(!el)return;el.textContent=message;el.classList.toggle('bad',bad);el.classList.toggle('good',!bad);}
+function startWizard(){
+ navigate('sync');$('syncWizard').reset();
+ $('nasFolderValue').value='.';$('selectedNASLabel').textContent='Share root';
+ $('remoteValue').value='root';$('selectedDriveLabel').textContent='Entire My Drive';
+ $('createSyncButton').disabled=false;
+ sourceProviderChanged();$('wizard').classList.remove('hidden');showSyncStep(1);
+}
+function closeSyncWizard(){$('wizard').classList.add('hidden');syncReviewed=false;}
+function sourceProviderChanged(){
+ syncReviewed=false;$('remoteValue').value='root';
+ $('selectedDriveLabel').textContent='Entire My Drive';
+ setWizardStatus('Choose the connected Google account and verify access.');
+}
+function resetDrive(){$('remoteValue').value='root';$('selectedDriveLabel').textContent='Entire My Drive';syncReviewed=false;}
+function nasChanged(){syncReviewed=false;$('nasFolderValue').value='.';$('selectedNASLabel').textContent='Share root';}
+async function verifyWizard(kind,data){
+ const body=new URLSearchParams({kind:kind,...data});
+ const res=await fetch('/api/wizard/verify',{method:'POST',body,credentials:'same-origin',cache:'no-store'});
+ let result;try{result=await res.json();}catch(_){throw Error('Connection verification failed (HTTP '+res.status+')');}
+ if(!res.ok||!result.ok)throw Error(result.message||'Connection unavailable');
+ return result.message;
+}
+async function wizardNext(){
+ if(!$('syncName').reportValidity()||!$('syncAccount').reportValidity())return;
+ const button=$('verifySourceButton');button.disabled=true;setWizardStatus('Checking Google Drive account and folder access…');
+ try{let message=await verifyWizard('drive',{account:$('syncAccount').value,folder:$('remoteValue').value});
+  setWizardStatus(message);showSyncStep(2);
+ }catch(e){setWizardStatus(e.message,true);}
+ finally{button.disabled=false;}
+}
+async function wizardReview(){
+ if(!$('nasId').reportValidity())return;
+ const btn=$('verifyTargetButton');btn.disabled=true;
+ try{
+  const id=$('nasId').value,path=$('nasFolderValue').value||'.';
+  const res=await fetch('/api/browse/nas?id='+encodeURIComponent(id)+'&path='+encodeURIComponent(path),{credentials:'same-origin',cache:'no-store'});
+  if(!res.ok)throw Error('NAS destination inaccessible: '+(await res.text()).trim());
+  await verifyWizard('drive',{account:$('syncAccount').value,folder:$('remoteValue').value});
+  setWizardStatus('Cloud and NAS verified. No data is being stored by Syncria.');
+  showSyncStep(3);
+ }catch(e){setWizardStatus(e.message,true);alert(e.message);}finally{btn.disabled=false;}
 }
 function wizardFinalize(){
  if(syncStep!==3)return;
  $('reviewName').textContent=$('syncName').value.trim();
- $('reviewProvider').textContent=$('sourceProvider').value==='google_drive'?'Google Drive':'Local / NAS source';
- $('reviewSource').textContent=$('sourceProvider').value==='google_drive'?($('syncAccount').selectedOptions[0]?.textContent+' / '+$('selectedDriveLabel').textContent):$('remoteValue').value;
- $('reviewTarget').textContent=$('localValue').value;
- $('reviewInterval').textContent=$('scheduleMode').value==='changes'?'On local changes + 5-minute reconciliation':$('syncInterval').selectedOptions[0]?.textContent||'';
+ $('reviewProvider').textContent='Google Drive';
+ $('reviewSource').textContent=$('syncAccount').selectedOptions[0]?.textContent+' / '+$('selectedDriveLabel').textContent;
+ $('reviewTarget').textContent=($('nasId').selectedOptions[0]?.textContent||'NAS')+' / '+$('selectedNASLabel').textContent;
+ $('reviewInterval').textContent=$('syncInterval').selectedOptions[0]?.textContent||'';
  showSyncStep(4);syncReviewed=true;
 }
 function submitSyncWizard(event){
  event.preventDefault();if(syncStep!==4||!syncReviewed)return false;
  syncReviewed=false;$('createSyncButton').disabled=true;$('syncWizard').submit();return false;
 }
-function showShareStep(step){shareStep=step;if(step!==3)shareVerified=false;for(let i=1;i<=3;i++){$('shareStep'+i).classList.toggle('active',i===step);$('shareMarker'+i).classList.toggle('active',i===step);}}
-function toggleConnection(force){let p=$('connectionPanel');const willOpen=force===undefined?p.classList.contains('hidden'):!!force;p.classList.toggle('hidden',!willOpen);if(willOpen){showShareStep(1);p.scrollIntoView({behavior:'smooth'});}}
-function shareNext(){if(!$('shareLabel').reportValidity()||!$('shareServer').reportValidity())return;showShareStep(2);discoverShares();}
-async function shareReview(){if(!$('sharePath').reportValidity())return;if($('shareProtocol').value==='smb'){for(const sel of ['[name=username]','[name=password]']){const e=document.querySelector('#smbFields '+sel);if(!e.value.trim()){e.setCustomValidity('Required for SMB');e.reportValidity();e.setCustomValidity('');return;}}}
-$('shareReviewName').textContent=$('shareLabel').value;$('shareReviewHost').textContent=$('shareProtocol').value.toUpperCase()+' · '+$('shareServer').value;$('shareReviewPath').textContent=$('sharePath').value;const body=new URLSearchParams(new FormData($('networkWizard')));$('shareReviewStatus').textContent='Checking server…';try{const res=await fetch('/api/shares/verify',{method:'POST',body,credentials:'same-origin'});const result=await res.json();if(!res.ok||!result.ok)throw Error(result.message||'Server verification failed');shareVerified=true;showShareStep(3);shareVerified=true;$('shareReviewStatus').textContent=result.message;}catch(e){shareVerified=false;alert('Cannot connect: '+e.message);}}
-function shareSubmit(event){event.preventDefault();if(shareStep!==3||!shareVerified)return false;shareVerified=false;$('networkWizard').submit();return false;}
+function toggleDirectNAS(force){
+ navigate('storage');
+ const panel=$('directNASPanel'),open=force===undefined?panel.classList.contains('hidden'):!!force;
+ panel.classList.toggle('hidden',!open);
+ if(open)panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
 function startAccountWizard(){navigate('accounts');$('accountWizard').classList.remove('hidden');showAccountStep(1);$('accountWizard').scrollIntoView({behavior:'smooth'});}
 function showAccountStep(step){for(let i=1;i<=2;i++){$('accountStep'+i).classList.toggle('active',i===step);$('accountMarker'+i).classList.toggle('active',i===step);}}
-async function verifyConnectedAccount(id,button){button.disabled=true;button.textContent='Verifying…';try{const result=await verifyWizard('drive',{account:id,folder:'root'});button.textContent='Verified';button.title=result;}catch(e){button.textContent='Verification failed';button.title=e.message;}finally{button.disabled=false;}}
-let shareDiscoveryTimer=0,shareDiscoverySequence=0,shareDiscoveryAbort=null;
-function protocolChanged(){
- shareDiscoverySequence++;clearTimeout(shareDiscoveryTimer);if(shareDiscoveryAbort){shareDiscoveryAbort.abort();shareDiscoveryAbort=null;}
- const nfs=$('shareProtocol').value==='nfs';
- $('smbFields').classList.toggle('hidden',nfs);
- $('sharePathTitle').textContent=nfs?'NFS export path':'SMB share name';
- $('sharePath').placeholder=nfs?'/volume1/shared':'Shared';
- $('discoveredShares').replaceChildren();$('shareDiscoveryList').replaceChildren();
- $('shareDiscoveryStatus').textContent='';
- queueShareDiscovery();
-}
-function queueShareDiscovery(){
- ++shareDiscoverySequence;
- clearTimeout(shareDiscoveryTimer);
- if(shareDiscoveryAbort){shareDiscoveryAbort.abort();shareDiscoveryAbort=null;}
- $('discoveredShares').replaceChildren();$('shareDiscoveryList').replaceChildren();
- $('shareDiscoveryStatus').textContent='';
- const host=$('shareServer').value.trim();
- if(!host)return;
- // Avoid requesting incomplete IPv4 addresses while the user types.
- if(/^[0-9.]+$/.test(host)&&host.split('.').length!==4)return;
- shareDiscoveryTimer=setTimeout(discoverShares,600);
-}
-async function discoverShares(){
- const host=$('shareServer').value.trim(),protocol=$('shareProtocol').value,sequence=++shareDiscoverySequence;
- if(!host)return;
- $('shareDiscoveryStatus').textContent='Discovering '+protocol.toUpperCase()+' shares…';
- if(shareDiscoveryAbort)shareDiscoveryAbort.abort();
- const controller=new AbortController();shareDiscoveryAbort=controller;
- try{
-  const body=new URLSearchParams({server:host,protocol:protocol});
-  if(protocol==='smb'){body.set('username',document.querySelector('#smbFields [name=username]').value);body.set('password',document.querySelector('#smbFields [name=password]').value);}
-  const res=await fetch('/api/shares/discover',{method:'POST',body,credentials:'same-origin',cache:'no-store',signal:controller.signal});
-  const data=await res.json();
-  if(sequence!==shareDiscoverySequence||$('shareServer').value.trim()!==host||$('shareProtocol').value!==protocol)return;
-  if(!res.ok)throw Error(data.error||'Discovery failed');
-  $('discoveredShares').replaceChildren();$('shareDiscoveryList').replaceChildren();
-  for(const name of data.shares||[]){
-   const option=document.createElement('option');option.value=name;$('discoveredShares').appendChild(option);
-   const button=document.createElement('button');button.type='button';button.className='secondary';button.textContent=name;
-   button.addEventListener('click',()=>{$('sharePath').value=name;$('shareDiscoveryStatus').textContent='Selected '+name;});
-   $('shareDiscoveryList').appendChild(button);
-  }
-  $('shareDiscoveryStatus').textContent=data.shares.length?data.shares.length+' shares discovered. Select one below.':'No exports advertised. Enter the path manually if you know it.';
- }catch(e){if(sequence!==shareDiscoverySequence||e.name==='AbortError')return;$('shareDiscoveryStatus').textContent=e.message+' You can still enter the share or export manually.';}
- finally{if(shareDiscoveryAbort===controller)shareDiscoveryAbort=null;}
+async function verifyConnectedAccount(id,button){
+ button.disabled=true;button.textContent='Verifying…';
+ try{const result=await verifyWizard('drive',{account:id,folder:'root'});button.textContent='Verified';button.title=result;}
+ catch(e){button.textContent='Verification failed';button.title=e.message;}
+ finally{button.disabled=false;}
 }
 let updatePollingBusy=false,updateSubmitting=false,updateRunning=false,updateInstallAvailable=false;
 const updatePhaseTitles={checking:'Checking for updates',downloading:'Downloading update',verifying:'Verifying integrity',staging:'Installing verified update',restarting:'Restarting Syncria',complete:'Update completed',failed:'Update failed'};
