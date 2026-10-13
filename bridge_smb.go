@@ -2,6 +2,8 @@ package main
 
 import (
  "context"
+ "crypto/md5"
+ "encoding/hex"
  "errors"
  "fmt"
  "io"
@@ -64,14 +66,12 @@ func (a *App) dialSMB(ctx context.Context,s StorageShare)(*directSMB,error){
  host,err:=validateDiscoveryIP(s.Server);if err!=nil{return nil,err}
  username,password,err:=a.smbCredentials(s.ID);if err!=nil{return nil,err}
  target:=net.JoinHostPort(host,strconv.Itoa(445))
- conn,err:=(&net.Dialer{Timeout:8*time.Second}).DialContext(ctx,"tcp",target)
- if err!=nil{return nil,fmt.Errorf("NAS SMB port 445 not accessible: %w",err)}
  d:=&smb2.Dialer{Initiator:&smb2.NTLMInitiator{User:username,Password:password}}
  session,err:=d.Dial(ctx,target)
- if err!=nil{conn.Close();return nil,fmt.Errorf("SMB authentication failed: %w",err)}
+ if err!=nil{return nil,fmt.Errorf("SMB authentication failed or port 445 unavailable: %w",err)}
  fs,err:=session.Mount(s.Export)
- if err!=nil{session.Logoff();conn.Close();return nil,fmt.Errorf("SMB share unavailable: %w",err)}
- return &directSMB{socket:conn,session:session,share:fs.WithContext(ctx)},nil
+ if err!=nil{session.Logoff();return nil,fmt.Errorf("SMB share unavailable: %w",err)}
+ return &directSMB{session:session,share:fs.WithContext(ctx)},nil
 }
 func (s *directSMB) Close(){
  if s.share!=nil{_ =s.share.Umount()}
@@ -134,7 +134,7 @@ func (s *directSMB) open(root,rel string)(io.ReadCloser,int64,error){
 
 // put streams source -> NAS temporary file. The partial file is only on
 // the NAS, never the machine or container hosting Syncria.
-func (s *directSMB) put(ctx context.Context,root,rel string,source io.Reader,expectedSize int64,report func(int64))error {
+func (s *directSMB) put(ctx context.Context,root,rel string,source io.Reader,expectedSize int64,expectedMD5 string,report func(int64))error {
  dest,err:=joinRemotePath(root,rel);if err!=nil{return err}
  if err=s.mkdir(root,path.Dir(rel));err!=nil{return err}
  temp:=dest+".syncria-pending-"+newID()
@@ -144,6 +144,7 @@ func (s *directSMB) put(ctx context.Context,root,rel string,source io.Reader,exp
  const chunk=128*1024
  buf:=make([]byte,chunk)
  var n int64
+ checksum:=md5.New()
  for {
   if err:=ctx.Err();err!=nil{f.Close();return err}
   count,readErr:=source.Read(buf)
@@ -151,6 +152,7 @@ func (s *directSMB) put(ctx context.Context,root,rel string,source io.Reader,exp
    written,writeErr:=f.Write(buf[:count]);n+=int64(written)
    if writeErr!=nil{f.Close();return writeErr}
    if written!=count{f.Close();return io.ErrShortWrite}
+   if _,e:=checksum.Write(buf[:written]);e!=nil{f.Close();return e}
    if report!=nil{report(n)}
   }
   if readErr==io.EOF{break}
@@ -158,6 +160,7 @@ func (s *directSMB) put(ctx context.Context,root,rel string,source io.Reader,exp
  }
  if err=f.Close();err!=nil{return err}
  if expectedSize>=0&&expectedSize!=n{return fmt.Errorf("Transfer length mismatch: expected %d, wrote %d",expectedSize,n)}
+ if expectedMD5!=""&&!strings.EqualFold(hex.EncodeToString(checksum.Sum(nil)),expectedMD5){return errors.New("Source checksum mismatch; original NAS file preserved")}
  // Renaming a completed staging file is performed on the NAS. Existing
  // destination files are never removed first; if the NAS disallows
  // replacement the operation fails safely rather than deleting user data.
