@@ -164,7 +164,7 @@ code{color:#076bd3}
 <div class="update-revisions"><div><small>From version</small><strong id="updateFromVersion">—</strong></div><div><small>To version</small><strong id="updateToVersion">—</strong></div></div>
 <div class="update-measures">
 <div><small>Executable</small><strong id="updateProgressAsset">—</strong></div>
-<div><small>Actual downloaded bytes</small><strong id="updateProgressBytes">—</strong></div>
+<div><small id="updateTransferLabel">Actual downloaded bytes</small><strong id="updateProgressBytes">—</strong></div>
 <div><small>Actual SHA-256 bytes checked</small><strong id="updateVerifiedBytes">—</strong></div>
 <div><small>Elapsed time</small><strong id="updateElapsed">—</strong></div>
 </div>
@@ -444,7 +444,10 @@ function renderUpdateProgress(p){
  set('updateProgressTarget',p.target?'Target release: '+p.target:'');
  const bytes=Number(p.downloaded||0),total=Number(p.total||0);
  const verified=Number(p.verified_bytes||0),verificationTotal=Number(p.verified_total||0);
- set('updateProgressBytes',bytes>0||total>0?formatBytes(bytes)+(total>0?' / '+formatBytes(total):' · size not reported'):'No binary bytes received yet');
+ set('updateTransferLabel',p.operation==='manual'?'Actual uploaded bytes':'Actual downloaded bytes');
+ if(!(manualUploadInProgress&&phase==='receiving')){
+  set('updateProgressBytes',bytes>0||total>0?formatBytes(bytes)+(total>0?' / '+formatBytes(total):' · size not reported'):'No binary bytes received yet');
+ }
  set('updateVerifiedBytes',verified>0||verificationTotal>0?formatBytes(verified)+(verificationTotal>0?' / '+formatBytes(verificationTotal):''):'Not started');
  const secs=Math.max(0,Number(p.elapsed_seconds||0));
  set('updateElapsed',Math.floor(secs/60)+'m '+Math.floor(secs%60)+'s');
