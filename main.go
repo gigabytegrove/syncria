@@ -50,6 +50,9 @@ type Item struct {
 	Folder   bool   `json:"folder"`
 }
 type Job struct {
+    ScheduleMode string `json:"schedule_mode,omitempty"`
+    progressHook func(up,down,upBytes,downBytes int64) `json:"-"`
+    itemHook func(processed,total int64,current string) `json:"-"`
 	Provider    string `json:"provider,omitempty"`
 	ID          string          `json:"id"`
 	Name        string          `json:"name"`
@@ -90,6 +93,8 @@ type App struct {
     updateMu sync.Mutex
     updateBusy bool
     updateProgress UpdateProgress
+    syncProgress map[string]SyncProgress
+    watchers sync.Map
 	runs   sync.Map
 	cfg    Config
 	file   string
@@ -562,7 +567,17 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
 	for k, v := range j.State {
 		job.State[k] = v
 	}
-	a.mu.Unlock()
+    a.mu.Unlock()
+    a.setSyncProgress(jobID,func(p *SyncProgress){*p=SyncProgress{Phase:"scanning",Running:true,Started:time.Now()}})
+    job.progressHook=func(up,down,upBytes,downBytes int64){
+      a.setSyncProgress(jobID,func(p *SyncProgress){
+        p.Phase="transferring"
+        p.Uploads=up;p.Downloads=down;p.UploadBytes=upBytes;p.DownloadBytes=downBytes
+      })
+    }
+    job.itemHook=func(done,total int64,current string){
+      a.setSyncProgress(jobID,func(p *SyncProgress){p.Phase="processing";p.Processed=done;p.Total=total;p.Current=current})
+    }
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Minute)
     defer cancel()
     started := time.Now()
@@ -593,8 +608,12 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
 		actual.State = job.State
 		_ = a.save()
 	}
-	a.mu.Unlock()
-	return err
+    a.mu.Unlock()
+    a.setSyncProgress(jobID,func(p *SyncProgress){
+      p.Running=false
+      if err!=nil {p.Phase="failed";p.Error=err.Error()} else {p.Phase="complete"}
+    })
+    return err
 }
 func (a *App) execute(ctx context.Context, j *Job) error {
 	root, e := filepath.Abs(j.Local)
@@ -1001,6 +1020,9 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
                 return
             }
         }
+        mode:=strings.TrimSpace(r.FormValue("schedule_mode"))
+        if mode==""{mode="interval"}
+        if mode!="interval"&&mode!="changes"{redirect(w,r,"Choose an interval or on-change scheduling");return}
         interval, e := strconv.Atoi(r.FormValue("interval"))
         if e != nil || interval<1 || interval>1440 {
             redirect(w,r,"Interval must be 1 to 1440 minutes")
@@ -1022,7 +1044,7 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
                 return
             }
         }
-        a.cfg.Jobs = append(a.cfg.Jobs, Job{ID:newID(),Provider:provider,Name:name,AccountID:acc,RemoteID:remote,Local:local,Interval:interval,Enabled:false,State:map[string]Item{}})
+        a.cfg.Jobs = append(a.cfg.Jobs, Job{ID:newID(),Provider:provider,ScheduleMode:mode,Name:name,AccountID:acc,RemoteID:remote,Local:local,Interval:interval,Enabled:false,State:map[string]Item{}})
         e = a.save()
         a.mu.Unlock()
         if e != nil {http.Error(w,e.Error(),500);return}
@@ -1295,7 +1317,12 @@ func (a *App) scheduler(ctx context.Context) {
 		jobs := append([]Job(nil), a.cfg.Jobs...)
 		a.mu.Unlock()
 		for _, j := range jobs {
-			if j.Enabled && (j.LastRun.IsZero() || time.Since(j.LastRun) >= time.Duration(j.Interval)*time.Minute) {
+			if j.Enabled && j.ScheduleMode=="changes" {
+             if _,loaded:=a.watchers.LoadOrStore(j.ID,true);!loaded{go a.watchChangedJob(ctx,j.ID)}
+            }
+            cadence:=j.Interval
+            if j.ScheduleMode=="changes"{cadence=5}
+            if j.Enabled && (j.LastRun.IsZero() || time.Since(j.LastRun) >= time.Duration(cadence)*time.Minute) {
 				id := j.ID
 				go func() {
 					if e := a.syncJob(ctx, id); e != nil && e.Error() != "job already running" {
