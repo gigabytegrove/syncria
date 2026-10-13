@@ -340,7 +340,7 @@ func (a *App) folderChildren(ctx context.Context, acc, parent string) ([]driveFi
 	return items, nil
 }
 func safeName(n string) bool {
-	return n != "" && n != "." && n != ".." && !strings.ContainsAny(n, "/\\\x00") && n != ".sync-agent-trash" && n != ".syncria-recovery" && n != ".DS_Store"
+	return n != "" && n != "." && n != ".." && !strings.ContainsAny(n, "/\\\x00") && n != ".sync-agent-trash" && !strings.HasPrefix(n,".syncria-") && n != ".DS_Store"
 }
 func (a *App) remoteTree(ctx context.Context, acc, root string) (map[string]driveFile, error) {
 	res := map[string]driveFile{}
