@@ -12,6 +12,44 @@ import (
  "time"
 )
 
+func (a *App) checkpointBridge(j *Job)error{
+ a.mu.Lock();defer a.mu.Unlock()
+ existing:=a.job(j.ID)
+ if existing==nil{return errors.New("Relationship was removed while synchronizing")}
+ existing.PairStates=j.PairStates
+ existing.PendingDeletions=j.PendingDeletions
+ existing.Conflicts=j.Conflicts
+ existing.ConflictOverrides=j.ConflictOverrides
+ return a.save()
+}
+func (a *App) manualConflict(j *Job,key,rel string,l,r bridgeEntry)(string,string,error){
+ if j.ConflictOverrides!=nil{
+  selection:=j.ConflictOverrides[key+"|"+rel]
+  if selection=="primary"||selection=="secondary"{return selection,selection,nil}
+  if selection=="keep_both"{return "primary",conflictKeepBoth,nil}
+ }
+ found:=false
+ for _,existing:=range j.Conflicts{if existing.Pair==key&&existing.Path==rel{found=true;break}}
+ if !found{
+  j.Conflicts=append(j.Conflicts,BridgeConflict{Pair:key,Path:rel,PrimaryModified:l.Modified,SecondaryModified:r.Modified})
+ }
+ return "", "",errors.New("Manual conflict resolution required; choose the version in the Syncria relationship details")
+}
+func (a *App) selectResolution(j *Job,key,rel,policy string,l,r bridgeEntry)(string,string,error){
+ if policy==conflictManual{return a.manualConflict(j,key,rel,l,r)}
+ direction,err:=pickConflict(policy,l,r)
+ return direction,policy,err
+}
+func (a *App) clearConflict(j *Job,key,rel string){
+ if j.ConflictOverrides!=nil{delete(j.ConflictOverrides,key+"|"+rel)}
+ for i:=range j.Conflicts {
+  if j.Conflicts[i].Pair==key&&j.Conflicts[i].Path==rel {
+   j.Conflicts=append(j.Conflicts[:i],j.Conflicts[i+1:]...)
+   return
+  }
+ }
+}
+
 // Exactly five user-approved policies. No implicit fallback that overwrites
 // modified data is allowed for missing/unknown policies.
 const (
@@ -93,6 +131,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    }
    delete(next,rel)
    j.PairStates[key]=next
+   if err=a.checkpointBridge(j);err!=nil{return err}
    continue
   }
   if (hasL&&l.Folder)||(hasR&&r.Folder){
@@ -119,18 +158,20 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    if err!=nil{return err}
    if !same{
     if oneWay{return fmt.Errorf("Existing different files at %s: choose a safe resolution",rel)}
-    direction,err:=pickConflict(policy,l,r)
-    if err!=nil{return fmt.Errorf("Initial file conflict at %s: %w",rel,err)}
-    if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,direction,policy,&l,&r);err!=nil{return err}
+    direction,method,resolveErr:=a.selectResolution(j,key,rel,policy,l,r)
+    if resolveErr!=nil{_ =a.checkpointBridge(j);return fmt.Errorf("Initial file conflict at %s: %w",rel,resolveErr)}
+    if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,direction,method,&l,&r);err!=nil{return err}
+    a.clearConflict(j,key,rel)
    }
   }else{
    changedPrimary:=prior.MD5!=l.Fingerprint|| (prior.ID!=""&&l.ID!=""&&prior.ID!=l.ID)
    changedSecondary:=prior.LocalMD5!=r.Fingerprint
    if changedPrimary&&changedSecondary{
     if oneWay{return fmt.Errorf("Both files changed at %s; one-way relationship will not overwrite them",rel)}
-    direction,err:=pickConflict(policy,l,r)
-    if err!=nil{return fmt.Errorf("File conflict at %s: %w",rel,err)}
-    if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,direction,policy,&l,&r);err!=nil{return err}
+    direction,method,resolveErr:=a.selectResolution(j,key,rel,policy,l,r)
+    if resolveErr!=nil{_ =a.checkpointBridge(j);return fmt.Errorf("File conflict at %s: %w",rel,resolveErr)}
+    if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,direction,method,&l,&r);err!=nil{return err}
+    a.clearConflict(j,key,rel)
    }else if changedPrimary{
     var bytes int64
     checksum:="";if len(l.Fingerprint)==32{checksum=l.Fingerprint}
@@ -147,9 +188,11 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
   }
   next[rel]=Item{ID:l.ID,MD5:l.Fingerprint,LocalMD5:r.Fingerprint}
   j.PairStates[key]=next
+  if i%20==0 {if err=a.checkpointBridge(j);err!=nil{return err}}
   if j.itemHook!=nil{j.itemHook(int64(i+1),int64(len(ordered)),rel)}
  }
  j.PairStates[key]=next
+ if err=a.checkpointBridge(j);err!=nil{return err}
  j.LastSummary=fmt.Sprintf("%d files copied to secondary, %d to primary; recovery window 10 minutes",countForward,countBack)
  return nil
 }
