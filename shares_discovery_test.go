@@ -12,7 +12,7 @@ func TestNoAutomaticPageReload(t *testing.T) {
  }
 }
 func TestDirectNASConnectionControls(t *testing.T) {
- for _,part:=range []string{"id=\"shareServer\"","/api/nas/action","/api/browse/nas","/api/browse/nas/create","id=\"nasId\""} {
+ for _,part:=range []string{"id=\"shareServer\"","/api/nas/action","/api/browse/nas","/api/browse/nas/create","id=\"nasTargets\"","id=\"nasSourceId\""} {
   if !strings.Contains(newUI,part) {t.Fatalf("missing direct NAS UI %q",part)}
  }
  if strings.Contains(newUI,"Connect a new SMB / NFS mount") {t.Fatal("kernel mounting returned to the NAS connection interface")}
