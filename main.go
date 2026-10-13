@@ -1453,7 +1453,7 @@ func (a *App) scheduler(ctx context.Context) {
 		a.mu.Unlock()
         a.expireRecoveries(ctx)
 		for _, j := range jobs {
-			if j.Enabled && j.Provider!="nas_bridge" && j.ScheduleMode=="changes" {
+			if j.Enabled && j.ScheduleMode=="changes" {
              if _,loaded:=a.watchers.LoadOrStore(j.ID,true);!loaded{go a.watchChangedJob(ctx,j.ID)}
             }
             cadence:=j.Interval
