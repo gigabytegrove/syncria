@@ -2,7 +2,7 @@
 
 **Pronunciation:** Sink-Re-Ah. **Default local web UI:** `http://127.0.0.1:9764` (configurable with `-listen`). The repository and Go module are named `syncria`. Existing default data directories may retain the historical `gdsync` name to preserve configurations during upgrades. Restart the agent after upgrading; existing instances launched with an explicit `-listen` argument continue using that chosen port.
 
-A lightweight, self-hosted, **experimental** Google Drive ↔ filesystem synchronization agent written in Go. Single binary, embedded browser UI, no external database, and no JavaScript build tool. Suitable for Windows and Linux (including servers with mounted NAS shares).
+A lightweight, self-hosted, **experimental** cloud and filesystem synchronization agent written in Go. Single binary, embedded browser UI, no external database, and no JavaScript build tool. Suitable for Windows and Linux (including servers with mounted NAS shares).
 
 > **Alpha warning:** This version has not been live-tested with Google Drive accounts. Make backups before enabling synchronization. Native Google Docs/Sheets/Slides, shortcuts, shared drives, files with duplicate names, and complicated rename/move scenarios are not fully supported. The agent **stops with a visible error** instead of silently processing unsupported Google-native formats. Do not use for your only copy of important data.
 
@@ -47,6 +47,45 @@ From the dashboard, use **Storage connections → Connect network share**, choos
 **Security:** Linux mounting requires elevated kernel privileges. The default container deliberately does not have these permissions. For trusted, isolated installations, enable mounting explicitly with `SYNCRIA_ENABLE_MOUNTS=1` plus the container's `SYS_ADMIN` capability and the host's appropriate mount security policy. Container runtimes with restrictive AppArmor/seccomp profiles may still reject the operation. Granting such permissions significantly expands container access and should not be done on a shared or untrusted Docker host. Alternatively, mount shares on the host and expose their parent directory under `/storage` without privilege elevation.
 
 For native Linux agent deployments, install `nfs-utils` or `nfs-common` and `cifs-utils` (depending on distribution), and run the agent under a controlled service with explicit rights to mount network filesystems. Do not expose the web interface directly to the public internet; use TLS and an access-controlled reverse proxy.
+
+## Version v0.4.0 — verified setup and transfer statistics
+
+The administrator navigation is rendered **only after authentication**. The running
+version is presented with one `v` prefix. The Sync relationship workflow is now a
+three-stage wizard: choose Google Drive or a storage folder as the source; choose
+a destination and frequency; verify both sides and review the mapping. Pressing
+Enter on an incomplete form cannot create a relationship. The backend rejects
+missing, inaccessible, overlapping, and unmounted managed-storage folders.
+
+**Source providers currently implemented:** Google Drive; filesystem storage
+(including host-mounted disks, SMB and NFS shares available within the configured
+storage root). Both modes synchronize in both directions. Google Drive mappings
+already stored in the configuration remain compatible and do not need migration.
+OneDrive, Dropbox, and S3 are **not** implemented in v0.4.0; the provider selector
+does not offer nonfunctional options.
+
+Filesystem-to-filesystem mode protects both sides: it never overwrites divergent
+files on the first run, blocks simultaneous edits and pauses for manual review on
+detected deletions. New sync relationships are always created disabled.
+
+Network connections have an explicit three-stage wizard with discovery,
+TCP reachability verification and a final mount check. The account connection
+wizard explains and hands off to Google OAuth; existing accounts can verify
+their Drive permission. Mounting inside Docker still requires an opt-in and
+appropriate kernel permissions. An existing host-managed mount is sufficient.
+
+The Overview and Activity & stats pages expose persisted per-job and aggregate
+run counts, successful/failed runs, transferred file counts, payload upload and
+download bytes, latest run duration and average payload throughput. Bytes are
+measured for successful full-file transfers and **are not** a per-packet or
+network-interface bandwidth meter. Historical transfers before this update
+cannot be backfilled and start at zero. Statistics persist in `state.json`.
+
+**Upgrade:** back up `state.json` and the data directory. Use the built-in
+updater once the versioned v0.4.0 binaries and checksums are published, or
+publish from your trusted machine with the existing zero-cost publisher. No
+container management platform integration, Docker socket or updater sidecar
+is needed.
 
 ## Interactive sync location selection
 
