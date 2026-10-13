@@ -78,18 +78,56 @@ let currentView='overview',pickerType='',folder='',parent='',folderName='',pickS
 function navigate(view){if(!$('view-'+view))return;currentView=view;document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+view));document.querySelectorAll('.nav button').forEach(el=>el.classList.toggle('active',el.dataset.view===view));$('pageTitle').textContent=({'overview':'Overview','sync':'Sync relationships','storage':'Storage connections','accounts':'Accounts','activity':'Activity & stats','updates':'Updates','settings':'Settings'})[view]||view;history.replaceState(null,'','#'+view);if(view==='updates')checkUpdate();}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.view)));
 let syncReviewed=false,syncStep=1,shareVerified=false,shareStep=1;
-function showSyncStep(step){syncStep=step;if(step!==3)syncReviewed=false;for(let i=1;i<=3;i++){$('wizard'+i).classList.toggle('active',i===step);$('stepMarker'+i).classList.toggle('active',i===step);}if($('wizard'))$('wizard').scrollIntoView({behavior:'smooth',block:'start'});}
+function showSyncStep(step){syncStep=step;if(step!==4)syncReviewed=false;for(let i=1;i<=4;i++){$('wizard'+i).classList.toggle('active',i===step);$('stepMarker'+i).classList.toggle('active',i===step);}if($('wizard'))$('wizard').scrollIntoView({behavior:'smooth',block:'start'});}
 function setWizardStatus(message,bad=false){let el=$('syncWizardStatus');if(!el)return;el.textContent=message;el.classList.toggle('bad',bad);el.classList.toggle('good',!bad);}
-function startWizard(){navigate('sync');$('syncWizard').reset();$('localValue').value='';$('selectedLocalLabel').textContent='Choose a destination';$('selectedSourceLabel').textContent='Choose a source folder';sourceProviderChanged();$('wizard').classList.remove('hidden');showSyncStep(1);}
+function startWizard(){navigate('sync');$('syncWizard').reset();$('localValue').value='';$('selectedLocalLabel').textContent='Choose a destination';$('selectedSourceLabel').textContent='Choose a source folder';sourceProviderChanged();scheduleModeChanged();$('createSyncButton').disabled=false;$('wizard').classList.remove('hidden');showSyncStep(1);}
 function closeSyncWizard(){$('wizard').classList.add('hidden');syncReviewed=false;}
 function sourceProviderChanged(){syncReviewed=false;const drive=$('sourceProvider').value==='google_drive';$('googleSourceFields').classList.toggle('hidden',!drive);$('storageSourceFields').classList.toggle('hidden',drive);$('syncAccount').required=drive;$('remoteValue').value=drive?'root':'';$('selectedDriveLabel').textContent='Entire My Drive';$('selectedSourceLabel').textContent='Choose a source folder';setWizardStatus(drive?'Select your Google account, then verify Drive access.':'Select the source folder from available storage.');}
 function resetDrive(){$('remoteValue').value='root';$('selectedDriveLabel').textContent='Entire My Drive';syncReviewed=false;}
 async function verifyWizard(kind,data){const body=new URLSearchParams({kind:kind,...data});const res=await fetch('/api/wizard/verify',{method:'POST',body,credentials:'same-origin',cache:'no-store'});let result;try{result=await res.json();}catch(_){throw Error('Verification request failed (HTTP '+res.status+')');}if(!res.ok||!result.ok)throw Error(result.message||'Verification failed');return result.message;}
 async function verifySource(){const provider=$('sourceProvider').value,remote=$('remoteValue').value;if(provider==='storage'){if(!remote)throw Error('Choose a source storage folder');return verifyWizard('storage',{path:remote});}const acc=$('syncAccount').value;if(!acc)throw Error('Connect or select a Google account first');return verifyWizard('drive',{account:acc,folder:remote});}
 async function wizardNext(){if(!$('syncName').reportValidity())return;const btn=$('verifySourceButton');btn.disabled=true;setWizardStatus('Checking source access…');try{const result=await verifySource();setWizardStatus(result);showSyncStep(2);}catch(e){setWizardStatus(e.message,true);}finally{btn.disabled=false;}}
-async function wizardReview(){const btn=$('verifyTargetButton');btn.disabled=true;syncReviewed=false;const destination=$('localValue').value;try{if(!destination)throw Error('Choose a destination storage folder');setWizardStatus('Verifying source and destination…');await verifySource();await verifyWizard('storage',{path:destination});if($('sourceProvider').value==='storage'){const source=$('remoteValue').value;const trim=s=>s.replace(/[\\/]+$/,'');const x=trim(source),y=trim(destination);if(x===y||x.startsWith(y+'/')||y.startsWith(x+'/')||x.startsWith(y+'\\')||y.startsWith(x+'\\'))throw Error('Source and destination cannot overlap');}
-$('reviewName').textContent=$('syncName').value.trim();$('reviewProvider').textContent=$('sourceProvider').value==='google_drive'?'Google Drive':'Storage folder';$('reviewSource').textContent=$('sourceProvider').value==='google_drive'?($('syncAccount').selectedOptions[0]?.textContent+' / '+$('selectedDriveLabel').textContent):$('remoteValue').value;$('reviewTarget').textContent=destination;$('reviewInterval').textContent=$('syncInterval').selectedOptions[0]?.textContent||'';syncReviewed=true;$('reviewStatus').textContent='Source and destination accessible. Relationship starts paused; conflicting files are protected.';showSyncStep(3);syncReviewed=true;}catch(e){setWizardStatus(e.message,true);alert('Cannot continue: '+e.message);}finally{btn.disabled=false;}}
-function submitSyncWizard(event){event.preventDefault();if(syncStep!==3||!syncReviewed)return false;syncReviewed=false;$('createSyncButton').disabled=true;$('syncWizard').submit();return false;}
+async function wizardReview(){
+ const btn=$('verifyTargetButton');btn.disabled=true;syncReviewed=false;
+ const destination=$('localValue').value;
+ try {
+  if(!destination)throw Error('Choose a destination storage folder');
+  setWizardStatus('Verifying source and destination…');
+  await verifySource();
+  await verifyWizard('storage',{path:destination});
+  if($('sourceProvider').value==='storage'){
+   const source=$('remoteValue').value,trim=s=>s.replace(/[\\/]+$/,'');
+   const x=trim(source),y=trim(destination);
+   if(x===y||x.startsWith(y+'/')||y.startsWith(x+'/')||x.startsWith(y+'\\')||y.startsWith(x+'\\'))throw Error('Source and destination cannot overlap');
+  }
+  setWizardStatus('Source and destination verified.');
+  showSyncStep(3);
+ }catch(e){setWizardStatus(e.message,true);alert('Cannot continue: '+e.message);}
+ finally{btn.disabled=false;}
+}
+function scheduleModeChanged(){
+ const changes=$('scheduleMode').value==='changes';
+ $('scheduleIntervalField').classList.toggle('hidden',changes);
+ if(changes){
+  $('syncInterval').value='5';
+  $('scheduleExplanation').textContent='Local Linux changes trigger a sync when detected. A 5-minute scan reconciles missed notifications and remote NAS / cloud changes. Remote NAS file changes may not emit inotify notifications.';
+ }else{
+  $('scheduleExplanation').textContent='Syncria checks for changes at the selected interval.';
+ }
+}
+function wizardFinalize(){
+ if(syncStep!==3)return;
+ $('reviewName').textContent=$('syncName').value.trim();
+ $('reviewProvider').textContent=$('sourceProvider').value==='google_drive'?'Google Drive':'Local / NAS source';
+ $('reviewSource').textContent=$('sourceProvider').value==='google_drive'?($('syncAccount').selectedOptions[0]?.textContent+' / '+$('selectedDriveLabel').textContent):$('remoteValue').value;
+ $('reviewTarget').textContent=$('localValue').value;
+ $('reviewInterval').textContent=$('scheduleMode').value==='changes'?'On local changes + 5-minute reconciliation':$('syncInterval').selectedOptions[0]?.textContent||'';
+ showSyncStep(4);syncReviewed=true;
+}
+function submitSyncWizard(event){
+ event.preventDefault();if(syncStep!==4||!syncReviewed)return false;
+ syncReviewed=false;$('createSyncButton').disabled=true;$('syncWizard').submit();return false;
+}
 function showShareStep(step){shareStep=step;if(step!==3)shareVerified=false;for(let i=1;i<=3;i++){$('shareStep'+i).classList.toggle('active',i===step);$('shareMarker'+i).classList.toggle('active',i===step);}}
 function toggleConnection(force){let p=$('connectionPanel');const willOpen=force===undefined?p.classList.contains('hidden'):!!force;p.classList.toggle('hidden',!willOpen);if(willOpen){showShareStep(1);p.scrollIntoView({behavior:'smooth'});}}
 function shareNext(){if(!$('shareLabel').reportValidity()||!$('shareServer').reportValidity())return;showShareStep(2);discoverShares();}
@@ -297,6 +335,17 @@ async function refreshDashboardStatus(){
     if(byteCount)byteCount.textContent=formatBytes(bytes);
     const progress=el('data-activity-running');
     if(progress){progress.textContent=job.running?'Running':job.error?'Last run failed':'Idle';progress.classList.toggle('off',!!job.error);}
+    const liveProgress=job.progress||{},progressBox=el('data-job-progress');
+    if(progressBox){
+      const stage=el('data-job-phase'),bar=el('data-job-bar'),info=el('data-job-progress-detail');
+      const running=!!liveProgress.running,done=Number(liveProgress.processed||0),total=Number(liveProgress.total||0);
+      if(stage)stage.textContent=running?'Syncing · '+(liveProgress.phase||'working'):liveProgress.phase==='failed'?'Last run failed':liveProgress.phase==='complete'?'Last run complete':'Idle';
+      if(bar){if(running&&total===0){bar.removeAttribute('value');}else{bar.value=total>0?Math.min(100,Math.round(done*100/total)):(running?0:100);}}
+      if(info)info.textContent=(total>0?done+' / '+total+' entries processed · ':'')+
+        Number(liveProgress.uploads||0)+' uploaded, '+Number(liveProgress.downloads||0)+' downloaded · '+
+        formatBytes(Number(liveProgress.upload_bytes||0)+Number(liveProgress.download_bytes||0))+
+        (liveProgress.current?' · '+liveProgress.current:'')+(liveProgress.error?' · '+liveProgress.error:'');
+    }
     const detail=el('data-job-detail');
     if(detail){
       const duration=Number(job.last_duration_ms||0)/1000;
@@ -316,7 +365,7 @@ async function refreshDashboardStatus(){
  finally{dashboardPollBusy=false;}
 }
 refreshDashboardStatus();
-setInterval(refreshDashboardStatus,15000);
+setInterval(refreshDashboardStatus,2500);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDashboardStatus()});
 window.addEventListener('pageshow',event=>{if(event.persisted)refreshDashboardStatus();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePicker()});if(location.hash){let page=location.hash.slice(1);if($('view-'+page))navigate(page)}
