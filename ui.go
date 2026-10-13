@@ -88,7 +88,7 @@ code{color:#076bd3}
 <div class="row"><button type="button" class="secondary" onclick="showSyncStep(1)">← Back</button><button id="verifyTargetButton" type="button" class="primary" onclick="wizardReview()">Verify destinations →</button><button type="button" class="secondary" onclick="toggleDirectNAS(true)">Add NAS</button></div></div>
 <div id="wizard3" class="step"><h2>3. Choose synchronization behavior</h2>
 <label class="field">Schedule<select id="syncInterval" name="interval"><option value="5">Every 5 minutes</option><option value="10">Every 10 minutes</option><option value="15">Every 15 minutes</option><option value="30">Every 30 minutes</option><option value="60">Every hour</option><option value="360">Every 6 hours</option><option value="1440">Daily</option></select></label>
-<input type="hidden" name="schedule_mode" value="interval">
+<label class="field">Trigger type<select id="scheduleMode" name="schedule_mode" onchange="scheduleModeChanged()"><option value="interval">Scheduled checks</option><option value="changes">On NAS file changes (SMB notifications + 5-minute cloud reconciliation)</option></select></label>
 <div id="nasDirectionFields" class="hidden"><label class="field">NAS synchronization direction<select id="nasDirection" name="direction" onchange="nasDirectionChanged()"><option value="one_way">One-way · Primary → Destination(s)</option><option value="bidirectional">Bidirectional · Changes move both directions</option></select></label>
 <div id="nasConflictFields" class="hidden"><label class="field">When the same file changes on both NAS devices<select name="conflict_policy" id="conflictPolicy"><option value="manual">Manual conflict resolution</option><option value="newer">Newer file wins</option><option value="primary">Primary NAS wins</option><option value="secondary">Secondary NAS wins</option><option value="keep_both">Keep both files</option></select></label></div></div>
 <div id="crossNASField"><label><input type="checkbox" name="cross_nas_propagation" value="1"> Allow changes from one NAS to propagate to other NAS destinations through the cloud</label><p class="muted">Off by default. If separate NAS-to-NAS synchronization is enabled, Syncria uses only the designated cloud-connected NAS.</p></div>
@@ -223,6 +223,11 @@ function browseNASDestination(id){
  if(checkbox&&!checkbox.checked){checkbox.checked=true;nasDestChanged();}
  selectedNASTargetID=id;openPicker('nas-target');
 }
+function scheduleModeChanged(){
+ const changed=$('scheduleMode').value==='changes';
+ $('syncInterval').closest('.field').classList.toggle('hidden',changed);
+ if(changed)$('syncInterval').value='5';
+}
 function nasDirectionChanged(){
  const nas=$('relationshipType').value==='nas',bi=$('nasDirection').value==='bidirectional';
  $('nasConflictFields').classList.toggle('hidden',!(nas&&bi));
@@ -290,7 +295,7 @@ function wizardFinalize(){
  $('reviewSource').textContent=nas?$('nasSourceId').selectedOptions[0]?.textContent+' / '+$('selectedNASSourceLabel').textContent:
   ($('sourceProvider').value==='dropbox' ? $('syncDropboxAccount').selectedOptions[0]?.textContent:$('syncAccount').selectedOptions[0]?.textContent)+' / '+$('selectedDriveLabel').textContent;
  $('reviewTarget').textContent=selectedNASDestinations().map(x=>x.label+' ('+x.folder+')').join(', ');
- $('reviewInterval').textContent=$('syncInterval').selectedOptions[0]?.textContent||'';
+ $('reviewInterval').textContent=$('scheduleMode').value==='changes'?'On NAS changes · 5-minute cloud reconciliation':$('syncInterval').selectedOptions[0]?.textContent||'';
  $('reviewDirection').textContent=nas?($('nasDirection').value==='one_way'?'One-way · Primary → Destination(s)':'Bidirectional · '+$('conflictPolicy').selectedOptions[0]?.textContent):
   ('Cloud ↔ NAS'+($('crossNASField').querySelector('input').checked?' · Cross-NAS propagation enabled':' · Cross-NAS propagation off'));
  $('reviewDeletion').textContent=($('propagateDeletions').checked?'Propagate deletions':'Do not propagate deletions')+
