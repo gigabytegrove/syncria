@@ -3,8 +3,6 @@ package main
 import (
  "bytes"
  "context"
- "crypto/sha256"
- "encoding/hex"
  "encoding/json"
  "errors"
  "fmt"
@@ -12,7 +10,6 @@ import (
  "net/http"
  "net/url"
  "path"
- "strconv"
  "strings"
  "time"
 )
@@ -179,7 +176,8 @@ func (b *bridgeDropboxEndpoint) Put(ctx context.Context,rel string,input io.Read
  target,err:=b.fullPath(rel);if err!=nil{return bridgeEntry{},err}
  const maxSimple int64=150*1024*1024
  var metadata dropboxFile
- counter:=&bridgeProgressReader{input:input,callback:progress}
+ sourceHash:=newDropboxHash()
+ counter:=&bridgeProgressReader{input:io.TeeReader(input,sourceHash),callback:progress}
  mode:=map[string]string{".tag":"overwrite"}
  if size<=maxSimple{
   payload,err:=b.uploadChunk(ctx,"files/upload",b.account,map[string]any{"path":target,"mode":mode,"autorename":false,"mute":true},counter,size)
@@ -213,6 +211,7 @@ func (b *bridgeDropboxEndpoint) Put(ctx context.Context,rel string,input io.Read
   }
  }
  if counter.read!=size||metadata.ID==""||metadata.Size!=size{return bridgeEntry{},errors.New("Dropbox upload could not verify file size and identity")}
+ if metadata.ContentHash==""||!strings.EqualFold(metadata.ContentHash,sourceHash.HexSum()){return bridgeEntry{},errors.New("Dropbox content checksum verification failed after upload")}
  if b.files==nil{b.files=map[string]dropboxFile{}}
  b.files[rel]=metadata
  modified,_:=time.Parse(time.RFC3339Nano,metadata.ServerModified)
@@ -293,6 +292,3 @@ func (a *App) browseDropbox(w http.ResponseWriter,r *http.Request){
  }
  sendBrowse(w,response)
 }
-var _=sha256.New
-var _=hex.EncodeToString
-var _=strconv.Itoa
