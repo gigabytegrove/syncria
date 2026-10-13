@@ -4,11 +4,38 @@ set -Eeuo pipefail
 cd "$(dirname "$0")/.."
 version="$1"
 case "$version" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo 'Usage: publish-release.sh vMAJOR.MINOR.PATCH' >&2; exit 2;; esac
-: "${GITHUB_USER:?Set GITHUB_USER to your GitHub username}"
-if test -z "${GH_TOKEN:-}"; then read -rsp "Classic GitHub token (public_repo, write:packages): " GH_TOKEN; echo; fi
-export GH_TOKEN
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"; unset GH_TOKEN' EXIT
+auth="$(mktemp -d)"
+trap 'rm -rf "$tmp" "$auth"; unset GH_TOKEN' EXIT
+
+# Release publishing is an explicit, one-time developer action.
+# Never repeatedly retry a stale credential (HTTP 401) as a host service.
+if test -z "${GH_TOKEN:-}" && command -v gh >/dev/null 2>&1; then
+  GH_TOKEN="$(gh auth token 2>/dev/null || true)"
+fi
+for attempt in 1 2 3; do
+  if test -z "${GH_TOKEN:-}"; then
+    test -r /dev/tty || { echo "Interactive GitHub token required." >&2; exit 1; }
+    read -rsp "GitHub publishing token (Contents read/write; packages for GHCR): " GH_TOKEN </dev/tty
+    echo >/dev/tty
+  fi
+  http_code="$(curl -sS -o "$tmp/whoami.json" -w '%{http_code}' \
+    -H "Authorization: Bearer $GH_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    https://api.github.com/user)"
+  if test "$http_code" = 200; then break; fi
+  echo "GitHub authentication rejected (HTTP $http_code). The previous publisher token is not valid." >&2
+  GH_TOKEN=""
+done
+test -n "${GH_TOKEN:-}" || { echo "No valid publishing token provided" >&2; exit 1; }
+export GH_TOKEN
+actual_login="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("login",""))' "$tmp/whoami.json")"
+if test -z "${GITHUB_USER:-}"; then GITHUB_USER="$actual_login"; fi
+if test "$GITHUB_USER" != "$actual_login"; then
+  echo "GITHUB_USER=$GITHUB_USER does not match authenticated token owner $actual_login" >&2
+  exit 1
+fi
+echo "Authenticated GitHub publishing user: $actual_login"
 mkdir -p "$tmp/dist"
 # Run tests once for the native Linux builder. Cross-compiled tests cannot execute on that host.
 docker run --rm --network none -v "$PWD:/src:ro" -w /src golang:1.23-alpine sh -ec 'go test ./... && go vet ./...'
@@ -86,7 +113,7 @@ assets={a["name"] for a in r.get("assets",[]) if a.get("state")=="uploaded" and 
 sys.exit(0 if not r.get("draft") and required.issubset(assets) else 1)
 PY
   then
-    echo "Release $version already publicly published with complete binaries and GHCR image"
+    echo "Release $version already publicly published with complete binaries"
     exit 0
   fi
   cat "$tmp/publish.json" >&2
@@ -94,9 +121,25 @@ PY
   exit 1
 fi
 echo "Published GitHub release $version"
+# Verify the newly published release is anonymously visible to all app updaters.
+public_status="$(curl -sS -o "$tmp/public-check.json" -w '%{http_code}' \
+  -H 'Accept: application/vnd.github+json' \
+  "https://api.github.com/repos/gigabytegrove/syncria/releases/tags/$version")"
+if test "$public_status" != 200; then
+  echo "ERROR: GitHub release is not publicly accessible (HTTP $public_status)." >&2
+  exit 1
+fi
+python3 - "$tmp/public-check.json" <<'PY'
+import json,sys
+r=json.load(open(sys.argv[1]))
+required={"syncria-linux-amd64","syncria-linux-arm64","syncria-windows-amd64.exe","syncria-darwin-amd64","SHA256SUMS"}
+assets={x["name"] for x in r.get("assets",[]) if x.get("state")=="uploaded" and x.get("size",0)>0}
+if r.get("draft") or r.get("prerelease") or not required.issubset(assets):
+    raise SystemExit("Release not installable: "+", ".join(sorted(required-assets)))
+print("Verified: public release and SHA256SUMS are available to Syncria's built-in updater.")
+PY
 # Optional GHCR publishing must never block direct GitHub binary updates.
 if test "${SYNCRIA_PUBLISH_GHCR:-0}" = 1; then
-  auth="$(mktemp -d)"
   export DOCKER_CONFIG="$auth"
   trap 'rm -rf "$tmp" "$auth"; unset GH_TOKEN' EXIT
   printf %s "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
