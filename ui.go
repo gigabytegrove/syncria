@@ -162,6 +162,13 @@ async function createFolder(){if(pickerType!=='local'||!folder)return;let name=p
 // The Updates screen checks the installed version on demand. The server restart
 // during an explicit installation is handled by the existing update workflow.
 // Poll only small status fields; never replace forms, panels, or the document.
+function formatBytes(value){
+  let n=Number(value)||0;
+  if(n<1024)return n.toLocaleString()+' B';
+  const units=['KB','MB','GB','TB','PB'];let i=-1;
+  do{n/=1024;i++;}while(n>=1024&&i<units.length-1);
+  return n.toFixed(n<10?1:0)+' '+units[i];
+}
 let dashboardPollBusy=false;
 async function refreshDashboardStatus(){
  if(document.hidden||dashboardPollBusy||!$('view-overview'))return;
@@ -172,6 +179,21 @@ async function refreshDashboardStatus(){
   const data=await res.json();
   if($('installedVersion')&&data.current)$('installedVersion').textContent=data.current;
   if($('sidebarVersion')&&data.current)$('sidebarVersion').textContent=data.current;
+   if(data.metrics){
+     const m=data.metrics;
+     const set=(id,value)=>{const el=$(id);if(el)el.textContent=value;};
+     const num=n=>Number(n||0).toLocaleString();
+     set('metricRuns',num(m.Runs));
+     set('metricFailures',num(m.Failures));
+     set('metricFiles',num(m.TrackedFiles));
+     set('metricBandwidth',formatBytes(Number(m.UploadBytes||0)+Number(m.DownloadBytes||0)));
+     set('activitySuccessful',num((m.Runs||0)-(m.Failures||0)));
+     set('activityFailed',num(m.Failures));
+     set('activityFiles',num((m.Uploaded||0)+(m.Downloaded||0)));
+     set('activityUploaded',formatBytes(m.UploadBytes));
+     set('activityDownloaded',formatBytes(m.DownloadBytes));
+     set('activityTransfer',formatBytes(Number(m.UploadBytes||0)+Number(m.DownloadBytes||0)));
+   }
   for(const job of data.jobs||[]){
    for(const el of document.querySelectorAll('[data-job-enabled]')){
     if(el.dataset.jobEnabled!==job.id)continue;
@@ -184,6 +206,25 @@ async function refreshDashboardStatus(){
    if(summary)summary.textContent=job.summary||'';
    const error=document.querySelector('[data-job-error="'+CSS.escape(job.id)+'"]');
    if(error){error.hidden=!job.error;error.textContent=job.error?'Error: '+job.error:'';}
+    const el=(attr)=>document.querySelector('['+attr+'="'+CSS.escape(job.id)+'"]');
+    const bytes=Number(job.total_upload_bytes||0)+Number(job.total_download_bytes||0);
+    const files=Number(job.total_uploads||0)+Number(job.total_downloads||0);
+    const line=el('data-job-statline');
+    if(line)line.textContent=files.toLocaleString()+' files moved · '+formatBytes(bytes)+' transferred · '+job.successful_runs+' successful / '+job.failed_runs+' failed runs';
+    const runs=el('data-job-runs'),fails=el('data-job-fails'),fileCount=el('data-job-files'),byteCount=el('data-job-bytes');
+    if(runs)runs.textContent=Number(job.successful_runs||0).toLocaleString();
+    if(fails)fails.textContent=Number(job.failed_runs||0).toLocaleString();
+    if(fileCount)fileCount.textContent=files.toLocaleString();
+    if(byteCount)byteCount.textContent=formatBytes(bytes);
+    const progress=el('data-activity-running');
+    if(progress){progress.textContent=job.running?'Running':job.error?'Last run failed':'Idle';progress.classList.toggle('off',!!job.error);}
+    const detail=el('data-job-detail');
+    if(detail){
+      const duration=Number(job.last_duration_ms||0)/1000;
+      const transferred=Number(job.last_upload_bytes||0)+Number(job.last_download_bytes||0);
+      const rate=duration>0?(transferred/duration):0;
+      detail.textContent='Latest run: '+(job.last_run||'Never')+' · '+(job.last_uploads||0)+' uploads / '+(job.last_downloads||0)+' downloads · '+formatBytes(transferred)+' · '+duration.toFixed(1)+'s · '+formatBytes(rate)+'/s average'+(job.error?' · '+job.error:'');
+    }
   }
   for(const share of data.shares||[]){
    for(const el of document.querySelectorAll('[data-share-mounted]')){
@@ -195,6 +236,7 @@ async function refreshDashboardStatus(){
  }catch(_e){/* Keep the current UI intact through temporary connection loss. */}
  finally{dashboardPollBusy=false;}
 }
+refreshDashboardStatus();
 setInterval(refreshDashboardStatus,15000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDashboardStatus()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePicker()});if(location.hash){let page=location.hash.slice(1);if($('view-'+page))navigate(page)}
