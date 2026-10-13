@@ -183,12 +183,34 @@ func updateBinaryWithProgress(ctx context.Context, dir string, r releaseInfo,pro
  sums,ok:=assetFor(r,"SHA256SUMS");if !ok{return "",errors.New("release lacks SHA256SUMS")}
  base:=filepath.Join(dir,"runtime");if err:=os.MkdirAll(base,0700);err!=nil{return "",err}
  tmpSum,err:=os.CreateTemp(base,".checksums-");if err!=nil{return "",err};sumPath:=tmpSum.Name();tmpSum.Close();os.Remove(sumPath);defer os.Remove(sumPath)
- if err=downloadAsset(ctx,sums,sumPath);err!=nil{return "",err};sumData,err:=os.ReadFile(sumPath);if err!=nil{return "",err}
+ if progress!=nil{progress("manifest",0,0)}
+ if err=downloadAsset(ctx,sums,sumPath);err!=nil{return "",err}
+ sumData,err:=os.ReadFile(sumPath);if err!=nil{return "",err}
  want,err:=expectedChecksum(sumData,binary.Name);if err!=nil{return "",err}
  tmp,err:=os.CreateTemp(base,".binary-");if err!=nil{return "",err};path:=tmp.Name();tmp.Close();os.Remove(path);defer os.Remove(path)
  if err=downloadAssetWithProgress(ctx,binary,path,func(downloaded,total int64){if progress!=nil{progress("downloading",downloaded,total)}});err!=nil{return "",err}
- if progress!=nil{progress("verifying",-1,-1)}
- f,err:=os.Open(path);if err!=nil{return "",err};hash:=sha256.New();_,err=io.Copy(hash,f);f.Close();if err!=nil{return "",err}
+ if progress!=nil{progress("verifying",0,0)}
+ f,err:=os.Open(path);if err!=nil{return "",err}
+ fileInfo,err:=f.Stat();if err!=nil{f.Close();return "",err}
+ hash:=sha256.New()
+ chunk:=make([]byte,128*1024)
+ var hashed int64
+ lastProgress:=time.Time{}
+ for {
+  n,readErr:=f.Read(chunk)
+  if n>0{
+   if _,err=hash.Write(chunk[:n]);err!=nil{f.Close();return "",err}
+   hashed+=int64(n)
+   if progress!=nil&&(time.Since(lastProgress)>120*time.Millisecond||hashed==fileInfo.Size()){
+    progress("verifying",hashed,fileInfo.Size())
+    lastProgress=time.Now()
+   }
+  }
+  if readErr==io.EOF{break}
+  if readErr!=nil{f.Close();return "",readErr}
+ }
+ if err=f.Close();err!=nil{return "",err}
+ if hashed!=fileInfo.Size(){return "",errors.New("Verification stopped before all binary bytes were hashed")}
  if hex.EncodeToString(hash.Sum(nil))!=want{return "",errors.New("download checksum mismatch; update rejected")}
  if err=os.Chmod(path,0700);err!=nil{return "",err}
  if progress!=nil{progress("staging",-1,-1)}
