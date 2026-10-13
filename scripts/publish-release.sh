@@ -78,49 +78,40 @@ if test "$found" = 0; then
   code="$(curl -sS -o "$tmp/release.json" -w '%{http_code}' -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" -d "{\"tag_name\":\"$version\",\"name\":\"Syncria $version\",\"draft\":true}" https://api.github.com/repos/gigabytegrove/syncria/releases)"
   if test "$code" != 201; then cat "$tmp/release.json" >&2; exit 1; fi
 else
-  echo "Resuming existing draft release $version"
+  echo "Reusing existing release record for $version"
 fi
-python3 - "$tmp/release.json" <<'PY'
+if python3 - "$tmp/release.json" <<'PY'
 import json,sys
 r=json.load(open(sys.argv[1]))
-if not r["draft"]:
-    raise SystemExit("Release already published. Bump VERSION instead of overwriting it.")
+sys.exit(0 if r.get("draft") else 1)
 PY
-release_id="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["id"])' "$tmp/release.json")"
-upload_url="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["upload_url"].split("{")[0])' "$tmp/release.json")"
-for file in "$tmp"/dist/*; do
-  name="$(basename "$file")"
-  if python3 - "$tmp/release.json" "$name" <<'PY'
+then
+  # Resume drafts; uploading each missing asset is safe after interruptions.
+  release_id="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["id"])' "$tmp/release.json")"
+  upload_url="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["upload_url"].split("{")[0])' "$tmp/release.json")"
+  for file in "$tmp"/dist/*; do
+    name="$(basename "$file")"
+    if python3 - "$tmp/release.json" "$name" <<'PY'
 import json,sys
 r=json.load(open(sys.argv[1]))
-sys.exit(0 if any(a["name"]==sys.argv[2] for a in r.get("assets",[])) else 1)
+sys.exit(0 if any(a["name"]==sys.argv[2] and a.get("state")=="uploaded" for a in r.get("assets",[])) else 1)
 PY
-  then continue; fi
-  code="$(curl -sS -o "$tmp/asset.json" -w '%{http_code}' -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/octet-stream" --data-binary "@$file" "$upload_url?name=$name")"
-  if test "$code" != 201; then cat "$tmp/asset.json" >&2; exit 1; fi
-done
-code="$(curl -sS -o "$tmp/publish.json" -w '%{http_code}' -X PATCH -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -d '{"draft":false}' "https://api.github.com/repos/gigabytegrove/syncria/releases/$release_id")"
-if test "$code" != 200; then
-  # The Releases API may reject publishing a duplicate draft with HTTP 422
-  # after the original release was made public in a previous attempt.
-  # Never report completion based only on a successful Docker push.
-  lookup="$(curl -sS -o "$tmp/public.json" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/gigabytegrove/syncria/releases/tags/$version")"
-  if test "$lookup" = 200 && python3 - "$tmp/public.json" <<'PY'
-import json,sys
-r=json.load(open(sys.argv[1]))
-required={"syncria-linux-amd64","syncria-linux-arm64","syncria-windows-amd64.exe","syncria-darwin-amd64","SHA256SUMS"}
-assets={a["name"] for a in r.get("assets",[]) if a.get("state")=="uploaded" and a.get("size",0)>0}
-sys.exit(0 if not r.get("draft") and required.issubset(assets) else 1)
-PY
-  then
-    echo "Release $version already publicly published with complete binaries"
-    exit 0
+    then continue; fi
+    code="$(curl -sS -o "$tmp/asset.json" -w '%{http_code}' -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/octet-stream" --data-binary "@$file" "$upload_url?name=$name")"
+    if test "$code" != 201; then cat "$tmp/asset.json" >&2; exit 1; fi
+  done
+  code="$(curl -sS -o "$tmp/publish.json" -w '%{http_code}' -X PATCH -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" -d '{"draft":false}' "https://api.github.com/repos/gigabytegrove/syncria/releases/$release_id")"
+  if test "$code" != 200; then
+    cat "$tmp/publish.json" >&2
+    echo "Unable to make release $version public" >&2
+    exit 1
   fi
-  cat "$tmp/publish.json" >&2
-  echo "Release $version remains unavailable in the public updater API" >&2
-  exit 1
+  echo "Published GitHub release $version"
+else
+  # A completed GitHub Release must not be retagged or overwritten.
+  # Continue to the optional GHCR push, which may have failed previously.
+  echo "GitHub release $version already published; verifying and continuing to container publish."
 fi
-echo "Published GitHub release $version"
 # Verify the newly published release is anonymously visible to all app updaters.
 public_status="$(curl -sS -o "$tmp/public-check.json" -w '%{http_code}' \
   -H 'Accept: application/vnd.github+json' \
