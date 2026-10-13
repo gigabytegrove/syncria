@@ -1023,6 +1023,10 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
         mode:=strings.TrimSpace(r.FormValue("schedule_mode"))
         if mode==""{mode="interval"}
         if mode!="interval"&&mode!="changes"{redirect(w,r,"Choose an interval or on-change scheduling");return}
+        if mode=="changes" {
+            if runtime.GOOS!="linux" {redirect(w,r,"Filesystem change scheduling requires Linux");return}
+            if _,watchErr:=exec.LookPath("inotifywait");watchErr!=nil {redirect(w,r,"Filesystem change scheduling requires inotifywait in the Syncria runtime; use a timed schedule instead");return}
+        }
         interval, e := strconv.Atoi(r.FormValue("interval"))
         if e != nil || interval<1 || interval>1440 {
             redirect(w,r,"Interval must be 1 to 1440 minutes")
