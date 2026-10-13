@@ -146,7 +146,14 @@ func (a *App) updateProgressAPI(w http.ResponseWriter,r *http.Request) {
   _=json.NewEncoder(w).Encode(struct {
    UpdateProgress
    Current string `json:"current"`
-  }{a.updateProgressSnapshot(),appVersion})
+   ElapsedSeconds int64 `json:"elapsed_seconds"`
+  }{func() UpdateProgress {return a.updateProgressSnapshot()}(),appVersion,func()int64 {
+    p:=a.updateProgressSnapshot()
+    if p.StartedAt.IsZero(){return 0}
+    seconds:=int64(time.Since(p.StartedAt).Seconds())
+    if seconds<0{return 0}
+    return seconds
+  }()})
   return
  }
  if r.Method!=http.MethodPost{w.Header().Set("Allow","GET, POST");http.Error(w,"Method not allowed",http.StatusMethodNotAllowed);return}
