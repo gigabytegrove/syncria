@@ -121,6 +121,14 @@ func allowedDesignatedNASOverlap(newJob,existing Job,folder NASDestination)bool{
  }
  return false
 }
+func (a *App) verifyNASFolder(ctx context.Context,d NASDestination)error{
+ nas,err:=a.openNAS(ctx,d);if err!=nil{return err}
+ defer nas.Close()
+ endpoint,ok:=nas.(*bridgeSMBEndpoint)
+ if !ok{return errors.New("NAS connection cannot browse selected folder")}
+ _,err=endpoint.client.share.ReadDir(endpoint.root)
+ return err
+}
 func (a *App) addBridge(w http.ResponseWriter,r *http.Request){
  name:=strings.TrimSpace(r.FormValue("name"))
  if name==""||len(name)>128{redirect(w,r,"Relationship name must be 1–128 characters");return}
@@ -195,20 +203,22 @@ func (a *App) addBridge(w http.ResponseWriter,r *http.Request){
  // accessible, without mounting or copying anything into Syncria.
  ctx,cancel:=context.WithTimeout(r.Context(),90*time.Second);defer cancel()
  if j.Provider=="nas_bridge"{
-  primary,err:=a.openNAS(ctx,NASDestination{ShareID:j.NASSourceID,Folder:j.NASSourceFolder})
-  if err!=nil{redirect(w,r,"Primary NAS unavailable: "+err.Error());return}
-  _,err=primary.Scan(ctx);primary.Close()
-  if err!=nil{redirect(w,r,"Primary NAS cannot be scanned: "+err.Error());return}
- }else{
-  cloud,err:=a.cloudEndpoint(&j);if err!=nil{redirect(w,r,err.Error());return}
-  _,err=cloud.Scan(ctx);cloud.Close()
-  if err!=nil{redirect(w,r,"Cloud folder cannot be scanned: "+err.Error());return}
+  if err:=a.verifyNASFolder(ctx,NASDestination{ShareID:j.NASSourceID,Folder:j.NASSourceFolder});err!=nil{
+   redirect(w,r,"Primary NAS folder unavailable: "+err.Error());return
+  }
+ }else if j.CloudProvider=="google_drive" {
+  if _,err:=a.folderChildren(ctx,j.AccountID,j.RemoteID);err!=nil{
+   redirect(w,r,"Google Drive folder unavailable: "+err.Error());return
+  }
+ }else {
+  if _,err:=a.dropboxList(ctx,j.DropboxAccountID,j.RemoteID,false);err!=nil{
+   redirect(w,r,"Dropbox folder unavailable: "+err.Error());return
+  }
  }
  for _,d:=range selected{
-  nas,err:=a.openNAS(ctx,d)
-  if err!=nil{redirect(w,r,"NAS unavailable: "+err.Error());return}
-  _,err=nas.Scan(ctx);nas.Close()
-  if err!=nil{redirect(w,r,"NAS destination cannot be scanned: "+err.Error());return}
+  if err:=a.verifyNASFolder(ctx,d);err!=nil{
+   redirect(w,r,"Destination NAS folder unavailable: "+err.Error());return
+  }
  }
  a.mu.Lock()
  // Overlapping storage is allowed ONLY for a cloud relationship's
