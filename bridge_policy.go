@@ -182,6 +182,8 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    if err!=nil{return err}
    recordTransfer(j,false,bytes);countBack++
    recordCloudOrigin(j,key,rel,l.Fingerprint)
+   // Persist the origin marker before another NAS relationship can observe this cloud version.
+   if err=a.checkpointBridge(j);err!=nil{return err}
   }else if !hasR{
    var bytes int64
    lChecksum:=""
@@ -221,6 +223,8 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     if err!=nil{return err}
     recordTransfer(j,false,bytes);countBack++
    recordCloudOrigin(j,key,rel,l.Fingerprint)
+   // Persist the origin marker before another NAS relationship can observe this cloud version.
+   if err=a.checkpointBridge(j);err!=nil{return err}
    }
   }
   next[rel]=Item{ID:l.ID,MD5:l.Fingerprint,LocalMD5:r.Fingerprint}
