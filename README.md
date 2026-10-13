@@ -6,6 +6,18 @@ A lightweight, self-hosted, **experimental** Google Drive ↔ filesystem synchro
 
 > **Alpha warning:** This version has not been live-tested with Google Drive accounts. Make backups before enabling synchronization. Native Google Docs/Sheets/Slides, shortcuts, shared drives, files with duplicate names, and complicated rename/move scenarios are not fully supported. The agent **stops with a visible error** instead of silently processing unsupported Google-native formats. Do not use for your only copy of important data.
 
+## Zero1Local companion — coming soon
+
+Syncria is the planned **Google Drive companion system for [Zero1Local](https://github.com/gigabytegrove/zero1local)**. Future Zero1Local versions will remove their native Google Drive OAuth and synchronization functionality rather than duplicating Syncria's engine.
+
+- Syncria remains a fully standalone application, supporting its existing native Linux/Windows deployment and standalone Docker operation.
+- It is **optional**: Zero1Local does not need Syncria for ordinary NAS, local backup, shares or administration, and Syncria does not require Zero1Local.
+- A future **optional connector** may display Syncria health and job status in Zero1Local. The current Syncria browser-session endpoints are not a stable connector API; there is **no working Zero1Local integration yet**.
+- Syncria can run on a separate host and use only explicitly permitted NAS shares. This is particularly important for low-resource Zero1Local-ix2 devices, which do not have Docker support.
+- The companion must not require a specific container management platform, a Docker socket, a secondary updater container, or privileged NAS admin credentials. Syncria retains its in-app update mechanism.
+
+This is a product roadmap, **not** a declaration that Google Drive sync or Zero1Local integration is production-qualified. Track the integration in [Syncria issue #1](https://github.com/gigabytegrove/syncria/issues/1) and see [Zero1Local's companion specification](https://github.com/gigabytegrove/zero1local/blob/main/docs/SYNCRIA.md).
+
 ## v0.3.0 dashboard replacement
 
 The original single-page dashboard markup has been deleted. The application now uses a separate `ui.go` template with a responsive sidebar, dedicated Overview, Sync relationships, Storage, Google accounts, Updates and Settings screens, connection-status cards, a modal Drive/local folder navigator, an isolated sync setup wizard, and network-share administration. The existing Go sync engine, saved accounts, credentials, and mappings remain compatible; this update is a **UI replacement**, not a configuration reset.
