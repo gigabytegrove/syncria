@@ -37,12 +37,23 @@ if test "$GITHUB_USER" != "$actual_login"; then
 fi
 echo "Authenticated GitHub publishing user: $actual_login"
 mkdir -p "$tmp/dist"
-# Run tests once for the native Linux builder. Cross-compiled tests cannot execute on that host.
-docker run --rm --network none -v "$PWD:/src:ro" -w /src golang:1.23-alpine sh -ec 'go test ./... && go vet ./...'
+# Test in a throwaway *writable* source copy so Go can resolve direct
+# protocol adapter dependencies without changing the maintainer checkout.
+# No GitHub Actions runners, persistent services or runtime updaters are used.
+mkdir -p "$tmp/go-cache"
+docker run --rm \
+  -v "$PWD:/source:ro" -v "$tmp/go-cache:/go/pkg/mod" \
+  -w /src golang:1.25-alpine sh -ec \
+  'cp -a /source /src; cd /src; go mod tidy; go test ./...; go vet ./...'
 for target in linux/amd64 linux/arm64 windows/amd64 darwin/amd64; do
   os="${target%/*}"; arch="${target#*/}"; ext=""
   if test "$os" = windows; then ext=".exe"; fi
-  docker run --rm --network none -v "$PWD:/src:ro" -v "$tmp/dist:/dist" -w /src -e GOOS="$os" -e GOARCH="$arch" -e CGO_ENABLED=0 -e REL_VERSION="$version" -e EXT="$ext" golang:1.23-alpine sh -ec 'go build -trimpath -ldflags="-s -w -X main.appVersion=$REL_VERSION" -o "/dist/syncria-$GOOS-$GOARCH$EXT" .'
+  docker run --rm \
+    -v "$PWD:/source:ro" -v "$tmp/go-cache:/go/pkg/mod" \
+    -v "$tmp/dist:/dist" -w /src \
+    -e GOOS="$os" -e GOARCH="$arch" -e CGO_ENABLED=0 \
+    -e REL_VERSION="$version" -e EXT="$ext" golang:1.25-alpine \
+    sh -ec 'cp -a /source /src; cd /src; go mod tidy; go build -trimpath -ldflags="-s -w -X main.appVersion=$REL_VERSION" -o "/dist/syncria-$GOOS-$GOARCH$EXT" .'
 done
 (cd "$tmp/dist" && sha256sum syncria-* > SHA256SUMS)
 gitsha="$(git rev-parse HEAD)"
