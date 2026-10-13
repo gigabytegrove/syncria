@@ -83,8 +83,13 @@ func (b *bridgeDriveEndpoint) Restore(ctx context.Context,rel,token string)error
 }
 func (b *bridgeDriveEndpoint) Purge(ctx context.Context,token string)error{
  if token==""||!validDriveID(token){return errors.New("Invalid Drive recovery token")}
- resp,err:=b.app.drive(ctx,b.account,http.MethodDelete,
-  "https://www.googleapis.com/drive/v3/files/"+url.PathEscape(token),nil,"")
+ uri:="https://www.googleapis.com/drive/v3/files/"+url.PathEscape(token)
+ var metadata struct{ID string `json:"id"`;Trashed bool `json:"trashed"`}
+ if err:=b.app.apiJSON(ctx,b.account,http.MethodGet,uri+"?fields=id,trashed",nil,&metadata);err!=nil{return err}
+ // A file restored by someone in Google Drive must NEVER be deleted
+ // automatically after Syncria's 10-minute undo window expires.
+ if !metadata.Trashed{return nil}
+ resp,err:=b.app.drive(ctx,b.account,http.MethodDelete,uri,nil,"")
  if err!=nil{return err}
  defer resp.Body.Close()
  return nil
