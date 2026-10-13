@@ -22,13 +22,78 @@ func (a *App) directShare(id string)(StorageShare,error){
  return StorageShare{},errors.New("Select a connected direct SMB NAS share")
 }
 
+func (a *App) cloudEndpoint(j *Job)(recoverableBridgeEndpoint,error){
+ provider:=j.CloudProvider
+ if provider==""{provider="google_drive"}
+ switch provider{
+ case "google_drive":
+  if j.AccountID==""{return nil,errors.New("Google Drive account not selected")}
+  a.mu.Lock();exists:=a.account(j.AccountID)!=nil;a.mu.Unlock()
+  if !exists{return nil,errors.New("Google Drive account unavailable")}
+  return &bridgeDriveEndpoint{app:a,account:j.AccountID,root:j.RemoteID},nil
+ case "dropbox":
+  if j.DropboxAccountID==""{return nil,errors.New("Dropbox account not selected")}
+  a.mu.Lock();exists:=a.dropboxAccount(j.DropboxAccountID)!=nil;a.mu.Unlock()
+  if !exists{return nil,errors.New("Dropbox account unavailable")}
+  return &bridgeDropboxEndpoint{app:a,account:j.DropboxAccountID,root:j.RemoteID},nil
+ default:return nil,fmt.Errorf("Cloud provider %q is not supported",provider)
+ }
+}
+func (a *App) openNAS(ctx context.Context,d NASDestination)(recoverableBridgeEndpoint,error){
+ share,err:=a.directShare(d.ShareID);if err!=nil{return nil,err}
+ conn,err:=a.dialSMB(ctx,share);if err!=nil{return nil,err}
+ return &bridgeSMBEndpoint{client:conn,root:d.Folder},nil
+}
 func (a *App) syncBridge(ctx context.Context,j *Job) error {
- if j.AccountID==""||j.NASShareID==""{return errors.New("Bridge source account or NAS destination is missing")}
- share,err:=a.directShare(j.NASShareID);if err!=nil{return err}
- network,err:=a.dialSMB(ctx,share);if err!=nil{return err}
- dest:=&bridgeSMBEndpoint{client:network,root:j.NASFolder}
- cloud:=&bridgeDriveEndpoint{app:a,account:j.AccountID,root:j.RemoteID}
- return a.executeBridge(ctx,j,cloud,dest)
+ destinations:=append([]NASDestination(nil),j.NASDestinations...)
+ if len(destinations)==0&&j.NASShareID!=""{
+  destinations=[]NASDestination{{ShareID:j.NASShareID,Folder:j.NASFolder}}
+ }
+ if len(destinations)==0{return errors.New("No destination NAS configured")}
+ if j.Provider=="nas_bridge"{
+  if j.NASSourceID==""{return errors.New("Select the primary NAS for the relationship")}
+  source:=NASDestination{ShareID:j.NASSourceID,Folder:j.NASSourceFolder}
+  policy:=j.ConflictPolicy
+  if policy==""{policy=conflictManual}
+  if j.Direction=="bidirectional"&&!validNASPolicy(policy){return errors.New("A valid approved NAS conflict policy is required")}
+  if j.Direction!="one_way"&&j.Direction!="bidirectional"{return errors.New("Choose one-way or bidirectional NAS sync")}
+  for _,destination:=range destinations{
+   primary,err:=a.openNAS(ctx,source);if err!=nil{return fmt.Errorf("Primary NAS: %w",err)}
+   secondary,err:=a.openNAS(ctx,destination);if err!=nil{primary.Close();return fmt.Errorf("Destination NAS: %w",err)}
+   key:=relationPairKey("nas:"+source.ShareID+":"+source.Folder,destination)
+   if err=a.executePolicyPair(ctx,j,primary,secondary,key,j.Direction=="one_way",policy);err!=nil{return err}
+  }
+  return nil
+ }
+ if j.Provider!="bridge"{return errors.New("Unsupported relationship type")}
+ // When a separate NAS-to-NAS relationship owns the selected NAS group,
+ // use the designated cloud-connected NAS only and let NAS-to-NAS do the
+ // rest. Otherwise every explicitly configured destination remains active.
+ a.mu.Lock();related:=false
+ for _,other:=range a.cfg.Jobs {
+  if other.ID==j.ID||other.Provider!="nas_bridge"||!other.Enabled{continue}
+  for _,d:=range destinations{
+   if d.ShareID==other.NASSourceID{related=true;break}
+   for _,child:=range other.NASDestinations{if d.ShareID==child.ShareID{related=true;break}}
+  }
+  if related{break}
+ }
+ a.mu.Unlock()
+ if related&&len(destinations)>1{destinations=destinations[:1]}
+ for i,d:=range destinations{
+  cloud,err:=a.cloudEndpoint(j);if err!=nil{return err}
+  nas,err:=a.openNAS(ctx,d);if err!=nil{cloud.Close();return err}
+  sourceName:=j.CloudProvider;if sourceName==""{sourceName="google_drive"}
+  account:=j.AccountID;if sourceName=="dropbox"{account=j.DropboxAccountID}
+  key:=relationPairKey(sourceName+":"+account+":"+j.RemoteID,d)
+  // The designated first NAS is the bidirectional cloud counterpart.
+  // Remaining NAS destinations are mirrors of the cloud only; they do not
+  // feed changes into the cloud unless explicitly configured as a separate
+  // cloud relationship. This avoids accidental NAS-to-NAS propagation.
+  oneWay:=i>0&&!j.CrossNASPropagation
+  if err=a.executePolicyPair(ctx,j,cloud,nas,key,oneWay,conflictManual);err!=nil{return err}
+ }
+ return nil
 }
 
 // addBridge only saves endpoint references and sync state on Syncria.
