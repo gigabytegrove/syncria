@@ -40,6 +40,9 @@ func findPending(j *Job,key,rel string)(int,PendingDeletion){
  return -1,PendingDeletion{}
 }
 func (a *App) restorePendingDeletion(ctx context.Context,id,key,rel string)error{
+ // Undo must not race an automatically scheduled NAS/cloud transfer.
+ a.bridgeSyncMu.Lock()
+ defer a.bridgeSyncMu.Unlock()
  if _,busy:=a.runs.Load(id);busy{return errors.New("Wait for the current sync to finish before restoring")}
  a.mu.Lock();job:=a.job(id)
  if job==nil{a.mu.Unlock();return errors.New("Relationship not found")}
@@ -112,12 +115,13 @@ func (a *App) expireRecoveries(ctx context.Context){
   for _,p:=range job.PendingDeletions{
    if time.Now().Before(p.Expires){continue}
    runCtx,cancel:=context.WithTimeout(ctx,30*time.Second)
+   a.bridgeSyncMu.Lock()
    primary,secondary,err:=a.recoveryPair(runCtx,&job,p.Pair)
-   if err!=nil{cancel();continue}
+   if err!=nil{a.bridgeSyncMu.Unlock();cancel();continue}
    surviving:=primary
    if p.MissingSide=="primary"{surviving=secondary}
    err=surviving.Purge(runCtx,p.RecoveryToken)
-   primary.Close();secondary.Close();cancel()
+   primary.Close();secondary.Close();a.bridgeSyncMu.Unlock();cancel()
    if err!=nil{continue}
    a.mu.Lock()
    actual:=a.job(job.ID)
