@@ -262,12 +262,61 @@ async function checkUpdate(force=false){
  await pollUpdateProgress();
 }
 setInterval(pollUpdateProgress,1200);
-function openPicker(type){pickerType=type;folder='';parent='';folderName='';$('picker').classList.add('open');$('pickerTitle').textContent=type==='drive'?'Browse Google Drive':type==='source-storage'?'Choose source storage folder':'Choose destination storage folder';$('pickerNew').classList.toggle('hidden',type!=='local');loadFolder(type==='drive'?'root':'');}
+function openPicker(type){
+ if(type!=='drive'&&type!=='nas'){alert('Select a cloud or connected NAS folder. Local Docker folders are not sync destinations.');return;}
+ if(type==='nas'&&!$('nasId').value){alert('Choose a NAS connection first.');return;}
+ pickerType=type;folder='';parent='';folderName='';$('picker').classList.add('open');
+ $('pickerTitle').textContent=type==='drive'?'Browse Google Drive':'Browse NAS directly';
+ $('pickerNew').classList.toggle('hidden',type!=='nas');
+ loadFolder(type==='drive'?'root':'.');
+}
 function closePicker(){pickSeq++;$('picker').classList.remove('open');}
-async function loadFolder(path,label){let seq=++pickSeq;let drive=pickerType==='drive',account=$('syncAccount');$('pickerStatus').textContent='Loading folders…';$('pickerSelect').disabled=true;$('folderList').replaceChildren();let endpoint=drive?'/api/browse/drive?account='+encodeURIComponent(account?account.value:'')+'&parent='+encodeURIComponent(path||'root'):'/api/browse/local?path='+encodeURIComponent(path);try{let resp=await fetch(endpoint,{cache:'no-store'});if(!resp.ok)throw Error((await resp.text()).trim());let data=await resp.json();if(seq!==pickSeq)return;folder=data.path;parent=data.parent||'';if(label)folderName=label;else if(drive&&folder==='root')folderName='Entire My Drive';else if(!drive)folderName=folder;$('pickerPath').textContent=drive?('My Drive / '+folderName):folder;$('pickerUp').disabled=!parent;$('pickerSelect').disabled=false;data.entries.forEach(item=>{let b=document.createElement('button');b.type='button';b.className='folder-row';b.textContent='📁   '+item.name;b.addEventListener('click',()=>loadFolder(item.id,item.name));$('folderList').appendChild(b)});$('pickerStatus').textContent=data.message||(data.entries.length?data.entries.length+' folders · Select current folder or open another.':'No subfolders · Select this folder.');}catch(e){if(seq!==pickSeq)return;$('pickerStatus').textContent='Unable to load folders: '+e.message;}}
-function pickerUp(){if(parent)loadFolder(parent,parent==='root'?'Entire My Drive':undefined);}
-function selectFolder(){if(!folder)return;syncReviewed=false;if(pickerType==='drive'){$('remoteValue').value=folder;$('selectedDriveLabel').textContent=folderName||folder;}else if(pickerType==='source-storage'){$('remoteValue').value=folder;$('selectedSourceLabel').textContent=folder;}else{$('localValue').value=folder;$('selectedLocalLabel').textContent=folder;}closePicker();}
-async function createFolder(){if(pickerType!=='local'||!folder)return;let name=prompt('New folder name');if(name===null)return;name=name.trim();if(!name)return;let p=new URLSearchParams({parent:folder,name});try{let res=await fetch('/api/browse/local/create',{method:'POST',body:p});if(!res.ok)throw Error((await res.text()).trim());await loadFolder(folder);}catch(e){$('pickerStatus').textContent='Could not create folder: '+e.message;}}
+async function loadFolder(selected,label){
+ let seq=++pickSeq,drive=pickerType==='drive';
+ $('pickerStatus').textContent='Reading remote folders…';$('pickerSelect').disabled=true;
+ $('folderList').replaceChildren();
+ const endpoint=drive?
+  '/api/browse/drive?account='+encodeURIComponent($('syncAccount').value)+'&parent='+encodeURIComponent(selected||'root'):
+  '/api/browse/nas?id='+encodeURIComponent($('nasId').value)+'&path='+encodeURIComponent(selected||'.');
+ try{
+  const resp=await fetch(endpoint,{credentials:'same-origin',cache:'no-store'});
+  if(!resp.ok)throw Error((await resp.text()).trim());
+  const data=await resp.json();if(seq!==pickSeq)return;
+  folder=data.path;parent=data.parent||'';
+  folderName=label||(drive?(folder==='root'?'Entire My Drive':folder):(folder==='.'?'Share root':folder));
+  $('pickerPath').textContent=folderName;
+  $('pickerUp').disabled=!parent;$('pickerSelect').disabled=false;
+  for(const item of data.entries||[]){
+   const btn=document.createElement('button');
+   btn.type='button';btn.className='folder-row';btn.textContent='📁  '+item.name;
+   btn.addEventListener('click',()=>loadFolder(item.id,item.name));
+   $('folderList').appendChild(btn);
+  }
+  $('pickerStatus').textContent=data.message||((data.entries||[]).length+' remote folders. Choose this folder or browse deeper.');
+ }catch(e){
+  if(seq!==pickSeq)return;
+  $('pickerStatus').textContent='Cannot browse: '+e.message;
+ }
+}
+function pickerUp(){if(parent)loadFolder(parent);}
+function selectFolder(){
+ if(!folder||!pickerType)return;
+ syncReviewed=false;
+ if(pickerType==='drive'){$('remoteValue').value=folder;$('selectedDriveLabel').textContent=folderName||folder;}
+ else{$('nasFolderValue').value=folder;$('selectedNASLabel').textContent=folderName||folder;}
+ closePicker();
+}
+async function createFolder(){
+ if(pickerType!=='nas'||!folder)return;
+ let name=prompt('New folder on NAS');if(name===null)return;
+ name=name.trim();if(!name)return;
+ const body=new URLSearchParams({id:$('nasId').value,parent:folder,name});
+ try{
+  const resp=await fetch('/api/browse/nas/create',{method:'POST',credentials:'same-origin',body});
+  if(!resp.ok)throw Error((await resp.text()).trim());
+  await loadFolder(folder);
+ }catch(e){$('pickerStatus').textContent='NAS folder creation failed: '+e.message;}
+}
 // Never navigate away from an active UI session in response to background polling.
 // The Updates screen checks the installed version on demand. The server restart
 // during an explicit installation is handled by the existing update workflow.
