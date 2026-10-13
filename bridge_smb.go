@@ -146,6 +146,7 @@ func (s *directSMB) put(ctx context.Context,root,rel string,source io.Reader,exp
  buf:=make([]byte,chunk)
  var n int64
  checksum:=md5.New()
+ dropboxChecksum:=newDropboxHash()
  for {
   if err:=ctx.Err();err!=nil{f.Close();return err}
   count,readErr:=source.Read(buf)
@@ -154,6 +155,7 @@ func (s *directSMB) put(ctx context.Context,root,rel string,source io.Reader,exp
    if writeErr!=nil{f.Close();return writeErr}
    if written!=count{f.Close();return io.ErrShortWrite}
    if _,e:=checksum.Write(buf[:written]);e!=nil{f.Close();return e}
+   if _,e:=dropboxChecksum.Write(buf[:written]);e!=nil{f.Close();return e}
    if report!=nil{report(n)}
   }
   if readErr==io.EOF{break}
@@ -161,7 +163,15 @@ func (s *directSMB) put(ctx context.Context,root,rel string,source io.Reader,exp
  }
  if err=f.Close();err!=nil{return err}
  if expectedSize>=0&&expectedSize!=n{return fmt.Errorf("Transfer length mismatch: expected %d, wrote %d",expectedSize,n)}
- if expectedMD5!=""&&!strings.EqualFold(hex.EncodeToString(checksum.Sum(nil)),expectedMD5){return errors.New("Source checksum mismatch; original NAS file preserved")}
+ if expectedMD5!=""{
+  switch len(expectedMD5){
+  case 32:
+   if !strings.EqualFold(hex.EncodeToString(checksum.Sum(nil)),expectedMD5){return errors.New("Source MD5 mismatch; original NAS file preserved")}
+  case 64:
+   if !strings.EqualFold(dropboxChecksum.HexSum(),expectedMD5){return errors.New("Dropbox source content hash mismatch; original NAS file preserved")}
+  default:return errors.New("Unrecognized source checksum; NAS destination unchanged")
+  }
+ }
  // Renaming a completed staging file is performed on the NAS. Existing
  // destination files are never removed first; if the NAS disallows
  // replacement the operation fails safely rather than deleting user data.
