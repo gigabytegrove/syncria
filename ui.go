@@ -26,6 +26,14 @@ body{background:linear-gradient(150deg,#f7fbff 0%,#edf5ff 100%);color:#092b54}
 code{color:#076bd3}
 .danger{background:#fff0f2;border:1px solid #f1c2c9;color:#b32238}
 .auth-layout{display:block;max-width:600px;margin:0 auto;min-height:100vh}.auth-layout .content{padding:60px 18px}.auth-brand{display:block;width:220px;max-width:100%;margin:0 0 42px}.auth-layout .topline{margin-bottom:25px}.auth-layout .panel{max-width:100%!important}.stats .stat strong{font-variant-numeric:tabular-nums}.stats-compact{grid-template-columns:repeat(4,minmax(0,1fr))}.stats-compact .stat{padding:12px}.stats-compact .stat strong{font-size:20px}.wizard-status{padding:12px 14px;border-radius:9px;background:#f2f7fd;border:1px solid #d5e4f3;margin:12px 0;color:#22486a}.wizard-status.good{background:#e8f7f2;border-color:#b9e6d6;color:#12634d}.wizard-status.bad{background:#fff0f1;border-color:#f0bdc4;color:#9e283f}.step-indicator{flex-wrap:wrap}.review-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.review-grid>div{padding:13px;background:#f5faff;border:1px solid #dae7f4;border-radius:10px}.review-grid strong{display:block;overflow-wrap:anywhere}.mini-stat{font-variant-numeric:tabular-nums}@media(max-width:680px){.stats-compact,.review-grid{grid-template-columns:1fr 1fr}}
+.update-progress-panel{margin:20px 0 4px;padding:18px;border-radius:12px;border:1px solid #c4daf5;background:#f6faff}
+.update-progress-panel progress{width:100%;height:15px;accent-color:#0869f8;display:block;margin:13px 0 9px}
+.update-progress-panel .update-progress-meta{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.update-progress-panel .update-steps{list-style:none;display:flex;gap:8px;flex-wrap:wrap;padding:0;margin:15px 0 0}
+.update-progress-panel .update-steps li{border:1px solid #d6e3f5;padding:5px 10px;border-radius:7px;color:#597493;font-size:12px}
+.update-progress-panel .update-steps li.active{background:#e3f2ff;color:#0869f8;border-color:#91bbef;font-weight:700}
+.update-progress-panel .update-steps li.done{color:#146c52;background:#e7f6ed;border-color:#bcdfc9}
+.update-progress-panel .update-steps li.failed{color:#a02835;background:#fff2f4;border-color:#e6aeb8}
 </style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">{{if and .Configured .Logged}}<aside class="sidebar"><div class="brand"><img src="/assets/syncria-logo.svg" alt="Syncria" style="display:block;width:200px;max-width:100%;height:auto;object-fit:contain;object-position:left"></div><div><div class="tiny">Workspace</div><nav class="nav" aria-label="Main navigation">
 <button class="active" type="button" data-view="overview">◫ &nbsp; Overview</button>
@@ -59,7 +67,7 @@ code{color:#076bd3}
 <section class="view" id="view-accounts"><p class="lead">Connect and verify cloud accounts. Local and mounted storage sources do not require a cloud account.</p><section class="panel"><div class="panel-head"><h2>Cloud accounts</h2><button class="primary" type="button" onclick="startAccountWizard()">+ Add account</button></div>{{range .Accounts}}<div class="entry"><div><strong>{{.Email}}</strong><p>Google Drive · OAuth authorized</p></div><div class="row"><button class="secondary" type="button" onclick="verifyConnectedAccount('{{.ID}}',this)">Verify access</button><span class="status">Connected</span><form method="post" action="/action" class="inline" onsubmit="return confirm('Disconnect account?')"><input type="hidden" name="action" value="remove_account"><input type="hidden" name="id" value="{{.ID}}"><button class="danger">Disconnect</button></form></div></div>{{else}}<div class="empty"><strong>No cloud accounts connected</strong>Use Add account to connect and verify Google Drive access.</div>{{end}}</section>
 <section class="panel hidden" id="accountWizard"><div class="panel-head"><h2>Connect cloud account</h2><button class="secondary" type="button" onclick="document.getElementById('accountWizard').classList.add('hidden')">Close</button></div><div class="step-indicator"><span class="active" id="accountMarker1">1 · Provider</span><span id="accountMarker2">2 · Authorization</span></div><div class="step active" id="accountStep1"><label class="field">Available provider<select id="accountProvider"><option value="google_drive">Google Drive</option></select></label><p class="muted">Google Drive requires an OAuth application. Other storage types are supported as local/SMB/NFS folder sources without an account.</p>{{if .ClientID}}<p class="wizard-status good">Google OAuth client configured. Continue to authorize and verify an account.</p><button class="primary" type="button" onclick="showAccountStep(2)">Continue →</button>{{else}}<p class="wizard-status bad">Google OAuth is not configured yet. Set it up under Settings before connecting.</p><button class="secondary" type="button" onclick="navigate('settings')">Configure Google OAuth</button>{{end}}</div><div class="step" id="accountStep2"><p>Google will show Syncria's requested Drive permissions. You will return to this dashboard after authorization. Syncria then stores the connected account for use in relationships.</p><div class="row"><button class="secondary" type="button" onclick="showAccountStep(1)">← Back</button><a href="/oauth/start" class="primary" style="text-decoration:none">Authorize Google account →</a></div></div></section></section>
 <section class="view" id="view-activity"><p class="lead">Historical transfer totals are persisted with each relationship; live running state and the latest results refresh automatically. Bandwidth reflects payload bytes transferred, not protocol overhead.</p><div class="stats"><div class="stat"><small>Successful runs</small><strong id="activitySuccessful">{{.Metrics.Runs}}</strong></div><div class="stat"><small>Failed runs</small><strong id="activityFailed">{{.Metrics.Failures}}</strong></div><div class="stat"><small>Files transferred</small><strong id="activityFiles">—</strong></div><div class="stat"><small>Uploaded</small><strong id="activityUploaded">—</strong></div><div class="stat"><small>Downloaded</small><strong id="activityDownloaded">—</strong></div><div class="stat"><small>Combined transfer</small><strong id="activityTransfer">—</strong></div></div><section class="panel"><h2>Per-relationship statistics</h2>{{range .Jobs}}<div class="entry"><div style="width:100%"><strong>{{.Name}}</strong> <span class="status" data-activity-running="{{.ID}}">History</span><p class="muted">{{if eq .Provider "storage"}}Storage ↔ Storage{{else}}Google Drive ↔ Storage{{end}}</p><div class="stats stats-compact"><div class="stat"><small>Completed runs</small><strong data-job-runs="{{.ID}}">{{.SuccessfulRuns}}</strong></div><div class="stat"><small>Failed runs</small><strong data-job-fails="{{.ID}}">{{.FailedRuns}}</strong></div><div class="stat"><small>Files moved</small><strong data-job-files="{{.ID}}">—</strong></div><div class="stat"><small>Payload transferred</small><strong data-job-bytes="{{.ID}}">—</strong></div></div><p data-job-detail="{{.ID}}" class="muted">Latest run stats loading…</p></div></div>{{else}}<div class="empty">There are no sync relationships to measure yet.</div>{{end}}</section></section>
-<section class="view" id="view-updates"><p class="lead">Install verified versioned releases without losing your persistent configuration.</p><section class="panel"><div class="panel-head"><h2>Software updates</h2><span class="pill">Installed: <span id="installedVersion">{{.Version}}</span></span></div><div class="selected"><div><span class="card-label">Latest GitHub version tag</span><strong id="latestVersion">Checking releases…</strong><span class="muted" id="updateMessage"></span></div><button class="secondary" type="button" onclick="checkUpdate()">Check again</button></div><div class="row"><form method="post" action="/action" onsubmit="return confirm('Install latest verified release and restart Syncria?')"><input type="hidden" name="action" value="update_install"><button id="installUpdateButton" class="primary" disabled>Install latest</button></form><form method="post" action="/action" onsubmit="return confirm('Rollback to previous version?')"><input type="hidden" name="action" value="update_rollback"><button class="secondary">Rollback</button></form></div><p style="margin-top:18px">Updates are blocked while synchronization is active. Versions are discovered from GitHub tags. Installation is enabled when verified binaries and checksums are published.</p></section><section class="panel"><h2>Manual update</h2><p class="muted">Upload the Syncria executable and SHA256SUMS from the same GitHub release. The server verifies the binary checksum before installing. No GitHub API access is required.</p><form action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return confirm('Verify uploaded release files, install, and restart Syncria?')"><label class="field">Syncria application binary<input type="file" name="binary" required></label><label class="field">SHA256SUMS<input type="file" name="checksums" required></label><button class="primary" type="submit">Verify and install uploaded update</button></form></section></section>
+<section class="view" id="view-updates"><p class="lead">Install verified versioned releases without losing your persistent configuration.</p><section class="panel"><div class="panel-head"><h2>Software updates</h2><span class="pill">Installed: <span id="installedVersion">{{.Version}}</span></span></div><div class="selected"><div><span class="card-label">Latest GitHub version tag</span><strong id="latestVersion">Checking releases…</strong><span class="muted" id="updateMessage"></span></div><button class="secondary" type="button" onclick="checkUpdate()">Check again</button></div><div class="row"><button id="installUpdateButton" class="primary" disabled type="button" onclick="startUpdate('install')">Install latest</button><button id="rollbackUpdateButton" class="secondary" type="button" onclick="startUpdate('rollback')">Rollback</button></div><section id="updateFlow" class="update-progress-panel hidden" aria-live="polite" aria-label="Update installation progress"><div class="update-progress-meta"><strong id="updatePhaseTitle">Preparing update…</strong><span id="updatePercent" class="muted">0%</span></div><progress id="updateProgressBar" value="0" max="100" aria-label="Installation progress"></progress><p id="updateProgressMessage" class="muted" role="status">Preparing…</p><div class="row"><span id="updateProgressBytes" class="muted"></span><span id="updateProgressTarget" class="muted"></span></div><ol class="update-steps" id="updateSteps"><li data-update-phase="checking">Check</li><li data-update-phase="downloading">Download</li><li data-update-phase="verifying">Verify</li><li data-update-phase="staging">Install</li><li data-update-phase="restarting">Restart</li><li data-update-phase="complete">Complete</li></ol><p id="updateError" class="wizard-status bad hidden" role="alert"></p><button id="updateReloadButton" class="secondary hidden" type="button" onclick="window.location.assign('/#updates')">Reload updated interface</button></section><p style="margin-top:18px">Updates are blocked while synchronization is active. Versions are discovered from GitHub tags. Installation is enabled when verified binaries and checksums are published.</p></section><section class="panel"><h2>Manual update</h2><p class="muted">Upload the Syncria executable and SHA256SUMS from the same GitHub release. The server verifies the binary checksum before installing. No GitHub API access is required.</p><form action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return confirm('Verify uploaded release files, install, and restart Syncria?')"><label class="field">Syncria application binary<input type="file" name="binary" required></label><label class="field">SHA256SUMS<input type="file" name="checksums" required></label><button class="primary" type="submit">Verify and install uploaded update</button></form></section></section>
 <section class="view" id="view-settings"><p class="lead">Application configuration and account authorization.</p><section class="panel"><h2>Google OAuth</h2><p>Set up a Google Cloud OAuth web application, enable Drive API and register this callback URI:</p><div class="selected"><code>{{.Callback}}</code></div><form method="post" action="/action"><input type="hidden" name="action" value="oauth_settings"><label class="field">Client ID<input name="client_id" value="{{.ClientID}}" required></label><label class="field">Client secret<input name="client_secret" type="password" placeholder="Leave blank to keep existing secret"></label><label class="field">Public dashboard URL<input name="base_url" value="{{.BaseURL}}" required></label><button class="primary">Save OAuth settings</button></form></section></section>
 {{end}}</div></main>
 <div class="picker" id="picker" role="dialog" aria-modal="true" aria-labelledby="pickerTitle"><div class="picker-box"><div class="picker-head"><div class="panel-head" style="margin:0"><h2 id="pickerTitle">Select folder</h2><button class="secondary" type="button" onclick="closePicker()">✕ Close</button></div><div id="pickerPath" class="picker-path">Loading…</div></div><div class="row picker-actions"><button class="secondary" type="button" id="pickerUp" onclick="pickerUp()">← Back</button><button class="secondary" type="button" id="pickerNew" onclick="createFolder()">+ New folder</button></div><div id="folderList" class="folder-list" aria-live="polite"></div><div class="picker-footer"><small id="pickerStatus" class="muted">Choose a folder.</small><button class="primary" type="button" id="pickerSelect" onclick="selectFolder()">Select folder</button></div></div></div>
@@ -137,21 +145,90 @@ async function discoverShares(){
  }catch(e){if(sequence!==shareDiscoverySequence||e.name==='AbortError')return;$('shareDiscoveryStatus').textContent=e.message+' You can still enter the share or export manually.';}
  finally{if(shareDiscoveryAbort===controller)shareDiscoveryAbort=null;}
 }
+let updatePollingBusy=false,updateSubmitting=false,updateRunning=false,updateInstallAvailable=false;
+const updatePhaseTitles={checking:'Checking for updates',downloading:'Downloading update',verifying:'Verifying integrity',staging:'Installing verified update',restarting:'Restarting Syncria',complete:'Update completed',failed:'Update failed'};
+const updateSequence=['checking','downloading','verifying','staging','restarting','complete'];
+function renderUpdateProgress(p){
+ if(!p||p.phase==='idle'||!p.phase)return;
+ const box=$('updateFlow');if(!box)return;
+ box.classList.remove('hidden');
+ const phase=p.phase,index=updateSequence.indexOf(phase);
+ updateRunning=!!p.active;
+ $('updatePhaseTitle').textContent=updatePhaseTitles[phase]||p.message||phase;
+ $('updateProgressMessage').textContent=p.message||'';
+ $('updateProgressTarget').textContent=p.target?('Version: '+p.target):'';
+ const bytes=Number(p.downloaded||0),total=Number(p.total||0);
+ $('updateProgressBytes').textContent=bytes>0||total>0?formatBytes(bytes)+' downloaded'+(total>0?' of '+formatBytes(total):''):'';
+ const percent=Math.max(0,Math.min(100,Number(p.percent||0))),bar=$('updateProgressBar');
+ if(phase==='downloading'&&total===0){bar.removeAttribute('value');$('updatePercent').textContent='Receiving data…';}
+ else{bar.value=percent;$('updatePercent').textContent=percent+'%';}
+ $('updateError').classList.toggle('hidden',phase!=='failed');
+ $('updateError').textContent=phase==='failed'?(p.error||'Update failed. The previous version remains available.'):'';
+ $('updateReloadButton').classList.toggle('hidden',phase!=='complete');
+ for(const li of document.querySelectorAll('[data-update-phase]')){
+  const i=updateSequence.indexOf(li.dataset.updatePhase);
+  li.classList.toggle('active',li.dataset.updatePhase===phase);
+  li.classList.toggle('done',phase==='complete'||(i>=0&&index>=0&&i<index));
+  li.classList.toggle('failed',phase==='failed'&&i===4);
+ }
+ const install=$('installUpdateButton'),rollback=$('rollbackUpdateButton');
+ if(install)install.disabled=updateRunning||updateSubmitting||!updateInstallAvailable;
+ if(rollback)rollback.disabled=updateRunning||updateSubmitting;
+ if(p.current&&$('installedVersion'))$('installedVersion').textContent=p.current;
+ if(phase==='restarting')$('updateProgressMessage').textContent='Waiting for Syncria to reconnect and confirm the installed version…';
+}
+async function pollUpdateProgress(){
+ if(updatePollingBusy||!$('updateFlow'))return;
+ if(!updateRunning&&currentView!=='updates')return;
+ updatePollingBusy=true;
+ try{
+  const res=await fetch('/api/update/progress',{cache:'no-store',credentials:'same-origin'});
+  if(res.status===401)return;
+  if(!res.ok)throw Error('Progress request failed: HTTP '+res.status);
+  renderUpdateProgress(await res.json());
+ }catch(e){
+  if(updateRunning)$('updateProgressMessage').textContent='Reconnecting after restart…';
+ }finally{updatePollingBusy=false;}
+}
+async function startUpdate(operation){
+ if(updateSubmitting||updateRunning)return;
+ if(!confirm(operation==='rollback'?'Restore the previous Syncria binary and restart?':'Download, verify and install the latest Syncria release?'))return;
+ updateSubmitting=true;
+ $('updateFlow').classList.remove('hidden');
+ $('updatePhaseTitle').textContent=operation==='rollback'?'Preparing rollback':'Starting update…';
+ $('updateProgressMessage').textContent='Connecting to the built-in updater…';
+ $('updateError').classList.add('hidden');$('updateReloadButton').classList.add('hidden');
+ $('installUpdateButton').disabled=true;$('rollbackUpdateButton').disabled=true;
+ try{
+  const res=await fetch('/api/update/progress',{method:'POST',credentials:'same-origin',cache:'no-store',body:new URLSearchParams({operation})});
+  if(!res.ok)throw Error((await res.text()).trim()||('HTTP '+res.status));
+  renderUpdateProgress(await res.json());
+  updateRunning=true;
+ }catch(e){
+  updateRunning=false;
+  $('updatePhaseTitle').textContent='Update could not start';
+  $('updateProgressMessage').textContent='No changes installed.';
+  $('updateError').textContent=e.message;$('updateError').classList.remove('hidden');
+ }finally{updateSubmitting=false;await pollUpdateProgress();}
+}
 async function checkUpdate(){
  if(!$('latestVersion'))return;
- $('latestVersion').textContent='Checking GitHub tags…';
- $('updateMessage').textContent='';
+ $('latestVersion').textContent='Checking GitHub releases…';
+ $('updateMessage').textContent='';updateInstallAvailable=false;
  if($('installUpdateButton'))$('installUpdateButton').disabled=true;
  try{
   const res=await fetch('/api/update/status',{cache:'no-store',credentials:'same-origin'});
   if(!res.ok)throw Error('HTTP '+res.status);
   const obj=await res.json();
   if(obj.error)throw Error(obj.error);
-  $('latestVersion').textContent=obj.latest||'No tag found';
-  $('updateMessage').textContent=obj.pending?' · '+(obj.message||'Waiting for installable binaries'):obj.available?' · Ready to install':' · You are up to date';
-  if($('installUpdateButton'))$('installUpdateButton').disabled=!obj.available;
- }catch(e){$('latestVersion').textContent='Unable to check tags';$('updateMessage').textContent=e.message;}
+  $('latestVersion').textContent=obj.latest||'No release found';
+  $('updateMessage').textContent=obj.pending?' · '+(obj.message||'Waiting for binaries'):obj.available?' · Ready to install':' · You are up to date';
+  updateInstallAvailable=!!obj.available;
+  if($('installUpdateButton'))$('installUpdateButton').disabled=updateRunning||updateSubmitting||!updateInstallAvailable;
+ }catch(e){$('latestVersion').textContent='Unable to check releases';$('updateMessage').textContent=e.message;}
+ await pollUpdateProgress();
 }
+setInterval(pollUpdateProgress,1200);
 function openPicker(type){pickerType=type;folder='';parent='';folderName='';$('picker').classList.add('open');$('pickerTitle').textContent=type==='drive'?'Browse Google Drive':type==='source-storage'?'Choose source storage folder':'Choose destination storage folder';$('pickerNew').classList.toggle('hidden',type!=='local');loadFolder(type==='drive'?'root':'');}
 function closePicker(){pickSeq++;$('picker').classList.remove('open');}
 async function loadFolder(path,label){let seq=++pickSeq;let drive=pickerType==='drive',account=$('syncAccount');$('pickerStatus').textContent='Loading folders…';$('pickerSelect').disabled=true;$('folderList').replaceChildren();let endpoint=drive?'/api/browse/drive?account='+encodeURIComponent(account?account.value:'')+'&parent='+encodeURIComponent(path||'root'):'/api/browse/local?path='+encodeURIComponent(path);try{let resp=await fetch(endpoint,{cache:'no-store'});if(!resp.ok)throw Error((await resp.text()).trim());let data=await resp.json();if(seq!==pickSeq)return;folder=data.path;parent=data.parent||'';if(label)folderName=label;else if(drive&&folder==='root')folderName='Entire My Drive';else if(!drive)folderName=folder;$('pickerPath').textContent=drive?('My Drive / '+folderName):folder;$('pickerUp').disabled=!parent;$('pickerSelect').disabled=false;data.entries.forEach(item=>{let b=document.createElement('button');b.type='button';b.className='folder-row';b.textContent='📁   '+item.name;b.addEventListener('click',()=>loadFolder(item.id,item.name));$('folderList').appendChild(b)});$('pickerStatus').textContent=data.message||(data.entries.length?data.entries.length+' folders · Select current folder or open another.':'No subfolders · Select this folder.');}catch(e){if(seq!==pickSeq)return;$('pickerStatus').textContent='Unable to load folders: '+e.message;}}
