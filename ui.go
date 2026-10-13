@@ -34,17 +34,17 @@ code{color:#076bd3}
 .update-progress-panel .update-steps li.active{background:#e3f2ff;color:#0869f8;border-color:#91bbef;font-weight:700}
 .update-progress-panel .update-steps li.done{color:#146c52;background:#e7f6ed;border-color:#bcdfc9}
 .update-progress-panel .update-steps li.failed{color:#a02835;background:#fff2f4;border-color:#e6aeb8}
-</style></head><body>
+` + v051Theme + `</style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">{{if and .Configured .Logged}}<aside class="sidebar"><div class="brand"><img src="/assets/syncria-logo.svg" alt="Syncria" style="display:block;width:200px;max-width:100%;height:auto;object-fit:contain;object-position:left"></div><div><div class="tiny">Workspace</div><nav class="nav" aria-label="Main navigation">
-<button class="active" type="button" data-view="overview">◫ &nbsp; Overview</button>
-<button type="button" data-view="sync">⇄ &nbsp; Sync relationships</button>
-<button type="button" data-view="storage">▤ &nbsp; Storage</button>
-<button type="button" data-view="accounts">◎ &nbsp; Accounts</button>
-<button type="button" data-view="activity">▥ &nbsp; Activity & stats</button>
-<button type="button" data-view="updates">↻ &nbsp; Updates</button>
-<button type="button" data-view="settings">⚙ &nbsp; Settings</button>
+<button class="active" type="button" data-view="overview"><span aria-hidden="true" class="nav-icon">◫</span><span>Overview</span></button>
+<button type="button" data-view="sync"><span aria-hidden="true" class="nav-icon">⇄</span><span>Sync relationships</span></button>
+<button type="button" data-view="storage"><span aria-hidden="true" class="nav-icon">▤</span><span>Storage</span></button>
+<button type="button" data-view="accounts"><span aria-hidden="true" class="nav-icon">◎</span><span>Accounts</span></button>
+<button type="button" data-view="activity"><span aria-hidden="true" class="nav-icon">▥</span><span>Activity & stats</span></button>
+<button type="button" data-view="updates"><span aria-hidden="true" class="nav-icon">↻</span><span>Updates</span></button>
+<button type="button" data-view="settings"><span aria-hidden="true" class="nav-icon">⚙</span><span>Settings</span></button>
 </nav></div><div class="sidebar-bottom">Syncria <strong><span id="sidebarVersion">{{.Version}}</span></strong><p>Cloud ↔ NAS sync bridge</p></div></aside>{{end}}
-<div class="content">{{if not .Logged}}<img class="auth-brand" src="/assets/syncria-logo.svg" alt="Syncria">{{end}}<div class="topline"><div><div class="eyebrow">Storage synchronization</div><h1 id="pageTitle">{{if not .Configured}}Welcome{{else if not .Logged}}Sign in{{else}}Overview{{end}}</h1></div>{{if .Logged}}<form method="post" action="/action"><input type="hidden" name="action" value="logout"><button class="logout" type="submit">Sign out</button></form>{{end}}</div>
+<div class="content">{{if not .Logged}}<img class="auth-brand" src="/assets/syncria-logo.svg" alt="Syncria">{{end}}<div class="topline"><div><div class="eyebrow">Syncria · Storage control</div><h1 id="pageTitle">{{if not .Configured}}Welcome{{else if not .Logged}}Sign in{{else}}Overview{{end}}</h1></div>{{if .Logged}}<form method="post" action="/action"><input type="hidden" name="action" value="logout"><button class="logout" type="submit">Sign out</button></form>{{end}}</div>
 {{if .Message}}<div class="notice">{{.Message}}</div>{{end}}{{if and .Configured .Logged}}<div id="sessionExpiredNotice" class="notice bad hidden" role="alert">Your Syncria session has expired. <a href="/">Sign in again</a> to continue.</div>{{end}}
 {{if not .Configured}}<section class="panel" style="max-width:550px"><h2>Welcome to Syncria</h2><p>Create the administrator password to protect your dashboard.</p><form method="post" action="/action"><input type="hidden" name="action" value="setup"><label class="field">Administrator password<input type="password" name="password" minlength="12" required autocomplete="new-password"></label><button class="primary">Secure dashboard</button></form></section>
 {{else if not .Logged}}<section class="panel" style="max-width:550px"><h2>Sign in</h2><p>Access your synchronization workspace.</p><form method="post" action="/action"><input type="hidden" name="action" value="login"><label class="field">Administrator password<input type="password" name="password" required autocomplete="current-password"></label><button class="primary">Sign in</button></form></section>
