@@ -179,7 +179,7 @@ code{color:#076bd3}
 <p class="muted">These are server-recorded events with their real timestamps. File transfer progress uses measured byte counts. Restart is confirmed only after the new application responds.</p>
 <ol class="update-timeline" id="updateEventTimeline" aria-live="polite"><li><strong>Ready</strong><small>Start an update to see its recorded steps.</small></li></ol>
 </section>
-<section class="panel"><h2>Manual recovery installation</h2><p class="muted">Only use this if online release downloads are unavailable. Supply a platform-matching executable and its SHA256SUMS file. This also uses the existing updater and preserves rollback support.</p>
+<section class="panel"><h2>Manual update & recovery</h2><p class="muted">Only use this if online release downloads are unavailable. Supply a platform-matching executable and its SHA256SUMS file. This also uses the existing updater and preserves rollback support.</p>
 <form id="manualUpdateForm" action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return submitManualUpdate(event)">
 <label class="field">Syncria executable<input type="file" name="binary" id="manualBinary" required></label>
 <label class="field">SHA256SUMS<input type="file" name="checksums" required></label>
