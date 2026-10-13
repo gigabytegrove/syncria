@@ -41,6 +41,14 @@ func (a *App) getSyncProgress(id string) SyncProgress {
 
 func (a *App) watchChangedJob(ctx context.Context,id string) {
  defer a.watchers.Delete(id)
+ a.mu.Lock()
+ initial:=a.job(id)
+ remote:=initial!=nil&&(initial.Provider=="bridge"||initial.Provider=="nas_bridge")
+ a.mu.Unlock()
+ if remote {
+  a.watchBridgeChanges(ctx,id)
+  return
+ }
  // inotify notifications from local Linux paths are useful for immediate
  // sync. SMB/NFS remote changes may not propagate: a periodic five-minute
  // reconciliation still runs via the normal scheduler.
