@@ -1059,6 +1059,35 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		redirect(w, r, "OAuth settings saved")
+    case "dropbox_oauth_settings":
+        id:=strings.TrimSpace(r.FormValue("client_id"))
+        secret:=strings.TrimSpace(r.FormValue("client_secret"))
+        if id==""||len(id)>256||len(secret)>512{redirect(w,r,"Enter a valid Dropbox app key and secret");return}
+        a.mu.Lock()
+        a.cfg.DropboxOAuthID=id
+        if secret!=""{a.cfg.DropboxOAuthSecret=secret}
+        e:=a.save()
+        a.mu.Unlock()
+        if e!=nil{http.Error(w,"Unable to save Dropbox OAuth settings",500);return}
+        redirect(w,r,"Dropbox OAuth settings saved")
+        return
+    case "remove_dropbox_account":
+        id:=r.FormValue("id")
+        a.mu.Lock()
+        for _,job:=range a.cfg.Jobs{
+          if job.Provider=="bridge"&&job.CloudProvider=="dropbox"&&job.DropboxAccountID==id {
+           a.mu.Unlock();redirect(w,r,"Remove connected relationships before disconnecting this Dropbox account");return
+          }
+        }
+        index:=-1
+        for i,acct:=range a.cfg.DropboxAccounts{if acct.ID==id{index=i;break}}
+        if index<0{a.mu.Unlock();redirect(w,r,"Dropbox account not found");return}
+        a.cfg.DropboxAccounts=append(a.cfg.DropboxAccounts[:index],a.cfg.DropboxAccounts[index+1:]...)
+        e:=a.save()
+        a.mu.Unlock()
+        if e!=nil{http.Error(w,"Unable to save account removal",500);return}
+        redirect(w,r,"Dropbox account disconnected; remote data unchanged")
+        return
     case "add_bridge":
         a.addBridge(w,r)
         return
