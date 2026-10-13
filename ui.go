@@ -34,24 +34,24 @@ code{color:#076bd3}
 .update-progress-panel .update-steps li.active{background:#e3f2ff;color:#0869f8;border-color:#91bbef;font-weight:700}
 .update-progress-panel .update-steps li.done{color:#146c52;background:#e7f6ed;border-color:#bcdfc9}
 .update-progress-panel .update-steps li.failed{color:#a02835;background:#fff2f4;border-color:#e6aeb8}
-</style></head><body>
+` + v051Theme + `</style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">{{if and .Configured .Logged}}<aside class="sidebar"><div class="brand"><img src="/assets/syncria-logo.svg" alt="Syncria" style="display:block;width:200px;max-width:100%;height:auto;object-fit:contain;object-position:left"></div><div><div class="tiny">Workspace</div><nav class="nav" aria-label="Main navigation">
-<button class="active" type="button" data-view="overview">◫ &nbsp; Overview</button>
-<button type="button" data-view="sync">⇄ &nbsp; Sync relationships</button>
-<button type="button" data-view="storage">▤ &nbsp; Storage</button>
-<button type="button" data-view="accounts">◎ &nbsp; Accounts</button>
-<button type="button" data-view="activity">▥ &nbsp; Activity & stats</button>
-<button type="button" data-view="updates">↻ &nbsp; Updates</button>
-<button type="button" data-view="settings">⚙ &nbsp; Settings</button>
+<button class="active" type="button" data-view="overview"><span aria-hidden="true" class="nav-icon">◫</span><span>Overview</span></button>
+<button type="button" data-view="sync"><span aria-hidden="true" class="nav-icon">⇄</span><span>Sync relationships</span></button>
+<button type="button" data-view="storage"><span aria-hidden="true" class="nav-icon">▤</span><span>Storage</span></button>
+<button type="button" data-view="accounts"><span aria-hidden="true" class="nav-icon">◎</span><span>Accounts</span></button>
+<button type="button" data-view="activity"><span aria-hidden="true" class="nav-icon">▥</span><span>Activity & stats</span></button>
+<button type="button" data-view="updates"><span aria-hidden="true" class="nav-icon">↻</span><span>Updates</span></button>
+<button type="button" data-view="settings"><span aria-hidden="true" class="nav-icon">⚙</span><span>Settings</span></button>
 </nav></div><div class="sidebar-bottom">Syncria <strong><span id="sidebarVersion">{{.Version}}</span></strong><p>Cloud ↔ NAS sync bridge</p></div></aside>{{end}}
-<div class="content">{{if not .Logged}}<img class="auth-brand" src="/assets/syncria-logo.svg" alt="Syncria">{{end}}<div class="topline"><div><div class="eyebrow">Storage synchronization</div><h1 id="pageTitle">{{if not .Configured}}Welcome{{else if not .Logged}}Sign in{{else}}Overview{{end}}</h1></div>{{if .Logged}}<form method="post" action="/action"><input type="hidden" name="action" value="logout"><button class="logout" type="submit">Sign out</button></form>{{end}}</div>
-{{if .Message}}<div class="notice">{{.Message}}</div>{{end}}{{if and .Configured .Logged}}<div id="sessionExpiredNotice" class="notice bad hidden" role="alert">Your Syncria session has expired. <a href="/">Sign in again</a> to continue.</div>{{end}}
+<div class="content">{{if not .Logged}}<img class="auth-brand" src="/assets/syncria-logo.svg" alt="Syncria">{{end}}<div class="topline"><div><div class="eyebrow">Syncria · Storage control</div><h1 id="pageTitle">{{if not .Configured}}Welcome{{else if not .Logged}}Sign in{{else}}Overview{{end}}</h1></div>{{if .Logged}}<form method="post" action="/action"><input type="hidden" name="action" value="logout"><button class="logout" type="submit">Sign out</button></form>{{end}}</div>
+{{if .Message}}<div class="notice">{{.Message}}</div>{{end}}{{if and .Configured .Logged}}<div id="updateLiveBanner" class="update-live-banner hidden" role="status"><div><strong>Update running in Syncria</strong><div><small id="updateLiveBannerStatus">Checking the updater status…</small></div></div><button type="button" class="secondary" onclick="navigate('updates')">View exact progress →</button></div>{{end}}{{if and .Configured .Logged}}<div id="sessionExpiredNotice" class="notice bad hidden" role="alert">Your Syncria session has expired. <a href="/">Sign in again</a> to continue.</div>{{end}}
 {{if not .Configured}}<section class="panel" style="max-width:550px"><h2>Welcome to Syncria</h2><p>Create the administrator password to protect your dashboard.</p><form method="post" action="/action"><input type="hidden" name="action" value="setup"><label class="field">Administrator password<input type="password" name="password" minlength="12" required autocomplete="new-password"></label><button class="primary">Secure dashboard</button></form></section>
 {{else if not .Logged}}<section class="panel" style="max-width:550px"><h2>Sign in</h2><p>Access your synchronization workspace.</p><form method="post" action="/action"><input type="hidden" name="action" value="login"><label class="field">Administrator password<input type="password" name="password" required autocomplete="current-password"></label><button class="primary">Sign in</button></form></section>
 {{else}}
-<section class="view active" id="view-overview"><p class="lead">Manage Google Drive, Dropbox, and multiple NAS devices through independent synchronization relationships.</p><div class="stats"><div class="stat"><small>Google Drive accounts</small><strong>{{len .Accounts}}</strong><small>Connected</small></div><div class="stat"><small>Dropbox accounts</small><strong>{{len .DropboxAccounts}}</strong><small>Connected</small></div><div class="stat"><small>Sync relationships</small><strong>{{len .Jobs}}</strong><small>Configured</small></div><div class="stat"><small>Network shares</small><strong>{{len .Shares}}</strong><small>Saved destinations</small></div><div class="stat"><small>Files synchronized</small><strong id="metricFiles">{{.Metrics.TrackedFiles}}</strong><small>Files tracked across relationships</small></div><div class="stat"><small>Data transferred</small><strong id="metricBandwidth" class="mini-stat">—</strong><small>Uploaded + downloaded</small></div><div class="stat"><small>Completed runs</small><strong id="metricRuns">{{.Metrics.Runs}}</strong><small><span id="metricFailures">{{.Metrics.Failures}}</span> failed</small></div></div>
-<div class="split"><section class="panel"><div class="panel-head"><h2>Synchronization</h2><button class="primary" type="button" onclick="navigate('sync');startWizard()">+ New sync</button></div>{{range .Jobs}}<div class="entry"><div><strong>{{.Name}}</strong> {{if .Enabled}}<span class="status">Enabled</span>{{else}}<span class="status off">Paused</span>{{end}}<p>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} ↔ {{len .NASDestinations}} NAS destination(s){{else if eq .Provider "nas_bridge"}}NAS ↔ NAS · {{len .NASDestinations}} destination(s){{else}}Existing filesystem relationship{{end}}</p></div><button class="secondary" type="button" onclick="navigate('sync')">Manage</button></div>{{else}}<div class="empty"><strong>No sync relationships yet</strong>Connect a Google Drive or Dropbox account and select your NAS destination(s) to begin.</div>{{end}}</section><section class="panel"><div class="panel-head"><h2>Connected storage</h2><button class="secondary" type="button" onclick="navigate('storage')">Manage</button></div>{{range .Shares}}<div class="entry"><div><strong>{{.Label}}</strong><p>{{.Protocol}} · {{.Server}}</p></div>{{if .Mounted}}<span class="status" data-share-mounted="{{.ID}}">Mounted</span>{{else}}<span class="status off" data-share-mounted="{{.ID}}">Disconnected</span>{{end}}</div>{{else}}<div class="empty"><strong>No direct NAS connections yet</strong>Add a NAS through the Storage screen.</div>{{end}}</section></div></section>
-<section class="view" id="view-sync"><p class="lead">Choose a source, a destination, and when to sync. Then monitor file transfers as they happen. New relationships start paused.</p><section class="panel"><div class="panel-head"><h2>Sync relationships</h2><button type="button" class="primary" onclick="startWizard()">+ New sync</button></div>{{range .Jobs}}{{$job := .}}<div class="entry"><div><strong>{{.Name}}</strong> {{if .Enabled}}<span class="status" data-job-enabled="{{.ID}}">Enabled</span>{{else}}<span class="status off" data-job-enabled="{{.ID}}">Paused</span>{{end}}<p>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} ↔ {{len .NASDestinations}} NAS destination(s){{else if eq .Provider "nas_bridge"}}NAS ↔ NAS · {{.Direction}}{{else}}Existing filesystem relationship{{end}}</p><p data-job-statline="{{.ID}}" class="muted">Transferred {{.TotalUploads}} files to destination and {{.TotalDownloads}} to source · {{.SuccessfulRuns}} successful / {{.FailedRuns}} failed runs</p><p>{{if eq .ScheduleMode "changes"}}On local changes, with 5-minute reconciliation{{else}}Every {{.Interval}} min{{end}} · <span data-job-run="{{.ID}}">{{if .LastRun.IsZero}}Never run{{else}}Last run {{.LastRun.Format "Jan 2, 2006 15:04"}}{{end}}</span> · <span data-job-summary="{{.ID}}">{{.LastSummary}}</span></p><p data-job-error="{{.ID}}" style="color:var(--bad)" {{if not .LastError}}hidden{{end}}>Error: {{.LastError}}</p><div class="update-progress-panel" data-job-progress="{{.ID}}"><strong data-job-phase="{{.ID}}">Idle</strong><progress data-job-bar="{{.ID}}" max="100"></progress><p class="muted" data-job-progress-detail="{{.ID}}">Enable and run to see live processing progress.</p></div>
+<section class="view active" id="view-overview"><div class="workspace-hero"><div><h2>Cloud storage and NAS, working together.</h2><p>Manage Google Drive, Dropbox and independent NAS-to-NAS relationships from one control center. Syncria coordinates the transfers; your files remain at their endpoints.</p></div><button class="primary" type="button" onclick="startWizard()">+ New sync relationship</button></div><div class="stats"><div class="stat"><small>Google Drive accounts</small><strong>{{len .Accounts}}</strong><small>Connected</small></div><div class="stat"><small>Dropbox accounts</small><strong>{{len .DropboxAccounts}}</strong><small>Connected</small></div><div class="stat"><small>Sync relationships</small><strong>{{len .Jobs}}</strong><small>Configured</small></div><div class="stat"><small>Network shares</small><strong>{{len .Shares}}</strong><small>Saved destinations</small></div><div class="stat"><small>Files synchronized</small><strong id="metricFiles">{{.Metrics.TrackedFiles}}</strong><small>Files tracked across relationships</small></div><div class="stat"><small>Data transferred</small><strong id="metricBandwidth" class="mini-stat">—</strong><small>Uploaded + downloaded</small></div><div class="stat"><small>Completed runs</small><strong id="metricRuns">{{.Metrics.Runs}}</strong><small><span id="metricFailures">{{.Metrics.Failures}}</span> failed</small></div></div>
+<div class="split"><section class="panel"><div class="panel-head"><h2>Synchronization</h2><button class="primary" type="button" onclick="navigate('sync');startWizard()">+ New sync</button></div>{{range .Jobs}}<div class="entry"><div><strong>{{.Name}}</strong> {{if .Enabled}}<span class="status">Enabled</span>{{else}}<span class="status off">Paused</span>{{end}}<p>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} ↔ {{len .NASDestinations}} NAS destination(s){{else if eq .Provider "nas_bridge"}}NAS ↔ NAS · {{len .NASDestinations}} destination(s){{else}}Existing filesystem relationship{{end}}</p></div><button class="secondary" type="button" onclick="navigate('sync')">Manage</button></div>{{else}}<div class="empty"><strong>No sync relationships yet</strong>Connect a Google Drive or Dropbox account and select your NAS destination(s) to begin.</div>{{end}}</section><section class="panel"><div class="panel-head"><h2>Connected storage</h2><button class="secondary" type="button" onclick="navigate('storage')">Manage</button></div>{{range .Shares}}<div class="entry"><div><strong>{{.Label}}</strong><p>{{.Protocol}} · {{.Server}}</p></div>{{if not .Local}}<span class="status" data-share-mounted="{{.ID}}">Direct SMB configured</span>{{else if .Mounted}}<span class="status" data-share-mounted="{{.ID}}">Mounted</span>{{else}}<span class="status off" data-share-mounted="{{.ID}}">Not mounted</span>{{end}}</div>{{else}}<div class="empty"><strong>No direct NAS connections yet</strong>Add a NAS through the Storage screen.</div>{{end}}</section></div></section>
+<section class="view" id="view-sync"><p class="lead">Configure cloud-to-NAS and independent NAS-to-NAS relationships. Each relationship has its own schedule, conflict policy, deletion propagation and ten-minute Undo settings.</p><section class="panel"><div class="panel-head"><h2>Sync relationships</h2><button type="button" class="primary" onclick="startWizard()">+ New sync</button></div>{{range .Jobs}}{{$job := .}}<div class="entry relationship-card"><div><span class="relationship-kind">{{if eq .Provider "bridge"}}Cloud ↔ NAS{{else if eq .Provider "nas_bridge"}}NAS ↔ NAS{{else}}Existing filesystem{{end}}</span><strong>{{.Name}}</strong> {{if .Enabled}}<span class="status" data-job-enabled="{{.ID}}">Enabled</span>{{else}}<span class="status off" data-job-enabled="{{.ID}}">Paused</span>{{end}}<p>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} ↔ {{len .NASDestinations}} NAS destination(s){{else if eq .Provider "nas_bridge"}}NAS ↔ NAS · {{.Direction}}{{else}}Existing filesystem relationship{{end}}</p><div class="relationship-metadata"><span>{{if eq .Provider "nas_bridge"}}{{.Direction}}{{else}}Cloud sync{{end}}</span><span>{{len .NASDestinations}} destination(s)</span><span>{{if eq .ScheduleMode "changes"}}On NAS changes{{else}}Every {{.Interval}} min{{end}}</span><span>Independent deletion policy</span></div><p data-job-statline="{{.ID}}" class="muted">Transferred {{.TotalUploads}} files to destination and {{.TotalDownloads}} to source · {{.SuccessfulRuns}} successful / {{.FailedRuns}} failed runs</p><p>{{if eq .ScheduleMode "changes"}}On NAS notifications, with 5-minute reconciliation{{else}}Every {{.Interval}} min{{end}} · <span data-job-run="{{.ID}}">{{if .LastRun.IsZero}}Never run{{else}}Last run {{.LastRun.Format "Jan 2, 2006 15:04"}}{{end}}</span> · <span data-job-summary="{{.ID}}">{{.LastSummary}}</span></p><p data-job-error="{{.ID}}" style="color:var(--bad)" {{if not .LastError}}hidden{{end}}>Error: {{.LastError}}</p><div class="update-progress-panel" data-job-progress="{{.ID}}"><strong data-job-phase="{{.ID}}">Idle</strong><progress data-job-bar="{{.ID}}" max="100"></progress><p class="muted" data-job-progress-detail="{{.ID}}">Enable and run to see live processing progress.</p></div>
 {{if .Conflicts}}<div class="panel" style="margin-top:12px"><h3>Manual conflicts — awaiting your decision</h3><p class="muted">Syncria has not overwritten either file. Choose a version for each conflicting file, then run this relationship again.</p>
 {{range .Conflicts}}<div class="entry"><div><strong>{{.Path}}</strong><p class="muted">Primary: {{.PrimaryModified.Format "Jan 2, 2006 15:04"}} · Secondary: {{.SecondaryModified.Format "Jan 2, 2006 15:04"}}</p></div>
 <form method="post" action="/api/conflicts/resolve" class="inline"><input type="hidden" name="id" value="{{$job.ID}}"><input type="hidden" name="pair" value="{{.Pair}}"><input type="hidden" name="path" value="{{.Path}}">
@@ -143,7 +143,51 @@ code{color:#076bd3}
 {{else}}<p class="wizard-status bad">Set up Dropbox OAuth under Settings first.</p><button type="button" class="secondary" onclick="navigate('settings')">Configure Dropbox OAuth</button>{{end}}</div>
 <div class="row"><button type="button" class="secondary" onclick="showAccountStep(1)">← Back</button></div></div></section></section>
 <section class="view" id="view-activity"><p class="lead">Historical transfer totals are persisted with each relationship; live running state and the latest results refresh automatically. Bandwidth reflects payload bytes transferred, not protocol overhead.</p><div class="stats"><div class="stat"><small>Successful runs</small><strong id="activitySuccessful">{{.Metrics.Runs}}</strong></div><div class="stat"><small>Failed runs</small><strong id="activityFailed">{{.Metrics.Failures}}</strong></div><div class="stat"><small>Files transferred</small><strong id="activityFiles">—</strong></div><div class="stat"><small>Uploaded</small><strong id="activityUploaded">—</strong></div><div class="stat"><small>Downloaded</small><strong id="activityDownloaded">—</strong></div><div class="stat"><small>Combined transfer</small><strong id="activityTransfer">—</strong></div></div><section class="panel"><h2>Per-relationship statistics</h2>{{range .Jobs}}<div class="entry"><div style="width:100%"><strong>{{.Name}}</strong> <span class="status" data-activity-running="{{.ID}}">History</span><p class="muted">{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} ↔ NAS{{else if eq .Provider "nas_bridge"}}NAS ↔ NAS{{else}}Existing filesystem relationship{{end}}</p><div class="stats stats-compact"><div class="stat"><small>Completed runs</small><strong data-job-runs="{{.ID}}">{{.SuccessfulRuns}}</strong></div><div class="stat"><small>Failed runs</small><strong data-job-fails="{{.ID}}">{{.FailedRuns}}</strong></div><div class="stat"><small>Files moved</small><strong data-job-files="{{.ID}}">—</strong></div><div class="stat"><small>Payload transferred</small><strong data-job-bytes="{{.ID}}">—</strong></div></div><p data-job-detail="{{.ID}}" class="muted">Latest run stats loading…</p></div></div>{{else}}<div class="empty">There are no sync relationships to measure yet.</div>{{end}}</section></section>
-<section class="view" id="view-updates"><p class="lead">Install verified versioned releases without losing your persistent configuration.</p><section class="panel"><div class="panel-head"><h2>Software updates</h2><span class="pill">Installed: <span id="installedVersion">{{.Version}}</span></span></div><div class="selected"><div><span class="card-label">Latest GitHub version tag</span><strong id="latestVersion">Checking releases…</strong><span class="muted" id="updateMessage"></span></div><button class="secondary" type="button" onclick="checkUpdate(true)">Check again</button></div><div class="row"><button id="installUpdateButton" class="primary" disabled type="button" onclick="startUpdate('install')">Install latest</button><button id="rollbackUpdateButton" class="secondary" type="button" onclick="startUpdate('rollback')">Rollback</button></div><section id="updateFlow" class="update-progress-panel hidden" aria-live="polite" aria-label="Update installation progress"><div class="update-progress-meta"><strong id="updatePhaseTitle">Preparing update…</strong><span id="updatePercent" class="muted">0%</span></div><progress id="updateProgressBar" value="0" max="100" aria-label="Installation progress"></progress><p id="updateProgressMessage" class="muted" role="status">Preparing…</p><div class="row"><span id="updateProgressBytes" class="muted"></span><span id="updateProgressTarget" class="muted"></span></div><ol class="update-steps" id="updateSteps"><li data-update-phase="checking">Check</li><li data-update-phase="downloading">Download</li><li data-update-phase="verifying">Verify</li><li data-update-phase="staging">Install</li><li data-update-phase="restarting">Restart</li><li data-update-phase="complete">Complete</li></ol><p id="updateError" class="wizard-status bad hidden" role="alert"></p><button id="updateReloadButton" class="secondary hidden" type="button" onclick="window.location.assign('/#updates')">Reload updated interface</button></section><p style="margin-top:18px">Updates are blocked while synchronization is active. Versions are discovered from GitHub tags. Installation is enabled when verified binaries and checksums are published.</p></section><section class="panel"><h2>Manual update</h2><p class="muted">Upload the Syncria executable and SHA256SUMS from the same GitHub release. The server verifies the binary checksum before installing. No GitHub API access is required.</p><form action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return confirm('Verify uploaded release files, install, and restart Syncria?')"><label class="field">Syncria application binary<input type="file" name="binary" required></label><label class="field">SHA256SUMS<input type="file" name="checksums" required></label><button class="primary" type="submit">Verify and install uploaded update</button></form></section></section>
+<section class="view" id="view-updates">
+<p class="lead">Update Syncria directly from here. Download verification, executable replacement and restart are tracked by the running application. Every completed step and any failure is reported below.</p>
+<div class="update-workspace">
+<div>
+<section class="panel"><div class="panel-head"><h2>Application updates</h2><span class="pill">In-app updater</span></div>
+<div class="update-hero"><div><span class="card-label">Latest published release</span><strong id="latestVersion">Checking releases…</strong><p id="updateMessage">Release metadata is being checked.</p></div>
+<button class="secondary" type="button" onclick="checkUpdate(true)">Check again</button></div>
+<div class="update-revisions"><div><small>Currently running</small><strong id="installedVersion">{{.Version}}</strong></div><div><small>Available version</small><strong id="updateAvailableVersion">Checking…</strong></div></div>
+<div class="row"><button id="installUpdateButton" class="primary" disabled type="button" onclick="startUpdate('install')">Download & install update</button><button id="rollbackUpdateButton" class="secondary" type="button" onclick="startUpdate('rollback')">Restore previous version</button></div>
+<p class="muted" style="margin-top:13px">Updates remain in this container using Syncria's existing launcher and persistent configuration. No image pull, replacement container, external updater, or manual compilation is required.</p>
+</section>
+<section id="updateFlow" class="panel hidden" aria-live="polite" aria-label="Exact update installation status">
+<div class="panel-head"><h2>Update execution</h2><span class="pill" id="updateProgressOperation">Install</span></div>
+<div class="update-progress-panel" style="margin-top:0">
+<div class="update-progress-meta"><strong id="updatePhaseTitle">No update has started</strong><strong id="updatePercent">—</strong></div>
+<p id="updateProgressMessage" role="status">Latest server status will appear here.</p>
+<progress class="update-meter" id="updateProgressBar" max="100" aria-label="Measured download or verification progress"></progress>
+<div class="update-connection" id="updateConnectionStatus">Waiting for a connection to the update status endpoint.</div>
+<div class="update-revisions"><div><small>From version</small><strong id="updateFromVersion">—</strong></div><div><small>To version</small><strong id="updateToVersion">—</strong></div></div>
+<div class="update-measures">
+<div><small>Executable</small><strong id="updateProgressAsset">—</strong></div>
+<div><small id="updateTransferLabel">Actual downloaded bytes</small><strong id="updateProgressBytes">—</strong></div>
+<div><small>Actual SHA-256 bytes checked</small><strong id="updateVerifiedBytes">—</strong></div>
+<div><small>Elapsed time</small><strong id="updateElapsed">—</strong></div>
+</div>
+<div class="row"><span id="updateProgressTarget" class="muted"></span></div>
+<ol class="update-steps" id="updateSteps"><li data-update-phase="checking">Check</li><li data-update-phase="manifest">Manifest</li><li data-update-phase="downloading">Download</li><li data-update-phase="verifying">SHA-256</li><li data-update-phase="staging">Install</li><li data-update-phase="restarting">Restart</li><li data-update-phase="complete">Complete</li></ol>
+<p id="updateError" class="update-alert hidden" role="alert"></p>
+<div class="row" style="margin-top:14px"><button id="updateReloadButton" class="primary hidden" type="button" onclick="window.location.assign('/?updated=1#updates')">Open updated interface</button></div>
+</div></section>
+</div>
+<div>
+<section class="panel"><div class="panel-head"><h2>Recorded update events</h2><span class="status" id="updateLogState">No update in progress</span></div>
+<p class="muted">These are server-recorded events with their real timestamps. File transfer progress uses measured byte counts. Restart is confirmed only after the new application responds.</p>
+<ol class="update-timeline" id="updateEventTimeline" aria-live="polite"><li><strong>Ready</strong><small>Start an update to see its recorded steps.</small></li></ol>
+</section>
+<section class="panel"><h2>Manual update & recovery</h2><p class="muted">Only use this if online release downloads are unavailable. Supply a platform-matching executable and its SHA256SUMS file. This also uses the existing updater and preserves rollback support.</p>
+<form id="manualUpdateForm" action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return submitManualUpdate(event)">
+<label class="field">Syncria executable<input type="file" name="binary" id="manualBinary" required></label>
+<label class="field">SHA256SUMS<input type="file" name="checksums" required></label>
+<button class="secondary" type="submit" id="manualUpdateButton">Verify and install supplied files</button></form>
+</section>
+</div>
+</div>
+</section>
 <section class="view" id="view-settings"><p class="lead">Application configuration and account authorization.</p><section class="panel"><h2>Google OAuth</h2><p>Set up a Google Cloud OAuth web application, enable Drive API and register this callback URI:</p><div class="selected"><code>{{.Callback}}</code></div><form method="post" action="/action"><input type="hidden" name="action" value="oauth_settings"><label class="field">Client ID<input name="client_id" value="{{.ClientID}}" required></label><label class="field">Client secret<input name="client_secret" type="password" placeholder="Leave blank to keep existing secret"></label><label class="field">Public dashboard URL<input name="base_url" value="{{.BaseURL}}" required></label><button class="primary">Save OAuth settings</button></form></section><section class="panel"><h2>Dropbox OAuth</h2>
 <p>Register the following redirect URI in your Dropbox developer application:</p><div class="selected"><code>{{.DropboxCallback}}</code></div>
 <form method="post" action="/action"><input type="hidden" name="action" value="dropbox_oauth_settings">
@@ -333,89 +377,210 @@ async function verifyConnectedAccount(id,button){
  finally{button.disabled=false;}
 }
 let updatePollingBusy=false,updateSubmitting=false,updateRunning=false,updateInstallAvailable=false;
-const updatePhaseTitles={checking:'Checking for updates',downloading:'Downloading update',verifying:'Verifying integrity',staging:'Installing verified update',restarting:'Restarting Syncria',complete:'Update completed',failed:'Update failed'};
-const updateSequence=['checking','downloading','verifying','staging','restarting','complete'];
+let lastUpdatePhase='idle',lastUpdateLog='',lastConfirmedUpdateStatus='';
+let manualUploadInProgress=false;
+const updatePhaseTitles={
+ checking:'Checking published release',manifest:'Reading release checksums',
+ receiving:'Receiving manual update',downloading:'Downloading exact executable',
+ verifying:'Verifying SHA-256 bytes',staging:'Installing verified executable',
+ restarting:'Restart requested',complete:'Installed and verified',failed:'Update failed',idle:'No update'
+};
+const updateSequence=['checking','manifest','receiving','downloading','verifying','staging','restarting','complete'];
+function updateClock(value){
+ if(!value)return 'Time unavailable';
+ const date=new Date(value);
+ return Number.isFinite(date.getTime())?date.toLocaleString():'Time unavailable';
+}
+function renderUpdateEvents(events,phase){
+ if(!$('updateEventTimeline'))return;
+ const serialized=JSON.stringify(events||[]);
+ if(serialized===lastUpdateLog)return;
+ lastUpdateLog=serialized;
+ const list=$('updateEventTimeline');list.replaceChildren();
+ if(!Array.isArray(events)||!events.length){
+  const li=document.createElement('li');
+  const strong=document.createElement('strong');strong.textContent='No recorded events';
+  li.appendChild(strong);list.appendChild(li);return;
+ }
+ for(const [i,event] of events.entries()){
+  const li=document.createElement('li');
+  const final=i===events.length-1;
+  li.classList.toggle('active',final&&phase!=='failed');
+  li.classList.toggle('failed',final&&phase==='failed');
+  const strong=document.createElement('strong');strong.textContent=event.detail||event.phase||'Update event';
+  const small=document.createElement('small');small.textContent=updateClock(event.at);
+  li.append(strong,small);list.appendChild(li);
+ }
+}
+function setUpdateProgressBar(phase,current,total){
+ const bar=$('updateProgressBar'),label=$('updatePercent');
+ if(!bar||!label)return;
+ if(phase==='complete'){bar.value=100;label.textContent='Completed';return;}
+ if((phase==='downloading'||phase==='verifying'||phase==='receiving')&&total>0){
+  const pc=Math.min(100,Math.max(0,Math.floor(current*100/total)));
+  bar.value=pc;label.textContent=pc+'% of '+(phase==='verifying'?'SHA-256 hash':phase==='receiving'?'upload':'download');
+ }else{
+  bar.removeAttribute('value');
+  label.textContent=phase==='failed'?'Failed':'Measured progress only';
+ }
+}
 function renderUpdateProgress(p){
- if(!p||p.phase==='idle'||!p.phase)return;
- const box=$('updateFlow');if(!box)return;
- box.classList.remove('hidden');
- const phase=p.phase,index=updateSequence.indexOf(phase);
+ if(!p||!p.phase)return;
+ lastUpdatePhase=p.phase;
  updateRunning=!!p.active;
- $('updatePhaseTitle').textContent=updatePhaseTitles[phase]||p.message||phase;
- $('updateProgressMessage').textContent=p.message||'';
- $('updateProgressTarget').textContent=p.target?('Version: '+p.target):'';
+ const phase=p.phase;
+ if(phase!=='idle')$('updateFlow')?.classList.remove('hidden');
+ const events=Array.isArray(p.events)?p.events:[];
+ renderUpdateEvents(events,phase);
+ const logState=$('updateLogState');
+ if(logState)logState.textContent=phase==='complete'?'Verified':phase==='failed'?'Failed':p.active?'Recording live':'Last update';
+ const set=(id,value)=>{const el=$(id);if(el)el.textContent=value;};
+ set('updatePhaseTitle',updatePhaseTitles[phase]||phase);
+ set('updateProgressMessage',p.message||'No stage description provided by the server');
+ set('updateProgressOperation',p.operation==='rollback'?'Rollback':p.operation==='manual'?'Manual update':'Release install');
+ set('updateFromVersion',p.from||p.current||'—');
+ set('updateToVersion',p.target||'Awaiting release metadata');
+ set('updateProgressAsset',p.asset||'Awaiting asset selection');
+ set('updateProgressTarget',p.target?'Target release: '+p.target:'');
  const bytes=Number(p.downloaded||0),total=Number(p.total||0);
- $('updateProgressBytes').textContent=bytes>0||total>0?formatBytes(bytes)+' downloaded'+(total>0?' of '+formatBytes(total):''):'';
- const percent=Math.max(0,Math.min(100,Number(p.percent||0))),bar=$('updateProgressBar');
- if(phase==='downloading'&&total===0){bar.removeAttribute('value');$('updatePercent').textContent='Receiving data…';}
- else{bar.value=percent;$('updatePercent').textContent=percent+'%';}
- $('updateError').classList.toggle('hidden',phase!=='failed');
- $('updateError').textContent=phase==='failed'?(p.error||'Update failed. The previous version remains available.'):'';
- $('updateReloadButton').classList.toggle('hidden',phase!=='complete');
+ const verified=Number(p.verified_bytes||0),verificationTotal=Number(p.verified_total||0);
+ set('updateTransferLabel',p.operation==='manual'?'Actual uploaded bytes':'Actual downloaded bytes');
+ if(!(manualUploadInProgress&&phase==='receiving')){
+  set('updateProgressBytes',bytes>0||total>0?formatBytes(bytes)+(total>0?' / '+formatBytes(total):' · size not reported'):'No binary bytes received yet');
+ }
+ set('updateVerifiedBytes',verified>0||verificationTotal>0?formatBytes(verified)+(verificationTotal>0?' / '+formatBytes(verificationTotal):''):'Not started');
+ const secs=Math.max(0,Number(p.elapsed_seconds||0));
+ set('updateElapsed',Math.floor(secs/60)+'m '+Math.floor(secs%60)+'s');
+ if(!(manualUploadInProgress&&phase==='receiving')){setUpdateProgressBar(phase,phase==='verifying'?verified:bytes,phase==='verifying'?verificationTotal:total);}
+ const error=$('updateError');
+ if(error){
+  error.classList.toggle('hidden',phase!=='failed');
+  error.textContent=phase==='failed'?(p.error||'The updater recorded a failure without a reason'):'';
+ }
+ const reconnect=$('updateConnectionStatus');
+ if(reconnect){
+  reconnect.classList.remove('lost');
+  reconnect.textContent='Connected · status verified at '+updateClock(p.updated_at)+(p.current?' · running '+p.current:'');
+ }
+ const button=$('updateReloadButton');
+ if(button)button.classList.toggle('hidden',phase!=='complete'||(p.operation!=='manual'&&(!p.target||p.current!==p.target)));
  for(const li of document.querySelectorAll('[data-update-phase]')){
-  const i=updateSequence.indexOf(li.dataset.updatePhase);
+  const index=updateSequence.indexOf(li.dataset.updatePhase);
+  const phaseIndex=updateSequence.indexOf(phase);
   li.classList.toggle('active',li.dataset.updatePhase===phase);
-  li.classList.toggle('done',phase==='complete'||(i>=0&&index>=0&&i<index));
-  li.classList.toggle('failed',phase==='failed'&&i===4);
+  li.classList.toggle('done',phase==='complete'||(index>=0&&phaseIndex>=0&&index<phaseIndex));
+  li.classList.toggle('failed',phase==='failed'&&li.dataset.updatePhase==='restarting');
+ }
+ if(p.current){
+  set('installedVersion',p.current);set('sidebarVersion',p.current);
  }
  const install=$('installUpdateButton'),rollback=$('rollbackUpdateButton');
  if(install)install.disabled=updateRunning||updateSubmitting||!updateInstallAvailable;
  if(rollback)rollback.disabled=updateRunning||updateSubmitting;
- if(p.current&&$('installedVersion'))$('installedVersion').textContent=p.current;
- if(phase==='restarting')$('updateProgressMessage').textContent='Waiting for Syncria to reconnect and confirm the installed version…';
+ const banner=$('updateLiveBanner'),bannerText=$('updateLiveBannerStatus');
+ if(banner){
+  banner.classList.toggle('hidden',!updateRunning||currentView==='updates');
+  if(bannerText)bannerText.textContent=(p.target||'Release')+' · '+(p.message||phase);
+ }
 }
 async function pollUpdateProgress(){
  if(updatePollingBusy||!$('updateFlow'))return;
- if(!updateRunning&&currentView!=='updates')return;
+ if(!updateRunning&&currentView!=='updates'&&lastUpdatePhase==='idle')return;
  updatePollingBusy=true;
  try{
-  const res=await fetch('/api/update/progress',{cache:'no-store',credentials:'same-origin'});
-  if(res.status===401)return;
-  if(!res.ok)throw Error('Progress request failed: HTTP '+res.status);
-  renderUpdateProgress(await res.json());
- }catch(e){
-  if(updateRunning)$('updateProgressMessage').textContent='Reconnecting after restart…';
+  const response=await fetch('/api/update/progress',{credentials:'same-origin',cache:'no-store'});
+  if(response.status===401){throw Error('Authentication expired (401)');}
+  if(!response.ok)throw Error('HTTP '+response.status);
+  const payload=await response.json();
+  lastConfirmedUpdateStatus=payload.updated_at||'';
+  renderUpdateProgress(payload);
+ }catch(error){
+  if(updateRunning||currentView==='updates'){
+   const reconnect=$('updateConnectionStatus');
+   if(reconnect){
+    reconnect.classList.add('lost');
+    reconnect.textContent='Status endpoint unreachable: '+error.message+'. Last recorded step: '+(updatePhaseTitles[lastUpdatePhase]||lastUpdatePhase)+'. The browser cannot confirm completion until the new Syncria process responds.';
+   }
+  }
  }finally{updatePollingBusy=false;}
 }
 async function startUpdate(operation){
  if(updateSubmitting||updateRunning)return;
- if(!confirm(operation==='rollback'?'Restore the previous Syncria binary and restart?':'Download, verify and install the latest Syncria release?'))return;
- updateSubmitting=true;
+ if(!confirm(operation==='rollback'?'Restore Syncria\'s saved previous executable?':'Download, verify and install the latest published Syncria release?'))return;
+ navigate('updates');
  $('updateFlow').classList.remove('hidden');
- $('updatePhaseTitle').textContent=operation==='rollback'?'Preparing rollback':'Starting update…';
- $('updateProgressMessage').textContent='Connecting to the built-in updater…';
+ updateSubmitting=true;
+ const set=(id,value)=>{const el=$(id);if(el)el.textContent=value;};
+ set('updatePhaseTitle','Requesting update');
+ set('updateProgressMessage','Submitting update request to this Syncria instance.');
+ set('updateConnectionStatus','Connecting to the update status endpoint…');
  $('updateError').classList.add('hidden');$('updateReloadButton').classList.add('hidden');
  $('installUpdateButton').disabled=true;$('rollbackUpdateButton').disabled=true;
  try{
-  const res=await fetch('/api/update/progress',{method:'POST',credentials:'same-origin',cache:'no-store',body:new URLSearchParams({operation})});
-  if(!res.ok)throw Error((await res.text()).trim()||('HTTP '+res.status));
-  renderUpdateProgress(await res.json());
+  const response=await fetch('/api/update/progress',{method:'POST',credentials:'same-origin',cache:'no-store',body:new URLSearchParams({operation})});
+  if(!response.ok)throw Error((await response.text()).trim()||('HTTP '+response.status));
+  renderUpdateProgress(await response.json());
   updateRunning=true;
- }catch(e){
+ }catch(error){
   updateRunning=false;
-  $('updatePhaseTitle').textContent='Update could not start';
-  $('updateProgressMessage').textContent='No changes installed.';
-  $('updateError').textContent=e.message;$('updateError').classList.remove('hidden');
+  set('updatePhaseTitle','Update request rejected');
+  set('updateProgressMessage','Updater did not accept this request. No new release has been installed.');
+  set('updateError',error.message);$('updateError').classList.remove('hidden');
  }finally{updateSubmitting=false;await pollUpdateProgress();}
 }
 async function checkUpdate(force=false){
  if(!$('latestVersion'))return;
- $('latestVersion').textContent='Checking GitHub releases…';
+ $('latestVersion').textContent='Checking GitHub Releases…';
  $('updateMessage').textContent='';updateInstallAvailable=false;
- if($('installUpdateButton'))$('installUpdateButton').disabled=true;
+ $('installUpdateButton').disabled=true;
  try{
-  const res=await fetch('/api/update/status'+(force?'?refresh=1':''),{cache:'no-store',credentials:'same-origin'});
-  if(!res.ok)throw Error('HTTP '+res.status);
-  const obj=await res.json();
-  if(obj.error)throw Error(obj.error);
-  $('latestVersion').textContent=obj.latest||'No release found';
-  $('updateMessage').textContent=obj.pending?' · '+(obj.message||'Waiting for binaries'):obj.available?' · Ready to install':' · You are up to date';
-  updateInstallAvailable=!!obj.available;
-  if($('installUpdateButton'))$('installUpdateButton').disabled=updateRunning||updateSubmitting||!updateInstallAvailable;
- }catch(e){$('latestVersion').textContent='Unable to check releases';$('updateMessage').textContent=e.message;}
+  const res=await fetch('/api/update/status'+(force?'?refresh=1':''),{credentials:'same-origin',cache:'no-store'});
+  if(!res.ok)throw Error('Release check HTTP '+res.status);
+  const result=await res.json();
+  if(result.error)throw Error(result.error);
+  $('latestVersion').textContent=result.latest||'No published release';
+  $('updateAvailableVersion').textContent=result.latest||'None';
+  $('updateMessage').textContent=result.pending?result.message||'Awaiting release binaries':result.available?'Verified release assets available for this platform':'Installed release is current';
+  updateInstallAvailable=!!result.available;
+  $('installUpdateButton').disabled=updateRunning||updateSubmitting||!updateInstallAvailable;
+ }catch(error){
+  $('latestVersion').textContent='Release check failed';
+  $('updateAvailableVersion').textContent='Unavailable';
+  $('updateMessage').textContent=error.message;
+ }
  await pollUpdateProgress();
 }
-setInterval(pollUpdateProgress,1200);
+async function submitManualUpdate(event){
+ event.preventDefault();
+ if(updateSubmitting||updateRunning)return false;
+ if(!confirm('Install the selected executable after verifying its SHA256SUMS?'))return false;
+ navigate('updates');
+ const form=event.currentTarget,button=$('manualUpdateButton');
+ updateSubmitting=true;manualUploadInProgress=true;button.disabled=true;
+ $('updateFlow').classList.remove('hidden');
+ $('updatePhaseTitle').textContent='Submitting manual update';
+ $('updateProgressMessage').textContent='Uploading the selected executable to Syncria.';
+ try{
+  const request=new XMLHttpRequest();
+  const result=await new Promise((resolve,reject)=>{
+   request.open('POST','/api/update/manual',true);
+   request.responseType='text';
+   request.upload.onprogress=e=>{
+    if(e.lengthComputable)setUpdateProgressBar('receiving',e.loaded,e.total);
+    $('updateProgressBytes').textContent=formatBytes(e.loaded)+(e.lengthComputable?' / '+formatBytes(e.total):'');
+   };
+   request.onload=()=>request.status>=200&&request.status<300?resolve(request.responseText):reject(Error(request.responseText||'Manual install HTTP '+request.status));
+   request.onerror=()=>reject(Error('Manual update upload connection failed'));
+   request.send(new FormData(form));
+  });
+  await pollUpdateProgress();
+ }catch(error){
+  $('updatePhaseTitle').textContent='Manual update request failed';
+  $('updateError').textContent=error.message;$('updateError').classList.remove('hidden');
+ }finally{manualUploadInProgress=false;updateSubmitting=false;button.disabled=false;await pollUpdateProgress();}
+ return false;
+}
+setInterval(pollUpdateProgress,1000);
 function openPicker(type){
  const nas=type==='nas-source'||type==='nas-target';
  if(!nas&&type!=='drive'&&type!=='dropbox')return;
@@ -574,8 +739,8 @@ async function refreshDashboardStatus(){
   for(const share of data.shares||[]){
    for(const el of document.querySelectorAll('[data-share-mounted]')){
     if(el.dataset.shareMounted!==share.id)continue;
-    el.textContent=share.mounted?'Mounted':'Disconnected';
-    el.classList.toggle('off',!share.mounted);
+    el.textContent=share.direct?'Direct SMB configured':share.mounted?'Mounted':'Not mounted';
+    el.classList.toggle('off',!share.direct&&!share.mounted);
    }
   }
  }catch(_e){/* Keep the current UI intact through temporary connection loss. */}

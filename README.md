@@ -1,5 +1,43 @@
 # Syncria
 
+## Syncria v0.5.1 — live updater and refreshed management UI
+
+The **in-app updater remains the primary deployment and update method**:
+open **Updates → Check again → Download & install update**. Release
+binaries are downloaded and verified with the published SHA256SUMS before
+the current application is replaced, and the original supervised launcher
+performs the restart. GHCR/Compose and standalone executables remain
+alternative deployment methods; no sidecar updater, Docker socket, or
+manually compiled binaries are needed to upgrade an existing installation.
+
+The updated interface gives all existing views consistent layout, colors
+and navigation while retaining the existing Syncria logo, account
+configuration, NAS relationships, file conflict actions and recovery.
+
+The **Updates** view shows:
+
+- Running and available versions, exact chosen platform executable, and
+  timestamped *server-persisted* update events.
+- Actual downloaded/total bytes (and a measured percentage when the HTTP
+  response supplies its full size), not a fabricated overall percentage.
+- Independently counted SHA-256 bytes verified against the release manifest.
+- Explicit transitions for release lookup, SHA256SUMS retrieval, download,
+  checksum calculation, staging/rollback preservation and restart request.
+- Restart success **only after the new executable responds**, plus an
+  explicit connection-lost state when the update status endpoint cannot
+  be reached. If interrupted or incorrect version starts, the status
+  records failure instead of silently claiming success.
+- An in-page history and a persistent update indicator when switching to
+  another dashboard view.
+- Legacy update button actions and manual recovery installation use the
+  same recorded update process; old generic “Update staged” redirect removed.
+
+During an upgrade *from* v0.5.0, the existing v0.5.0 page may still use
+its old progress presentation until v0.5.1 starts and the page is reloaded.
+This cannot be changed retroactively inside the already-running binary.
+Starting with v0.5.1, upgrades are tracked by the refreshed interface.
+
+
 **Pronunciation:** Sink-Re-Ah. **Default local web UI:** `http://127.0.0.1:9764` (configurable with `-listen`). The repository and Go module are named `syncria`. Existing default data directories may retain the historical `gdsync` name to preserve configurations during upgrades. Restart the agent after upgrading; existing instances launched with an explicit `-listen` argument continue using that chosen port.
 
 A lightweight, self-hosted cloud and NAS synchronization agent written in Go. Single binary, embedded browser UI, no external database, and no JavaScript build tool. Suitable for Windows and Linux (including servers with mounted NAS shares).
