@@ -640,12 +640,15 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     job.LastUploads, job.LastDownloads = 0, 0
     job.LastUploadBytes, job.LastDownloadBytes = 0, 0
     var err error
-    if job.Provider == "bridge" || job.Provider=="nas_bridge" {
-        err = a.syncBridge(ctx,&job)
-    } else {
-        // Historical mount-path jobs are preserved for migration but never
-        // executed in the streaming-only Syncria architecture.
-        err = errors.New("Legacy filesystem job is disabled in bridge mode. Recreate it with explicit cloud and NAS connections; no files were touched")
+    switch job.Provider {
+    case "bridge","nas_bridge":
+      err=a.syncBridge(ctx,&job)
+    case "storage":
+      err=a.executeStorage(ctx,&job)
+    case "","google_drive":
+      err=a.execute(ctx,&job)
+    default:
+      err=fmt.Errorf("Unsupported sync provider: %s",job.Provider)
     }
 	a.mu.Lock()
 	if actual := a.job(jobID); actual != nil {
@@ -1060,8 +1063,6 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
         a.addBridge(w,r)
         return
     case "add_job":
-        redirect(w,r,"Local storage mappings are discontinued. Configure a direct cloud ↔ NAS bridge instead")
-        return
         provider := strings.TrimSpace(r.FormValue("provider"))
         if provider == "" {provider = "google_drive"}
         if provider != "google_drive" && provider != "storage" {
@@ -1356,6 +1357,7 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	cfg := a.cfg
 	cfg.Accounts = append([]Account(nil), a.cfg.Accounts...)
+    cfg.DropboxAccounts=append([]DropboxAccount(nil),a.cfg.DropboxAccounts...)
 	cfg.Jobs = append([]Job(nil), a.cfg.Jobs...)
 	cfg.Shares = append([]StorageShare(nil), a.cfg.Shares...)
 	a.mu.Unlock()
@@ -1364,15 +1366,25 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 	if base == "" {
 		base = "http://localhost:9764"
 	}
-	data := struct {
-		Version, Message, ClientID, BaseURL, Callback string
-		Configured, Logged                            bool
-		Accounts                                      []Account
-		Jobs                                          []Job
-		Shares                                        []StorageShare
-        Metrics DashboardTotals
-        MountingEnabled bool
-	}{appVersion, r.URL.Query().Get("msg"), cfg.OAuthID, base, base + "/oauth/callback", cfg.PasswordHash != "", a.authenticated(r), cfg.Accounts, cfg.Jobs, cfg.Shares, summarizeMetrics(cfg.Jobs), os.Getenv("SYNCRIA_ENABLE_MOUNTS")=="1" && runtime.GOOS=="linux"}
+    data:=struct{
+      Version,Message,ClientID,BaseURL,Callback string
+      DropboxClientID,DropboxCallback string
+      Configured,Logged bool
+      Accounts []Account
+      DropboxAccounts []DropboxAccount
+      Jobs []Job
+      Shares []StorageShare
+      Metrics DashboardTotals
+      MountingEnabled bool
+    }{
+      Version:appVersion,Message:r.URL.Query().Get("msg"),ClientID:cfg.OAuthID,
+      BaseURL:base,Callback:base+"/oauth/callback",
+      DropboxClientID:cfg.DropboxOAuthID,DropboxCallback:base+"/oauth/dropbox/callback",
+      Configured:cfg.PasswordHash!="",Logged:a.authenticated(r),
+      Accounts:cfg.Accounts,DropboxAccounts:cfg.DropboxAccounts,
+      Jobs:cfg.Jobs,Shares:cfg.Shares,Metrics:summarizeMetrics(cfg.Jobs),
+      MountingEnabled:os.Getenv("SYNCRIA_ENABLE_MOUNTS")=="1" && runtime.GOOS=="linux",
+    }
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -1391,13 +1403,14 @@ func (a *App) scheduler(ctx context.Context) {
 		a.mu.Lock()
 		jobs := append([]Job(nil), a.cfg.Jobs...)
 		a.mu.Unlock()
+        a.expireRecoveries(ctx)
 		for _, j := range jobs {
-			if j.Enabled && (j.Provider=="bridge"||j.Provider=="nas_bridge") && j.ScheduleMode=="changes" {
+			if j.Enabled && j.Provider!="nas_bridge" && j.ScheduleMode=="changes" {
              if _,loaded:=a.watchers.LoadOrStore(j.ID,true);!loaded{go a.watchChangedJob(ctx,j.ID)}
             }
             cadence:=j.Interval
             if j.ScheduleMode=="changes"{cadence=5}
-            if j.Enabled && (j.Provider=="bridge"||j.Provider=="nas_bridge") && (j.LastRun.IsZero() || time.Since(j.LastRun) >= time.Duration(cadence)*time.Minute) {
+            if j.Enabled && (j.LastRun.IsZero() || time.Since(j.LastRun) >= time.Duration(cadence)*time.Minute) {
 				id := j.ID
 				go func() {
 					if e := a.syncJob(ctx, id); e != nil && e.Error() != "job already running" {
@@ -1450,8 +1463,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go a.scheduler(ctx)
-    // Legacy kernel mount management is not part of the streaming bridge.
-    // Old connection definitions remain in config for explicit migration.
+    // New direct NAS connections never mount filesystems. Legacy connections
+    // remain supported only when their existing opt-in mounting is configured.
+    if os.Getenv("SYNCRIA_ENABLE_MOUNTS")=="1" {go a.restoreShares()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.home)
 	mux.HandleFunc("/assets/syncria-logo.svg", serveBrandLogo)
@@ -1460,6 +1474,8 @@ func main() {
     mux.HandleFunc("/api/update/progress", a.updateProgressAPI)
 	mux.HandleFunc("/api/update/manual", a.manualUpdate)
     mux.HandleFunc("/api/browse/nas", a.browseNAS)
+    mux.HandleFunc("/api/browse/dropbox",a.browseDropbox)
+    mux.HandleFunc("/api/recovery/undo",a.recoveryAction)
     mux.HandleFunc("/api/browse/nas/create", a.createNASFolder)
     mux.HandleFunc("/api/nas/action", a.directNASAction)
 	mux.HandleFunc("/api/dashboard/status", a.dashboardStatus)
