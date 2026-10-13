@@ -123,7 +123,7 @@ code{color:#076bd3}
 <div><span class="card-label">When Syncria checks</span><strong id="reviewInterval"></strong></div>
 <div><span class="card-label">How files are matched</span><strong id="reviewDirection"></strong></div>
 <div><span class="card-label">Deleting and bringing back files</span><strong id="reviewDeletion"></strong></div></div>
-<p class="wizard-status good" id="reviewStatus">Your new sync starts turned off. Nothing will be copied until you click Turn on sync.</p>
+<p class="wizard-status good" id="reviewStatus">Your new sync starts turned off. Files will not be copied until you click Turn on sync or Sync now.</p>
 <div class="row"><button type="button" class="secondary" onclick="showSyncStep(3)">← Back</button><button type="submit" class="primary" id="createSyncButton">Save my sync (keep it off)</button></div></div></form></section></section>
 <section class="view" id="view-storage"><p class="lead">A NAS is a storage box on your network. Add yours here so Syncria knows where to find your files. Your files stay on the NAS.</p><div class="plain-guide"><strong>What you will need:</strong> Your NAS address, the folder you share, and the username and password you use to open it. If you don’t know them, check your NAS settings.</div>
 <div class="row"><button class="primary" type="button" onclick="toggleDirectNAS()">+ Add a NAS box</button></div>
