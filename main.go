@@ -594,12 +594,10 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     var err error
     if job.Provider == "bridge" {
         err = a.syncBridge(ctx,&job)
-    } else if job.Provider == "storage" {
-        err = a.executeStorage(ctx, &job)
-    } else if job.Provider == "" || job.Provider == "google_drive" {
-        err = a.execute(ctx, &job)
     } else {
-        err = fmt.Errorf("unsupported sync provider %q", job.Provider)
+        // Historical mount-path jobs are preserved for migration but never
+        // executed in the streaming-only Syncria architecture.
+        err = errors.New("Legacy filesystem job is disabled in bridge mode. Recreate it with explicit cloud and NAS connections; no files were touched")
     }
 	a.mu.Lock()
 	if actual := a.job(jobID); actual != nil {
@@ -1011,6 +1009,8 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
         a.addBridge(w,r)
         return
     case "add_job":
+        redirect(w,r,"Local storage mappings are discontinued. Configure a direct cloud ↔ NAS bridge instead")
+        return
         provider := strings.TrimSpace(r.FormValue("provider"))
         if provider == "" {provider = "google_drive"}
         if provider != "google_drive" && provider != "storage" {
@@ -1341,12 +1341,12 @@ func (a *App) scheduler(ctx context.Context) {
 		jobs := append([]Job(nil), a.cfg.Jobs...)
 		a.mu.Unlock()
 		for _, j := range jobs {
-			if j.Enabled && j.ScheduleMode=="changes" {
+			if j.Enabled && j.Provider=="bridge" && j.ScheduleMode=="changes" {
              if _,loaded:=a.watchers.LoadOrStore(j.ID,true);!loaded{go a.watchChangedJob(ctx,j.ID)}
             }
             cadence:=j.Interval
             if j.ScheduleMode=="changes"{cadence=5}
-            if j.Enabled && (j.LastRun.IsZero() || time.Since(j.LastRun) >= time.Duration(cadence)*time.Minute) {
+            if j.Enabled && j.Provider=="bridge" && (j.LastRun.IsZero() || time.Since(j.LastRun) >= time.Duration(cadence)*time.Minute) {
 				id := j.ID
 				go func() {
 					if e := a.syncJob(ctx, id); e != nil && e.Error() != "job already running" {
