@@ -1297,7 +1297,8 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 		Jobs                                          []Job
 		Shares                                        []StorageShare
         Metrics DashboardTotals
-	}{appVersion, r.URL.Query().Get("msg"), cfg.OAuthID, base, base + "/oauth/callback", cfg.PasswordHash != "", a.authenticated(r), cfg.Accounts, cfg.Jobs, cfg.Shares, summarizeMetrics(cfg.Jobs)}
+        MountingEnabled bool
+	}{appVersion, r.URL.Query().Get("msg"), cfg.OAuthID, base, base + "/oauth/callback", cfg.PasswordHash != "", a.authenticated(r), cfg.Accounts, cfg.Jobs, cfg.Shares, summarizeMetrics(cfg.Jobs), os.Getenv("SYNCRIA_ENABLE_MOUNTS")=="1" && runtime.GOOS=="linux"}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
