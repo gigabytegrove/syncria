@@ -11,15 +11,28 @@ import (
 var updateLookup struct {
  sync.Mutex
  validUntil time.Time
+ lastRefresh time.Time
  response map[string]any
 }
 
 func cachedUpdateStatus(ctx context.Context) map[string]any {
+ return lookupUpdateStatus(ctx,false)
+}
+// A user pressing Check again should query the public release API instead of
+// silently showing cached results. Throttle repeated manual checks to protect
+// against GitHub's unauthenticated API rate limits.
+func refreshedUpdateStatus(ctx context.Context) map[string]any {
+ return lookupUpdateStatus(ctx,true)
+}
+func lookupUpdateStatus(ctx context.Context,force bool) map[string]any {
  updateLookup.Lock()
  defer updateLookup.Unlock()
- if time.Now().Before(updateLookup.validUntil) && updateLookup.response != nil {
-  return updateLookup.response
+ now:=time.Now()
+ if updateLookup.response!=nil {
+  if !force&&now.Before(updateLookup.validUntil) {return updateLookup.response}
+  if force&&now.Sub(updateLookup.lastRefresh)<15*time.Second {return updateLookup.response}
  }
+ if force {updateLookup.lastRefresh=now}
  c,cancel:=context.WithTimeout(ctx,15*time.Second)
  defer cancel()
  status:=map[string]any{"current":appVersion}
