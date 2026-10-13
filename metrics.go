@@ -47,4 +47,5 @@ func recordTransfer(j *Job, toDestination bool, size int64) {
         j.TotalDownloads++
         j.TotalDownloadBytes += size
     }
+    if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes,j.LastDownloadBytes)}
 }
