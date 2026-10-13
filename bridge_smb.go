@@ -12,7 +12,6 @@ import (
  "path"
  "strconv"
  "strings"
- "time"
 
  smb2 "github.com/cloudsoda/go-smb2"
 )
