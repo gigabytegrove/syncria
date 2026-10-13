@@ -286,7 +286,14 @@ func (a *App) directNASAction(w http.ResponseWriter,r *http.Request){
   index:=-1
   for i,s:=range a.cfg.Shares{if s.ID==id&&s.Local==""{index=i;break}}
   if index<0{a.mu.Unlock();redirect(w,r,"NAS connection not found");return}
-  for _,j:=range a.cfg.Jobs{if j.Provider=="bridge"&&j.NASShareID==id{a.mu.Unlock();redirect(w,r,"Remove linked sync relationships before disconnecting this NAS");return}}
+  for _,j:=range a.cfg.Jobs {
+   if j.NASShareID==id||j.NASSourceID==id {
+    a.mu.Unlock();redirect(w,r,"This NAS is used by a synchronization relationship; remove the relationship before disconnecting");return
+   }
+   for _,d:=range j.NASDestinations{
+    if d.ShareID==id{a.mu.Unlock();redirect(w,r,"This NAS is used by a synchronization relationship; remove the relationship before disconnecting");return}
+   }
+  }
   a.cfg.Shares=append(a.cfg.Shares[:index],a.cfg.Shares[index+1:]...)
   err:=a.save();a.mu.Unlock()
   if err!=nil{http.Error(w,"Unable to save connection changes",500);return}
