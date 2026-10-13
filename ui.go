@@ -49,30 +49,64 @@ code{color:#076bd3}
 {{if not .Configured}}<section class="panel" style="max-width:550px"><h2>Welcome to Syncria</h2><p>Create the administrator password to protect your dashboard.</p><form method="post" action="/action"><input type="hidden" name="action" value="setup"><label class="field">Administrator password<input type="password" name="password" minlength="12" required autocomplete="new-password"></label><button class="primary">Secure dashboard</button></form></section>
 {{else if not .Logged}}<section class="panel" style="max-width:550px"><h2>Sign in</h2><p>Access your synchronization workspace.</p><form method="post" action="/action"><input type="hidden" name="action" value="login"><label class="field">Administrator password<input type="password" name="password" required autocomplete="current-password"></label><button class="primary">Sign in</button></form></section>
 {{else}}
-<section class="view active" id="view-overview"><p class="lead">Manage synchronization across cloud accounts, local folders and network storage.</p><div class="stats"><div class="stat"><small>Google accounts</small><strong>{{len .Accounts}}</strong><small>Connected</small></div><div class="stat"><small>Sync relationships</small><strong>{{len .Jobs}}</strong><small>Configured</small></div><div class="stat"><small>Network shares</small><strong>{{len .Shares}}</strong><small>Saved destinations</small></div><div class="stat"><small>Files synchronized</small><strong id="metricFiles">{{.Metrics.TrackedFiles}}</strong><small>Files tracked across relationships</small></div><div class="stat"><small>Data transferred</small><strong id="metricBandwidth" class="mini-stat">—</strong><small>Uploaded + downloaded</small></div><div class="stat"><small>Completed runs</small><strong id="metricRuns">{{.Metrics.Runs}}</strong><small><span id="metricFailures">{{.Metrics.Failures}}</span> failed</small></div></div>
-<div class="split"><section class="panel"><div class="panel-head"><h2>Synchronization</h2><button class="primary" type="button" onclick="navigate('sync');startWizard()">+ New sync</button></div>{{range .Jobs}}<div class="entry"><div><strong>{{.Name}}</strong> {{if .Enabled}}<span class="status">Enabled</span>{{else}}<span class="status off">Paused</span>{{end}}<p>{{if eq .Provider "bridge"}}Google Drive ↔ SMB NAS · {{.NASFolder}}{{else}}Legacy filesystem relationship — migration required, no file transfer will run{{end}}</p></div><button class="secondary" type="button" onclick="navigate('sync')">Manage</button></div>{{else}}<div class="empty"><strong>No sync relationships yet</strong>Choose a Drive folder and storage destination to begin.</div>{{end}}</section><section class="panel"><div class="panel-head"><h2>Connected storage</h2><button class="secondary" type="button" onclick="navigate('storage')">Manage</button></div>{{range .Shares}}<div class="entry"><div><strong>{{.Label}}</strong><p>{{.Protocol}} · {{.Server}}</p></div>{{if .Mounted}}<span class="status" data-share-mounted="{{.ID}}">Mounted</span>{{else}}<span class="status off" data-share-mounted="{{.ID}}">Disconnected</span>{{end}}</div>{{else}}<div class="empty"><strong>No managed network shares</strong>Local storage is still available.</div>{{end}}</section></div></section>
-<section class="view" id="view-sync"><p class="lead">Choose a source, a destination, and when to sync. Then monitor file transfers as they happen. New relationships start paused.</p><section class="panel"><div class="panel-head"><h2>Sync relationships</h2><button type="button" class="primary" onclick="startWizard()">+ New sync</button></div>{{range .Jobs}}<div class="entry"><div><strong>{{.Name}}</strong> {{if .Enabled}}<span class="status" data-job-enabled="{{.ID}}">Enabled</span>{{else}}<span class="status off" data-job-enabled="{{.ID}}">Paused</span>{{end}}<p>{{if eq .Provider "bridge"}}Google Drive ↔ NAS {{.NASFolder}}{{else}}Legacy filesystem relationship — migration required (disabled for safety){{end}}</p><p data-job-statline="{{.ID}}" class="muted">Transferred {{.TotalUploads}} files to destination and {{.TotalDownloads}} to source · {{.SuccessfulRuns}} successful / {{.FailedRuns}} failed runs</p><p>{{if eq .ScheduleMode "changes"}}On local changes, with 5-minute reconciliation{{else}}Every {{.Interval}} min{{end}} · <span data-job-run="{{.ID}}">{{if .LastRun.IsZero}}Never run{{else}}Last run {{.LastRun.Format "Jan 2, 2006 15:04"}}{{end}}</span> · <span data-job-summary="{{.ID}}">{{.LastSummary}}</span></p><p data-job-error="{{.ID}}" style="color:var(--bad)" {{if not .LastError}}hidden{{end}}>Error: {{.LastError}}</p><div class="update-progress-panel" data-job-progress="{{.ID}}"><strong data-job-phase="{{.ID}}">Idle</strong><progress data-job-bar="{{.ID}}" max="100"></progress><p class="muted" data-job-progress-detail="{{.ID}}">Enable and run to see live processing progress.</p></div></div><div class="row"><form class="inline" method="post" action="/action"><input type="hidden" name="action" value="run_job"><input type="hidden" name="id" value="{{.ID}}"><button class="secondary">Run</button></form><form class="inline" method="post" action="/action"><input type="hidden" name="action" value="toggle_job"><input type="hidden" name="id" value="{{.ID}}"><button class="secondary">{{if .Enabled}}Pause{{else}}Enable{{end}}</button></form><form class="inline" method="post" action="/action" onsubmit="return confirm('Remove mapping? Files will remain.')"><input type="hidden" name="action" value="delete_job"><input type="hidden" name="id" value="{{.ID}}"><button class="danger">Remove</button></form></div></div>{{else}}<div class="empty"><strong>No sync relationships</strong>Use New sync to create your first relationship.</div>{{end}}</section>
-<section id="wizard" class="panel hidden"><div class="panel-head"><h2>New cloud ↔ NAS sync</h2><button type="button" class="secondary" onclick="closeSyncWizard()">Close</button></div>
-<div class="step-indicator"><span id="stepMarker1" class="active">1 · Source</span><span id="stepMarker2">2 · Destination</span><span id="stepMarker3">3 · Schedule</span><span id="stepMarker4">4 · Review</span></div>
+<section class="view active" id="view-overview"><p class="lead">Manage Google Drive, Dropbox, and multiple NAS devices through independent synchronization relationships.</p><div class="stats"><div class="stat"><small>Google Drive accounts</small><strong>{{len .Accounts}}</strong><small>Connected</small></div><div class="stat"><small>Dropbox accounts</small><strong>{{len .DropboxAccounts}}</strong><small>Connected</small></div><div class="stat"><small>Sync relationships</small><strong>{{len .Jobs}}</strong><small>Configured</small></div><div class="stat"><small>Network shares</small><strong>{{len .Shares}}</strong><small>Saved destinations</small></div><div class="stat"><small>Files synchronized</small><strong id="metricFiles">{{.Metrics.TrackedFiles}}</strong><small>Files tracked across relationships</small></div><div class="stat"><small>Data transferred</small><strong id="metricBandwidth" class="mini-stat">—</strong><small>Uploaded + downloaded</small></div><div class="stat"><small>Completed runs</small><strong id="metricRuns">{{.Metrics.Runs}}</strong><small><span id="metricFailures">{{.Metrics.Failures}}</span> failed</small></div></div>
+<div class="split"><section class="panel"><div class="panel-head"><h2>Synchronization</h2><button class="primary" type="button" onclick="navigate('sync');startWizard()">+ New sync</button></div>{{range .Jobs}}<div class="entry"><div><strong>{{.Name}}</strong> {{if .Enabled}}<span class="status">Enabled</span>{{else}}<span class="status off">Paused</span>{{end}}<p>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} ↔ {{len .NASDestinations}} NAS destination(s){{else if eq .Provider "nas_bridge"}}NAS ↔ NAS · {{len .NASDestinations}} destination(s){{else}}Existing filesystem relationship{{end}}</p></div><button class="secondary" type="button" onclick="navigate('sync')">Manage</button></div>{{else}}<div class="empty"><strong>No sync relationships yet</strong>Connect a Google Drive or Dropbox account and select your NAS destination(s) to begin.</div>{{end}}</section><section class="panel"><div class="panel-head"><h2>Connected storage</h2><button class="secondary" type="button" onclick="navigate('storage')">Manage</button></div>{{range .Shares}}<div class="entry"><div><strong>{{.Label}}</strong><p>{{.Protocol}} · {{.Server}}</p></div>{{if .Mounted}}<span class="status" data-share-mounted="{{.ID}}">Mounted</span>{{else}}<span class="status off" data-share-mounted="{{.ID}}">Disconnected</span>{{end}}</div>{{else}}<div class="empty"><strong>No direct NAS connections yet</strong>Add a NAS through the Storage screen.</div>{{end}}</section></div></section>
+<section class="view" id="view-sync"><p class="lead">Choose a source, a destination, and when to sync. Then monitor file transfers as they happen. New relationships start paused.</p><section class="panel"><div class="panel-head"><h2>Sync relationships</h2><button type="button" class="primary" onclick="startWizard()">+ New sync</button></div>{{range .Jobs}}{{$job := .}}<div class="entry"><div><strong>{{.Name}}</strong> {{if .Enabled}}<span class="status" data-job-enabled="{{.ID}}">Enabled</span>{{else}}<span class="status off" data-job-enabled="{{.ID}}">Paused</span>{{end}}<p>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} ↔ {{len .NASDestinations}} NAS destination(s){{else if eq .Provider "nas_bridge"}}NAS ↔ NAS · {{.Direction}}{{else}}Existing filesystem relationship{{end}}</p><p data-job-statline="{{.ID}}" class="muted">Transferred {{.TotalUploads}} files to destination and {{.TotalDownloads}} to source · {{.SuccessfulRuns}} successful / {{.FailedRuns}} failed runs</p><p>{{if eq .ScheduleMode "changes"}}On local changes, with 5-minute reconciliation{{else}}Every {{.Interval}} min{{end}} · <span data-job-run="{{.ID}}">{{if .LastRun.IsZero}}Never run{{else}}Last run {{.LastRun.Format "Jan 2, 2006 15:04"}}{{end}}</span> · <span data-job-summary="{{.ID}}">{{.LastSummary}}</span></p><p data-job-error="{{.ID}}" style="color:var(--bad)" {{if not .LastError}}hidden{{end}}>Error: {{.LastError}}</p><div class="update-progress-panel" data-job-progress="{{.ID}}"><strong data-job-phase="{{.ID}}">Idle</strong><progress data-job-bar="{{.ID}}" max="100"></progress><p class="muted" data-job-progress-detail="{{.ID}}">Enable and run to see live processing progress.</p></div>
+{{if .Conflicts}}<div class="panel" style="margin-top:12px"><h3>Manual conflicts — awaiting your decision</h3><p class="muted">Syncria has not overwritten either file. Choose a version for each conflicting file, then run this relationship again.</p>
+{{range .Conflicts}}<div class="entry"><div><strong>{{.Path}}</strong><p class="muted">Primary: {{.PrimaryModified.Format "Jan 2, 2006 15:04"}} · Secondary: {{.SecondaryModified.Format "Jan 2, 2006 15:04"}}</p></div>
+<form method="post" action="/api/conflicts/resolve" class="inline"><input type="hidden" name="id" value="{{$job.ID}}"><input type="hidden" name="pair" value="{{.Pair}}"><input type="hidden" name="path" value="{{.Path}}">
+<label class="field">Resolve conflict<select name="choice"><option value="primary">Use primary</option><option value="secondary">Use secondary</option><option value="keep_both">Keep both files</option></select></label><button class="secondary" type="submit">Save decision</button></form></div>
+{{end}}</div>{{end}}
+{{if .PendingDeletions}}<div class="panel" style="margin-top:12px"><h3>Recently deleted — Undo available for 10 minutes</h3><p class="muted">Recoverable data stays on the NAS or cloud endpoint, not on Syncria.</p>
+{{range .PendingDeletions}}<div class="entry"><div><strong>{{.Path}}</strong><p class="muted">Recovery expires: {{.Expires.Format "Jan 2, 2006 15:04:05 MST"}}</p></div>
+<form method="post" action="/api/recovery/undo" class="inline"><input type="hidden" name="operation" value="undo"><input type="hidden" name="id" value="{{$job.ID}}"><input type="hidden" name="pair" value="{{.Pair}}"><input type="hidden" name="path" value="{{.Path}}"><button class="primary" type="submit">Undo deletion</button></form></div>{{end}}</div>{{end}}
+</div><div class="row"><form class="inline" method="post" action="/action"><input type="hidden" name="action" value="run_job"><input type="hidden" name="id" value="{{.ID}}"><button class="secondary">Run</button></form><form class="inline" method="post" action="/action"><input type="hidden" name="action" value="toggle_job"><input type="hidden" name="id" value="{{.ID}}"><button class="secondary">{{if .Enabled}}Pause{{else}}Enable{{end}}</button></form><form class="inline" method="post" action="/action" onsubmit="return confirm('Remove mapping? Files will remain.')"><input type="hidden" name="action" value="delete_job"><input type="hidden" name="id" value="{{.ID}}"><button class="danger">Remove</button></form></div></div>{{else}}<div class="empty"><strong>No sync relationships</strong>Use New sync to create your first relationship.</div>{{end}}</section>
+<section id="wizard" class="panel hidden"><div class="panel-head"><h2>New synchronization relationship</h2><button type="button" class="secondary" onclick="closeSyncWizard()">Close</button></div>
+<div class="step-indicator"><span id="stepMarker1" class="active">1 · Source</span><span id="stepMarker2">2 · Destination(s)</span><span id="stepMarker3">3 · Behavior</span><span id="stepMarker4">4 · Review</span></div>
 <form id="syncWizard" method="post" action="/action" onsubmit="return submitSyncWizard(event)" novalidate><input type="hidden" name="action" value="add_bridge">
-<div id="wizard1" class="step active"><h2>1. Choose a cloud source</h2><label class="field">Relationship name<input name="name" id="syncName" placeholder="Family documents" required maxlength="128"></label>
-<label class="field">Cloud service<select id="sourceProvider" onchange="sourceProviderChanged()"><option value="google_drive">Google Drive</option><option value="dropbox" disabled>Dropbox — integration not yet implemented</option></select></label>
-<div id="googleSourceFields"><label class="field">Google account<select name="account" id="syncAccount" onchange="resetDrive()" required><option value="">Choose an account</option>{{range .Accounts}}<option value="{{.ID}}">{{.Email}}</option>{{end}}</select></label>
-<div class="selected"><div><span class="card-label">Google Drive folder</span><strong id="selectedDriveLabel">Entire My Drive</strong></div><button class="secondary" type="button" onclick="openPicker('drive')">Browse cloud folders</button></div></div>
-<input type="hidden" id="remoteValue" name="remote" value="root"><p class="wizard-status" id="syncWizardStatus" role="status">Choose your Google account and verify the folder.</p>
-<div class="row"><button id="verifySourceButton" type="button" class="primary" onclick="wizardNext()">Verify source →</button><button type="button" class="secondary" onclick="navigate('accounts');startAccountWizard()">Add Google account</button></div></div>
-<div id="wizard2" class="step"><h2>2. Choose a NAS destination</h2><p class="muted">Syncria connects directly to your NAS over SMB2/3. No mount, /storage mapping, or local copy is required.</p>
-<label class="field">Connected NAS share<select id="nasId" name="nas_id" onchange="nasChanged()" required><option value="">Choose a NAS connection</option>{{range .Shares}}{{if not .Local}}{{if eq .Protocol "smb"}}<option value="{{.ID}}">{{.Label}} — {{.Server}} / {{.Export}}</option>{{end}}{{end}}{{end}}</select></label>
-<div class="selected"><div><span class="card-label">Folder on NAS</span><strong id="selectedNASLabel">Share root</strong></div><button type="button" class="secondary" onclick="openPicker('nas')">Browse NAS folders</button></div>
-<input type="hidden" name="nas_folder" id="nasFolderValue" value=".">
-<div class="row"><button type="button" class="secondary" onclick="showSyncStep(1)">← Back</button><button id="verifyTargetButton" type="button" class="primary" onclick="wizardReview()">Verify NAS →</button><button type="button" class="secondary" onclick="navigate('storage');toggleDirectNAS(true)">Add NAS connection</button></div></div>
-<div id="wizard3" class="step"><h2>3. Choose when to synchronize</h2><p class="muted">Cloud and NAS changes are discovered by polling their APIs. Linux inotify does not report remote changes to SMB/Google Drive.</p>
-<input type="hidden" id="scheduleMode" name="schedule_mode" value="interval">
-<label class="field" id="scheduleIntervalField">Synchronization schedule<select name="interval" id="syncInterval"><option value="5">Every 5 minutes</option><option value="10">Every 10 minutes</option><option value="15">Every 15 minutes</option><option value="30">Every 30 minutes</option><option value="60">Every hour</option><option value="360">Every 6 hours</option><option value="1440">Daily</option></select></label>
-<p id="scheduleExplanation" class="wizard-status">Syncria checks both endpoints and transfers only detected changes.</p>
-<div class="row"><button type="button" class="secondary" onclick="showSyncStep(2)">← Back</button><button type="button" class="primary" onclick="wizardFinalize()">Review configuration →</button></div></div>
-<div id="wizard4" class="step"><h2>4. Review the bridge</h2><div class="review-grid"><div><span class="card-label">Relationship</span><strong id="reviewName"></strong></div><div><span class="card-label">Source</span><strong id="reviewProvider"></strong><small id="reviewSource"></small></div><div><span class="card-label">NAS destination</span><strong id="reviewTarget"></strong></div><div><span class="card-label">Schedule</span><strong id="reviewInterval"></strong></div><div><span class="card-label">Direction</span><strong>Two-way sync with conflict protection</strong></div><div><span class="card-label">Storage on Syncria</span><strong>Configuration and indexes only — 0 file payloads</strong></div></div><p id="reviewStatus" class="wizard-status good">Nothing starts until you enable the bridge. Deletions and conflicts require review.</p>
-<div class="row"><button class="secondary" type="button" onclick="showSyncStep(3)">← Back</button><button id="createSyncButton" class="primary" type="submit">Create bridge</button></div></div></form></section></section>
+<div id="wizard1" class="step active"><h2>1. Choose your source</h2>
+<label class="field">Relationship name<input name="name" id="syncName" maxlength="128" placeholder="Family Drive ↔ Main NAS" required></label>
+<label class="field">Relationship type<select id="relationshipType" name="relationship_type" onchange="relationshipTypeChanged()"><option value="cloud">Cloud ↔ NAS</option><option value="nas">NAS ↔ NAS (independent of cloud)</option></select></label>
+<div id="cloudSourceFields">
+<label class="field">Cloud service<select id="sourceProvider" name="cloud_provider" onchange="sourceProviderChanged()"><option value="google_drive">Google Drive</option><option value="dropbox">Dropbox</option></select></label>
+<div id="googleSourceFields"><label class="field">Google account<select id="syncAccount" name="account" onchange="resetDrive()"><option value="">Select a Google account</option>{{range .Accounts}}<option value="{{.ID}}">{{.Email}}</option>{{end}}</select></label></div>
+<div class="hidden" id="dropboxSourceFields"><label class="field">Dropbox account<select id="syncDropboxAccount" name="dropbox_account" onchange="resetDrive()"><option value="">Select a Dropbox account</option>{{range .DropboxAccounts}}<option value="{{.ID}}">{{.Email}}</option>{{end}}</select></label></div>
+<div class="selected"><div><span class="card-label">Cloud folder</span><strong id="selectedDriveLabel">Entire My Drive</strong></div><button class="secondary" type="button" onclick="openPicker($('sourceProvider').value==='dropbox'?'dropbox':'drive')">Browse folders</button></div>
+<input type="hidden" name="remote" id="remoteValue" value="root"></div>
+<div class="hidden" id="nasSourceFields"><label class="field">Primary NAS connection<select id="nasSourceId" name="nas_source_id" onchange="nasSourceChanged()"><option value="">Choose the source NAS</option>{{range .Shares}}{{if not .Local}}{{if eq .Protocol "smb"}}<option value="{{.ID}}">{{.Label}} — {{.Server}} / {{.Export}}</option>{{end}}{{end}}{{end}}</select></label>
+<div class="selected"><div><span class="card-label">Source NAS folder</span><strong id="selectedNASSourceLabel">Share root</strong></div><button class="secondary" type="button" onclick="openPicker('nas-source')">Browse folder</button></div>
+<input type="hidden" id="nasSourceFolderValue" name="nas_source_folder" value="."></div>
+<p class="wizard-status" id="syncWizardStatus" role="status">Choose the account or NAS you want to synchronize.</p>
+<div class="row"><button id="verifySourceButton" class="primary" type="button" onclick="wizardNext()">Verify source →</button><button type="button" class="secondary" onclick="navigate($('relationshipType').value==='cloud'?'accounts':'storage')">Manage connections</button></div></div>
+<div id="wizard2" class="step"><h2>2. Choose one or more NAS destinations</h2><p class="muted">Each destination uses a direct network connection. Syncria does not keep a copy of your files.</p>
+<div id="nasTargets">
+{{range .Shares}}{{if not .Local}}{{if eq .Protocol "smb"}}
+<div class="entry nas-target"><div><label><input type="checkbox" name="nas_ids" value="{{.ID}}" onchange="nasDestChanged()"> <strong>{{.Label}}</strong></label><p>{{.Server}} / {{.Export}}</p><small id="nas-label-{{.ID}}">Share root</small></div>
+<div><button type="button" class="secondary" onclick="browseNASDestination('{{.ID}}')">Choose folder</button><input type="hidden" id="nas-folder-{{.ID}}" name="nas_folder_{{.ID}}" value="."></div></div>
+{{end}}{{end}}{{end}}
+</div><p class="wizard-status" id="nasDestStatus">Select at least one destination. Different folders can be selected for each NAS.</p>
+<div class="row"><button type="button" class="secondary" onclick="showSyncStep(1)">← Back</button><button id="verifyTargetButton" type="button" class="primary" onclick="wizardReview()">Verify destinations →</button><button type="button" class="secondary" onclick="toggleDirectNAS(true)">Add NAS</button></div></div>
+<div id="wizard3" class="step"><h2>3. Choose synchronization behavior</h2>
+<label class="field">Schedule<select id="syncInterval" name="interval"><option value="5">Every 5 minutes</option><option value="10">Every 10 minutes</option><option value="15">Every 15 minutes</option><option value="30">Every 30 minutes</option><option value="60">Every hour</option><option value="360">Every 6 hours</option><option value="1440">Daily</option></select></label>
+<label class="field">Trigger type<select id="scheduleMode" name="schedule_mode" onchange="scheduleModeChanged()"><option value="interval">Scheduled checks</option><option value="changes">On NAS file changes (SMB notifications + 5-minute cloud reconciliation)</option></select></label>
+<div id="nasDirectionFields" class="hidden"><label class="field">NAS synchronization direction<select id="nasDirection" name="direction" onchange="nasDirectionChanged()"><option value="one_way">One-way · Primary → Destination(s)</option><option value="bidirectional">Bidirectional · Changes move both directions</option></select></label>
+<div id="nasConflictFields" class="hidden"><label class="field">When the same file changes on both NAS devices<select name="conflict_policy" id="conflictPolicy"><option value="manual">Manual conflict resolution</option><option value="newer">Newer file wins</option><option value="primary">Primary NAS wins</option><option value="secondary">Secondary NAS wins</option><option value="keep_both">Keep both files</option></select></label></div></div>
+<div id="crossNASField"><label><input type="checkbox" name="cross_nas_propagation" value="1"> Allow changes from one NAS to propagate to other NAS destinations through the cloud</label><p class="muted">Off by default. If separate NAS-to-NAS synchronization is enabled, Syncria uses only the designated cloud-connected NAS.</p></div>
+<div class="panel" style="margin-top:16px"><h3>File deletion and recovery</h3>
+<label><input id="propagateDeletions" type="checkbox" name="propagate_deletions" value="1" checked> Propagate file deletions to synchronized destinations</label>
+<p class="muted">Enabled by default. When disabled, a deletion on one endpoint will not delete another copy.</p>
+<label><input id="recoveryEnabled" type="checkbox" name="recovery_enabled" value="1" checked> Allow accidental deletion to be undone for 10 minutes</label>
+<p class="muted">Enabled by default. Recoverable files stay on the NAS or cloud provider, never on Syncria.</p></div>
+<div class="row"><button type="button" class="secondary" onclick="showSyncStep(2)">← Back</button><button type="button" class="primary" onclick="wizardFinalize()">Review setup →</button></div></div>
+<div id="wizard4" class="step"><h2>4. Review and create</h2>
+<div class="review-grid"><div><span class="card-label">Relationship</span><strong id="reviewName"></strong></div>
+<div><span class="card-label">Source</span><strong id="reviewProvider"></strong><small id="reviewSource"></small></div>
+<div><span class="card-label">NAS destination(s)</span><strong id="reviewTarget"></strong></div>
+<div><span class="card-label">Schedule</span><strong id="reviewInterval"></strong></div>
+<div><span class="card-label">Direction and conflicts</span><strong id="reviewDirection"></strong></div>
+<div><span class="card-label">Deletion safeguard</span><strong id="reviewDeletion"></strong></div></div>
+<p class="wizard-status good" id="reviewStatus">This relationship will be created paused. No files are transferred until you enable it.</p>
+<div class="row"><button type="button" class="secondary" onclick="showSyncStep(3)">← Back</button><button type="submit" class="primary" id="createSyncButton">Create relationship</button></div></div></form></section></section>
 <section class="view" id="view-storage"><p class="lead">Connect directly to NAS shares over SMB2/3. Credentials and connection settings stay in Syncria; your files remain on the NAS.</p>
 <div class="row"><button class="primary" type="button" onclick="toggleDirectNAS()">+ Add NAS connection</button></div>
 <section id="directNASPanel" class="panel hidden"><div class="panel-head"><h2>Connect to a NAS</h2><button type="button" class="secondary" onclick="toggleDirectNAS(false)">Close</button></div>
@@ -90,11 +124,32 @@ code{color:#076bd3}
 {{if not .Local}}<div class="row"><form class="inline" action="/api/nas/action" method="post"><input type="hidden" name="operation" value="verify"><input type="hidden" name="id" value="{{.ID}}"><button class="secondary">Verify connection</button></form>
 <form class="inline" action="/api/nas/action" method="post" onsubmit="return confirm('Remove this NAS connection? Files on the NAS will not be touched.')"><input type="hidden" name="operation" value="disconnect"><input type="hidden" name="id" value="{{.ID}}"><button class="danger">Disconnect</button></form></div>{{end}}</div>
 {{else}}<div class="empty"><strong>No NAS connections</strong>Add your NAS IP address, SMB share name, and credentials. No storage mount is required.</div>{{end}}</section></section>
-<section class="view" id="view-accounts"><p class="lead">Connect cloud accounts here, then choose one as a source in the bridge wizard. Your NAS is configured independently under Storage.</p><section class="panel"><div class="panel-head"><h2>Cloud accounts</h2><button class="primary" type="button" onclick="startAccountWizard()">+ Add account</button></div>{{range .Accounts}}<div class="entry"><div><strong>{{.Email}}</strong><p>Google Drive · OAuth authorized</p></div><div class="row"><button class="secondary" type="button" onclick="verifyConnectedAccount('{{.ID}}',this)">Verify access</button><span class="status">Connected</span><form method="post" action="/action" class="inline" onsubmit="return confirm('Disconnect account?')"><input type="hidden" name="action" value="remove_account"><input type="hidden" name="id" value="{{.ID}}"><button class="danger">Disconnect</button></form></div></div>{{else}}<div class="empty"><strong>No cloud accounts connected</strong>Use Add account to connect and verify Google Drive access.</div>{{end}}</section>
-<section class="panel hidden" id="accountWizard"><div class="panel-head"><h2>Connect cloud account</h2><button class="secondary" type="button" onclick="document.getElementById('accountWizard').classList.add('hidden')">Close</button></div><div class="step-indicator"><span class="active" id="accountMarker1">1 · Provider</span><span id="accountMarker2">2 · Authorization</span></div><div class="step active" id="accountStep1"><label class="field">Available provider<select id="accountProvider"><option value="google_drive">Google Drive</option></select></label><p class="muted">Google Drive requires an OAuth application. NAS destinations are configured as direct network connections under Storage. Dropbox will appear when its actual OAuth and streaming adapter are implemented.</p>{{if .ClientID}}<p class="wizard-status good">Google OAuth client configured. Continue to authorize and verify an account.</p><button class="primary" type="button" onclick="showAccountStep(2)">Continue →</button>{{else}}<p class="wizard-status bad">Google OAuth is not configured yet. Set it up under Settings before connecting.</p><button class="secondary" type="button" onclick="navigate('settings')">Configure Google OAuth</button>{{end}}</div><div class="step" id="accountStep2"><p>Google will show Syncria's requested Drive permissions. You will return to this dashboard after authorization. Syncria then stores the connected account for use in relationships.</p><div class="row"><button class="secondary" type="button" onclick="showAccountStep(1)">← Back</button><a href="/oauth/start" class="primary" style="text-decoration:none">Authorize Google account →</a></div></div></section></section>
-<section class="view" id="view-activity"><p class="lead">Historical transfer totals are persisted with each relationship; live running state and the latest results refresh automatically. Bandwidth reflects payload bytes transferred, not protocol overhead.</p><div class="stats"><div class="stat"><small>Successful runs</small><strong id="activitySuccessful">{{.Metrics.Runs}}</strong></div><div class="stat"><small>Failed runs</small><strong id="activityFailed">{{.Metrics.Failures}}</strong></div><div class="stat"><small>Files transferred</small><strong id="activityFiles">—</strong></div><div class="stat"><small>Uploaded</small><strong id="activityUploaded">—</strong></div><div class="stat"><small>Downloaded</small><strong id="activityDownloaded">—</strong></div><div class="stat"><small>Combined transfer</small><strong id="activityTransfer">—</strong></div></div><section class="panel"><h2>Per-relationship statistics</h2>{{range .Jobs}}<div class="entry"><div style="width:100%"><strong>{{.Name}}</strong> <span class="status" data-activity-running="{{.ID}}">History</span><p class="muted">{{if eq .Provider "bridge"}}Google Drive ↔ NAS{{else}}Legacy filesystem relationship{{end}}</p><div class="stats stats-compact"><div class="stat"><small>Completed runs</small><strong data-job-runs="{{.ID}}">{{.SuccessfulRuns}}</strong></div><div class="stat"><small>Failed runs</small><strong data-job-fails="{{.ID}}">{{.FailedRuns}}</strong></div><div class="stat"><small>Files moved</small><strong data-job-files="{{.ID}}">—</strong></div><div class="stat"><small>Payload transferred</small><strong data-job-bytes="{{.ID}}">—</strong></div></div><p data-job-detail="{{.ID}}" class="muted">Latest run stats loading…</p></div></div>{{else}}<div class="empty">There are no sync relationships to measure yet.</div>{{end}}</section></section>
+<section class="view" id="view-accounts"><p class="lead">Connect each Google Drive or Dropbox account independently. Select the account when creating a cloud-to-NAS relationship.</p><section class="panel"><div class="panel-head"><h2>Cloud accounts</h2><button class="primary" type="button" onclick="startAccountWizard()">+ Add account</button></div>{{range .Accounts}}<div class="entry"><div><strong>{{.Email}}</strong><p>Google Drive · OAuth authorized</p></div><div class="row"><button class="secondary" type="button" onclick="verifyConnectedAccount('{{.ID}}',this)">Verify access</button><span class="status">Connected</span><form method="post" action="/action" class="inline" onsubmit="return confirm('Disconnect account?')"><input type="hidden" name="action" value="remove_account"><input type="hidden" name="id" value="{{.ID}}"><button class="danger">Disconnect</button></form></div></div>{{else}}<div class="empty"><strong>No cloud accounts connected</strong>Use Add account to connect and verify Google Drive access.</div>{{end}}</section>
+<section class="panel"><div class="panel-head"><h2>Dropbox accounts</h2><button class="secondary" type="button" onclick="startAccountWizard('dropbox')">+ Connect Dropbox</button></div>
+{{range .DropboxAccounts}}<div class="entry"><div><strong>{{.Email}}</strong><p>Dropbox · OAuth authorized</p></div>
+<form class="inline" method="post" action="/action" onsubmit="return confirm('Disconnect Dropbox? Synced files stay on their endpoints.')">
+<input type="hidden" name="action" value="remove_dropbox_account"><input type="hidden" name="id" value="{{.ID}}"><button class="danger" type="submit">Disconnect</button></form></div>
+{{else}}<p class="muted">No Dropbox accounts connected. Each Dropbox account is independent of Google Drive and other Dropbox accounts.</p>{{end}}</section>
+<section class="panel hidden" id="accountWizard"><div class="panel-head"><h2>Connect a cloud account</h2><button type="button" class="secondary" onclick="$('accountWizard').classList.add('hidden')">Close</button></div>
+<div class="step-indicator"><span id="accountMarker1" class="active">1 · Provider</span><span id="accountMarker2">2 · Authorization</span></div>
+<div class="step active" id="accountStep1"><label class="field">Cloud service<select id="accountProvider" onchange="accountProviderChanged()"><option value="google_drive">Google Drive</option><option value="dropbox">Dropbox</option></select></label><p class="muted">Each account is authorized separately. Syncria stores account tokens and transfer indexes, not synchronized files.</p>
+<div class="row"><button type="button" class="primary" onclick="showAccountStep(2)">Continue →</button><button type="button" class="secondary" onclick="navigate('settings')">OAuth settings</button></div></div>
+<div class="step" id="accountStep2"><div id="googleAccountAuthorize">
+<p>Google Drive requires a Google Cloud OAuth application configured in Settings.</p>
+{{if .ClientID}}<a class="primary" href="/oauth/start">Authorize Google Drive →</a>
+{{else}}<p class="wizard-status bad">Set up Google OAuth under Settings first.</p><button type="button" class="secondary" onclick="navigate('settings')">Configure Google OAuth</button>{{end}}</div>
+<div class="hidden" id="dropboxAccountAuthorize"><p>Dropbox requires a Dropbox app key and secret configured in Settings.</p>
+{{if .DropboxClientID}}<a class="primary" href="/oauth/dropbox/start">Authorize Dropbox →</a>
+{{else}}<p class="wizard-status bad">Set up Dropbox OAuth under Settings first.</p><button type="button" class="secondary" onclick="navigate('settings')">Configure Dropbox OAuth</button>{{end}}</div>
+<div class="row"><button type="button" class="secondary" onclick="showAccountStep(1)">← Back</button></div></div></section></section>
+<section class="view" id="view-activity"><p class="lead">Historical transfer totals are persisted with each relationship; live running state and the latest results refresh automatically. Bandwidth reflects payload bytes transferred, not protocol overhead.</p><div class="stats"><div class="stat"><small>Successful runs</small><strong id="activitySuccessful">{{.Metrics.Runs}}</strong></div><div class="stat"><small>Failed runs</small><strong id="activityFailed">{{.Metrics.Failures}}</strong></div><div class="stat"><small>Files transferred</small><strong id="activityFiles">—</strong></div><div class="stat"><small>Uploaded</small><strong id="activityUploaded">—</strong></div><div class="stat"><small>Downloaded</small><strong id="activityDownloaded">—</strong></div><div class="stat"><small>Combined transfer</small><strong id="activityTransfer">—</strong></div></div><section class="panel"><h2>Per-relationship statistics</h2>{{range .Jobs}}<div class="entry"><div style="width:100%"><strong>{{.Name}}</strong> <span class="status" data-activity-running="{{.ID}}">History</span><p class="muted">{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} ↔ NAS{{else if eq .Provider "nas_bridge"}}NAS ↔ NAS{{else}}Existing filesystem relationship{{end}}</p><div class="stats stats-compact"><div class="stat"><small>Completed runs</small><strong data-job-runs="{{.ID}}">{{.SuccessfulRuns}}</strong></div><div class="stat"><small>Failed runs</small><strong data-job-fails="{{.ID}}">{{.FailedRuns}}</strong></div><div class="stat"><small>Files moved</small><strong data-job-files="{{.ID}}">—</strong></div><div class="stat"><small>Payload transferred</small><strong data-job-bytes="{{.ID}}">—</strong></div></div><p data-job-detail="{{.ID}}" class="muted">Latest run stats loading…</p></div></div>{{else}}<div class="empty">There are no sync relationships to measure yet.</div>{{end}}</section></section>
 <section class="view" id="view-updates"><p class="lead">Install verified versioned releases without losing your persistent configuration.</p><section class="panel"><div class="panel-head"><h2>Software updates</h2><span class="pill">Installed: <span id="installedVersion">{{.Version}}</span></span></div><div class="selected"><div><span class="card-label">Latest GitHub version tag</span><strong id="latestVersion">Checking releases…</strong><span class="muted" id="updateMessage"></span></div><button class="secondary" type="button" onclick="checkUpdate(true)">Check again</button></div><div class="row"><button id="installUpdateButton" class="primary" disabled type="button" onclick="startUpdate('install')">Install latest</button><button id="rollbackUpdateButton" class="secondary" type="button" onclick="startUpdate('rollback')">Rollback</button></div><section id="updateFlow" class="update-progress-panel hidden" aria-live="polite" aria-label="Update installation progress"><div class="update-progress-meta"><strong id="updatePhaseTitle">Preparing update…</strong><span id="updatePercent" class="muted">0%</span></div><progress id="updateProgressBar" value="0" max="100" aria-label="Installation progress"></progress><p id="updateProgressMessage" class="muted" role="status">Preparing…</p><div class="row"><span id="updateProgressBytes" class="muted"></span><span id="updateProgressTarget" class="muted"></span></div><ol class="update-steps" id="updateSteps"><li data-update-phase="checking">Check</li><li data-update-phase="downloading">Download</li><li data-update-phase="verifying">Verify</li><li data-update-phase="staging">Install</li><li data-update-phase="restarting">Restart</li><li data-update-phase="complete">Complete</li></ol><p id="updateError" class="wizard-status bad hidden" role="alert"></p><button id="updateReloadButton" class="secondary hidden" type="button" onclick="window.location.assign('/#updates')">Reload updated interface</button></section><p style="margin-top:18px">Updates are blocked while synchronization is active. Versions are discovered from GitHub tags. Installation is enabled when verified binaries and checksums are published.</p></section><section class="panel"><h2>Manual update</h2><p class="muted">Upload the Syncria executable and SHA256SUMS from the same GitHub release. The server verifies the binary checksum before installing. No GitHub API access is required.</p><form action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return confirm('Verify uploaded release files, install, and restart Syncria?')"><label class="field">Syncria application binary<input type="file" name="binary" required></label><label class="field">SHA256SUMS<input type="file" name="checksums" required></label><button class="primary" type="submit">Verify and install uploaded update</button></form></section></section>
-<section class="view" id="view-settings"><p class="lead">Application configuration and account authorization.</p><section class="panel"><h2>Google OAuth</h2><p>Set up a Google Cloud OAuth web application, enable Drive API and register this callback URI:</p><div class="selected"><code>{{.Callback}}</code></div><form method="post" action="/action"><input type="hidden" name="action" value="oauth_settings"><label class="field">Client ID<input name="client_id" value="{{.ClientID}}" required></label><label class="field">Client secret<input name="client_secret" type="password" placeholder="Leave blank to keep existing secret"></label><label class="field">Public dashboard URL<input name="base_url" value="{{.BaseURL}}" required></label><button class="primary">Save OAuth settings</button></form></section></section>
+<section class="view" id="view-settings"><p class="lead">Application configuration and account authorization.</p><section class="panel"><h2>Google OAuth</h2><p>Set up a Google Cloud OAuth web application, enable Drive API and register this callback URI:</p><div class="selected"><code>{{.Callback}}</code></div><form method="post" action="/action"><input type="hidden" name="action" value="oauth_settings"><label class="field">Client ID<input name="client_id" value="{{.ClientID}}" required></label><label class="field">Client secret<input name="client_secret" type="password" placeholder="Leave blank to keep existing secret"></label><label class="field">Public dashboard URL<input name="base_url" value="{{.BaseURL}}" required></label><button class="primary">Save OAuth settings</button></form></section><section class="panel"><h2>Dropbox OAuth</h2>
+<p>Register the following redirect URI in your Dropbox developer application:</p><div class="selected"><code>{{.DropboxCallback}}</code></div>
+<form method="post" action="/action"><input type="hidden" name="action" value="dropbox_oauth_settings">
+<label class="field">Dropbox app key<input name="client_id" value="{{.DropboxClientID}}" required></label>
+<label class="field">Dropbox app secret<input name="client_secret" type="password" placeholder="Leave empty to keep existing secret"></label>
+<button type="submit" class="primary">Save Dropbox OAuth settings</button></form></section></section>
 {{end}}</div></main>
 <div class="picker" id="picker" role="dialog" aria-modal="true" aria-labelledby="pickerTitle"><div class="picker-box"><div class="picker-head"><div class="panel-head" style="margin:0"><h2 id="pickerTitle">Select folder</h2><button class="secondary" type="button" onclick="closePicker()">✕ Close</button></div><div id="pickerPath" class="picker-path">Loading…</div></div><div class="row picker-actions"><button class="secondary" type="button" id="pickerUp" onclick="pickerUp()">← Back</button><button class="secondary" type="button" id="pickerNew" onclick="createFolder()">+ New folder</button></div><div id="folderList" class="folder-list" aria-live="polite"></div><div class="picker-footer"><small id="pickerStatus" class="muted">Choose a folder.</small><button class="primary" type="button" id="pickerSelect" onclick="selectFolder()">Select folder</button></div></div></div>
 <script>
@@ -102,62 +157,149 @@ const $=id=>document.getElementById(id);
 let currentView='overview',pickerType='',folder='',parent='',folderName='',pickSeq=0;
 function navigate(view){if(!$('view-'+view))return;currentView=view;document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+view));document.querySelectorAll('.nav button').forEach(el=>el.classList.toggle('active',el.dataset.view===view));$('pageTitle').textContent=({'overview':'Overview','sync':'Sync relationships','storage':'Storage connections','accounts':'Accounts','activity':'Activity & stats','updates':'Updates','settings':'Settings'})[view]||view;history.replaceState(null,'','#'+view);if(view==='updates')checkUpdate();}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.view)));
-let syncReviewed=false,syncStep=1;
+let syncReviewed=false,syncStep=1,selectedNASTargetID='';
 function showSyncStep(step){
  syncStep=step;if(step!==4)syncReviewed=false;
  for(let i=1;i<=4;i++){$('wizard'+i).classList.toggle('active',i===step);$('stepMarker'+i).classList.toggle('active',i===step);}
  $('wizard').scrollIntoView({behavior:'smooth',block:'start'});
 }
-function setWizardStatus(message,bad=false){let el=$('syncWizardStatus');if(!el)return;el.textContent=message;el.classList.toggle('bad',bad);el.classList.toggle('good',!bad);}
+function setWizardStatus(message,bad=false){
+ const el=$('syncWizardStatus');if(!el)return;
+ el.textContent=message;el.classList.toggle('bad',bad);el.classList.toggle('good',!bad);
+}
 function startWizard(){
  navigate('sync');$('syncWizard').reset();
- $('nasFolderValue').value='.';$('selectedNASLabel').textContent='Share root';
+ $('createSyncButton').disabled=false;$('wizard').classList.remove('hidden');
  $('remoteValue').value='root';$('selectedDriveLabel').textContent='Entire My Drive';
- $('createSyncButton').disabled=false;
- sourceProviderChanged();$('wizard').classList.remove('hidden');showSyncStep(1);
+ $('nasSourceFolderValue').value='.';$('selectedNASSourceLabel').textContent='Share root';
+ document.querySelectorAll('#nasTargets input[type=hidden]').forEach(el=>el.value='.');
+ document.querySelectorAll('#nasTargets small[id^=nas-label-]').forEach(el=>el.textContent='Share root');
+ sourceProviderChanged();relationshipTypeChanged();scheduleModeChanged();nasDestChanged();showSyncStep(1);
 }
 function closeSyncWizard(){$('wizard').classList.add('hidden');syncReviewed=false;}
-function sourceProviderChanged(){
- syncReviewed=false;$('remoteValue').value='root';
- $('selectedDriveLabel').textContent='Entire My Drive';
- setWizardStatus('Choose the connected Google account and verify access.');
+function relationshipTypeChanged(){
+ syncReviewed=false;
+ const cloud=$('relationshipType').value==='cloud';
+ $('cloudSourceFields').classList.toggle('hidden',!cloud);
+ $('nasSourceFields').classList.toggle('hidden',cloud);
+ $('nasDirectionFields').classList.toggle('hidden',cloud);
+ $('crossNASField').classList.toggle('hidden',!cloud);
+ $('syncAccount').required=cloud&&$('sourceProvider').value==='google_drive';
+ $('syncDropboxAccount').required=cloud&&$('sourceProvider').value==='dropbox';
+ $('nasSourceId').required=!cloud;
+ nasDirectionChanged();
+ setWizardStatus(cloud?'Choose your Google Drive or Dropbox account.':'Choose the primary NAS for independent NAS-to-NAS synchronization.');
 }
-function resetDrive(){$('remoteValue').value='root';$('selectedDriveLabel').textContent='Entire My Drive';syncReviewed=false;}
-function nasChanged(){syncReviewed=false;$('nasFolderValue').value='.';$('selectedNASLabel').textContent='Share root';}
+function sourceProviderChanged(){
+ syncReviewed=false;
+ const google=$('sourceProvider').value==='google_drive';
+ $('googleSourceFields').classList.toggle('hidden',!google);
+ $('dropboxSourceFields').classList.toggle('hidden',google);
+ $('syncAccount').required=google&&$('relationshipType').value==='cloud';
+ $('syncDropboxAccount').required=!google&&$('relationshipType').value==='cloud';
+ resetDrive();
+}
+function resetDrive(){
+ $('remoteValue').value=$('sourceProvider').value==='dropbox'?'':'root';
+ $('selectedDriveLabel').textContent=$('sourceProvider').value==='dropbox'?'Entire Dropbox':'Entire My Drive';
+ syncReviewed=false;
+}
+function nasSourceChanged(){
+ $('nasSourceFolderValue').value='.';$('selectedNASSourceLabel').textContent='Share root';syncReviewed=false;
+}
+function nasDestChanged(){
+ syncReviewed=false;
+ const chosen=selectedNASDestinations();
+ $('nasDestStatus').textContent=chosen.length?chosen.length+' NAS destination(s) selected. Each can use a different folder.':'Select at least one NAS destination.';
+}
+function selectedNASDestinations(){
+ return [...document.querySelectorAll('#nasTargets input[name=nas_ids]:checked')].map(el=>({id:el.value,
+  folder:$('nas-folder-'+el.value)?.value||'.',
+  label:el.closest('.nas-target')?.querySelector('strong')?.textContent||el.value
+ }));
+}
+function browseNASDestination(id){
+ const checkbox=[...document.querySelectorAll('#nasTargets input[name=nas_ids]')].find(el=>el.value===id);
+ if(checkbox&&!checkbox.checked){checkbox.checked=true;nasDestChanged();}
+ selectedNASTargetID=id;openPicker('nas-target');
+}
+function scheduleModeChanged(){
+ const changed=$('scheduleMode').value==='changes';
+ $('syncInterval').closest('.field').classList.toggle('hidden',changed);
+ if(changed)$('syncInterval').value='5';
+}
+function nasDirectionChanged(){
+ const nas=$('relationshipType').value==='nas',bi=$('nasDirection').value==='bidirectional';
+ $('nasConflictFields').classList.toggle('hidden',!(nas&&bi));
+}
 async function verifyWizard(kind,data){
- const body=new URLSearchParams({kind:kind,...data});
+ const body=new URLSearchParams({kind,...data});
  const res=await fetch('/api/wizard/verify',{method:'POST',body,credentials:'same-origin',cache:'no-store'});
- let result;try{result=await res.json();}catch(_){throw Error('Connection verification failed (HTTP '+res.status+')');}
- if(!res.ok||!result.ok)throw Error(result.message||'Connection unavailable');
+ let result;try{result=await res.json();}catch(_){throw Error('Source verification failed (HTTP '+res.status+')');}
+ if(!res.ok||!result.ok)throw Error(result.message||'Source unavailable');
  return result.message;
 }
+async function verifyNAS(id,pathValue){
+ const response=await fetch('/api/browse/nas?id='+encodeURIComponent(id)+'&path='+encodeURIComponent(pathValue||'.'),{credentials:'same-origin',cache:'no-store'});
+ if(!response.ok)throw Error('NAS '+id+': '+(await response.text()).trim());
+ return response.json();
+}
+async function verifySource(){
+ if($('relationshipType').value==='nas'){
+  if(!$('nasSourceId').reportValidity())throw Error('Select the primary NAS');
+  await verifyNAS($('nasSourceId').value,$('nasSourceFolderValue').value);
+  return 'Primary NAS verified.';
+ }
+ const provider=$('sourceProvider').value;
+ if(provider==='dropbox'){
+  if(!$('syncDropboxAccount').reportValidity())throw Error('Select a Dropbox account');
+  const url='/api/browse/dropbox?account='+encodeURIComponent($('syncDropboxAccount').value)+'&path='+encodeURIComponent($('remoteValue').value);
+  const resp=await fetch(url,{credentials:'same-origin',cache:'no-store'});
+  if(!resp.ok)throw Error((await resp.text()).trim());
+  return 'Dropbox account and folder verified.';
+ }
+ if(!$('syncAccount').reportValidity())throw Error('Select a Google account');
+ return verifyWizard('drive',{account:$('syncAccount').value,folder:$('remoteValue').value});
+}
 async function wizardNext(){
- if(!$('syncName').reportValidity()||!$('syncAccount').reportValidity())return;
- const button=$('verifySourceButton');button.disabled=true;setWizardStatus('Checking Google Drive account and folder access…');
- try{let message=await verifyWizard('drive',{account:$('syncAccount').value,folder:$('remoteValue').value});
-  setWizardStatus(message);showSyncStep(2);
- }catch(e){setWizardStatus(e.message,true);}
- finally{button.disabled=false;}
+ if(!$('syncName').reportValidity())return;
+ const btn=$('verifySourceButton');btn.disabled=true;setWizardStatus('Verifying source…');
+ try{setWizardStatus(await verifySource());showSyncStep(2);}
+ catch(e){setWizardStatus(e.message,true);}
+ finally{btn.disabled=false;}
 }
 async function wizardReview(){
- if(!$('nasId').reportValidity())return;
  const btn=$('verifyTargetButton');btn.disabled=true;
  try{
-  const id=$('nasId').value,path=$('nasFolderValue').value||'.';
-  const res=await fetch('/api/browse/nas?id='+encodeURIComponent(id)+'&path='+encodeURIComponent(path),{credentials:'same-origin',cache:'no-store'});
-  if(!res.ok)throw Error('NAS destination inaccessible: '+(await res.text()).trim());
-  await verifyWizard('drive',{account:$('syncAccount').value,folder:$('remoteValue').value});
-  setWizardStatus('Cloud and NAS verified. No data is being stored by Syncria.');
+  const targets=selectedNASDestinations();
+  if(targets.length<1)throw Error('Choose at least one destination NAS');
+  if($('relationshipType').value==='nas'){
+   const source=$('nasSourceId').value,pathValue=$('nasSourceFolderValue').value;
+   for(const target of targets){
+    const p=pathValue.replace(/\/$/,'')||'.',q=target.folder.replace(/\/$/,'')||'.';
+    if(source===target.id&&(p===q||p==='.'||q==='.'||p.startsWith(q+'/')||q.startsWith(p+'/')))throw Error('The source folder overlaps destination '+target.label);
+   }
+  }
+  for(const target of targets)await verifyNAS(target.id,target.folder);
+  await verifySource();
+  $('nasDestStatus').textContent='Verified '+targets.length+' NAS destination(s).';
   showSyncStep(3);
- }catch(e){setWizardStatus(e.message,true);alert(e.message);}finally{btn.disabled=false;}
+ }catch(e){$('nasDestStatus').textContent=e.message;alert('Verification failed: '+e.message);}
+ finally{btn.disabled=false;}
 }
 function wizardFinalize(){
  if(syncStep!==3)return;
+ const nas=$('relationshipType').value==='nas';
  $('reviewName').textContent=$('syncName').value.trim();
- $('reviewProvider').textContent='Google Drive';
- $('reviewSource').textContent=$('syncAccount').selectedOptions[0]?.textContent+' / '+$('selectedDriveLabel').textContent;
- $('reviewTarget').textContent=($('nasId').selectedOptions[0]?.textContent||'NAS')+' / '+$('selectedNASLabel').textContent;
- $('reviewInterval').textContent=$('syncInterval').selectedOptions[0]?.textContent||'';
+ $('reviewProvider').textContent=nas?'NAS':$('sourceProvider').selectedOptions[0]?.textContent;
+ $('reviewSource').textContent=nas?$('nasSourceId').selectedOptions[0]?.textContent+' / '+$('selectedNASSourceLabel').textContent:
+  ($('sourceProvider').value==='dropbox' ? $('syncDropboxAccount').selectedOptions[0]?.textContent:$('syncAccount').selectedOptions[0]?.textContent)+' / '+$('selectedDriveLabel').textContent;
+ $('reviewTarget').textContent=selectedNASDestinations().map(x=>x.label+' ('+x.folder+')').join(', ');
+ $('reviewInterval').textContent=$('scheduleMode').value==='changes'?'On NAS changes · 5-minute cloud reconciliation':$('syncInterval').selectedOptions[0]?.textContent||'';
+ $('reviewDirection').textContent=nas?($('nasDirection').value==='one_way'?'One-way · Primary → Destination(s)':'Bidirectional · '+$('conflictPolicy').selectedOptions[0]?.textContent):
+  ('Cloud ↔ NAS'+($('crossNASField').querySelector('input').checked?' · Cross-NAS propagation enabled':' · Cross-NAS propagation off'));
+ $('reviewDeletion').textContent=($('propagateDeletions').checked?'Propagate deletions':'Do not propagate deletions')+
+  ($('recoveryEnabled').checked?' · 10-minute Undo enabled':' · Undo disabled');
  showSyncStep(4);syncReviewed=true;
 }
 function submitSyncWizard(event){
@@ -170,8 +312,20 @@ function toggleDirectNAS(force){
  panel.classList.toggle('hidden',!open);
  if(open)panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
-function startAccountWizard(){navigate('accounts');$('accountWizard').classList.remove('hidden');showAccountStep(1);$('accountWizard').scrollIntoView({behavior:'smooth'});}
-function showAccountStep(step){for(let i=1;i<=2;i++){$('accountStep'+i).classList.toggle('active',i===step);$('accountMarker'+i).classList.toggle('active',i===step);}}
+function startAccountWizard(provider){
+ navigate('accounts');$('accountWizard').classList.remove('hidden');
+ if(provider)$('accountProvider').value=provider;
+ accountProviderChanged();showAccountStep(1);$('accountWizard').scrollIntoView({behavior:'smooth'});
+}
+function accountProviderChanged(){
+ const dropbox=$('accountProvider').value==='dropbox';
+ $('googleAccountAuthorize').classList.toggle('hidden',dropbox);
+ $('dropboxAccountAuthorize').classList.toggle('hidden',!dropbox);
+}
+function showAccountStep(step){
+ for(let i=1;i<=2;i++){$('accountStep'+i).classList.toggle('active',i===step);$('accountMarker'+i).classList.toggle('active',i===step);}
+ accountProviderChanged();
+}
 async function verifyConnectedAccount(id,button){
  button.disabled=true;button.textContent='Verifying…';
  try{const result=await verifyWizard('drive',{account:id,folder:'root'});button.textContent='Verified';button.title=result;}
@@ -263,57 +417,77 @@ async function checkUpdate(force=false){
 }
 setInterval(pollUpdateProgress,1200);
 function openPicker(type){
- if(type!=='drive'&&type!=='nas'){alert('Select a cloud or connected NAS folder. Local Docker folders are not sync destinations.');return;}
- if(type==='nas'&&!$('nasId').value){alert('Choose a NAS connection first.');return;}
- pickerType=type;folder='';parent='';folderName='';$('picker').classList.add('open');
- $('pickerTitle').textContent=type==='drive'?'Browse Google Drive':'Browse NAS directly';
- $('pickerNew').classList.toggle('hidden',type!=='nas');
- loadFolder(type==='drive'?'root':'.');
+ const nas=type==='nas-source'||type==='nas-target';
+ if(!nas&&type!=='drive'&&type!=='dropbox')return;
+ if(nas){
+  const id=type==='nas-source' ? $('nasSourceId').value:selectedNASTargetID;
+  if(!id){alert('Choose a NAS connection before browsing folders.');return;}
+ }
+ pickerType=type;folder=null;parent=null;folderName='';
+ $('picker').classList.add('open');
+ $('pickerTitle').textContent=type==='drive'?'Browse Google Drive':type==='dropbox'?'Browse Dropbox':'Browse NAS folders';
+ $('pickerNew').classList.toggle('hidden',!nas);
+ const initial=type==='drive'?'root':type==='dropbox'?'':type==='nas-source'?$('nasSourceFolderValue').value:$('nas-folder-'+selectedNASTargetID).value;
+ loadFolder(initial);
 }
 function closePicker(){pickSeq++;$('picker').classList.remove('open');}
 async function loadFolder(selected,label){
- let seq=++pickSeq,drive=pickerType==='drive';
- $('pickerStatus').textContent='Reading remote folders…';$('pickerSelect').disabled=true;
+ const sequence=++pickSeq;
+ $('pickerStatus').textContent='Listing remote folders…';$('pickerSelect').disabled=true;
  $('folderList').replaceChildren();
- const endpoint=drive?
-  '/api/browse/drive?account='+encodeURIComponent($('syncAccount').value)+'&parent='+encodeURIComponent(selected||'root'):
-  '/api/browse/nas?id='+encodeURIComponent($('nasId').value)+'&path='+encodeURIComponent(selected||'.');
+ const q=encodeURIComponent(selected??'');
+ let endpoint='';
+ if(pickerType==='drive')endpoint='/api/browse/drive?account='+encodeURIComponent($('syncAccount').value)+'&parent='+q;
+ else if(pickerType==='dropbox')endpoint='/api/browse/dropbox?account='+encodeURIComponent($('syncDropboxAccount').value)+'&path='+q;
+ else{
+  const id=pickerType==='nas-source'?$('nasSourceId').value:selectedNASTargetID;
+  endpoint='/api/browse/nas?id='+encodeURIComponent(id)+'&path='+q;
+ }
  try{
-  const resp=await fetch(endpoint,{credentials:'same-origin',cache:'no-store'});
-  if(!resp.ok)throw Error((await resp.text()).trim());
-  const data=await resp.json();if(seq!==pickSeq)return;
-  folder=data.path;parent=data.parent||'';
-  folderName=label||(drive?(folder==='root'?'Entire My Drive':folder):(folder==='.'?'Share root':folder));
+  const response=await fetch(endpoint,{credentials:'same-origin',cache:'no-store'});
+  if(!response.ok)throw Error((await response.text()).trim());
+  const data=await response.json();if(sequence!==pickSeq)return;
+  folder=data.path;parent=data.parent===undefined?null:data.parent;
+  folderName=label||(pickerType==='drive'?(folder==='root'?'Entire My Drive':folder):
+   pickerType==='dropbox'?(folder===''?'Entire Dropbox':folder):(folder==='.'?'Share root':folder));
   $('pickerPath').textContent=folderName;
-  $('pickerUp').disabled=!parent;$('pickerSelect').disabled=false;
+  $('pickerUp').disabled=parent===null;
+  $('pickerSelect').disabled=false;
   for(const item of data.entries||[]){
-   const btn=document.createElement('button');
-   btn.type='button';btn.className='folder-row';btn.textContent='📁  '+item.name;
-   btn.addEventListener('click',()=>loadFolder(item.id,item.name));
-   $('folderList').appendChild(btn);
+   const button=document.createElement('button');
+   button.className='folder-row';button.type='button';button.textContent='📁 '+item.name;
+   button.addEventListener('click',()=>loadFolder(item.id,item.name));
+   $('folderList').appendChild(button);
   }
-  $('pickerStatus').textContent=data.message||((data.entries||[]).length+' remote folders. Choose this folder or browse deeper.');
+  $('pickerStatus').textContent=data.message||((data.entries||[]).length+' folders. Select this folder or browse deeper.');
  }catch(e){
-  if(seq!==pickSeq)return;
-  $('pickerStatus').textContent='Cannot browse: '+e.message;
+  if(sequence!==pickSeq)return;
+  $('pickerStatus').textContent='Folder listing failed: '+e.message;
  }
 }
-function pickerUp(){if(parent)loadFolder(parent);}
+function pickerUp(){if(parent!==null)loadFolder(parent);}
 function selectFolder(){
- if(!folder||!pickerType)return;
+ if(folder===null||!pickerType)return;
  syncReviewed=false;
- if(pickerType==='drive'){$('remoteValue').value=folder;$('selectedDriveLabel').textContent=folderName||folder;}
- else{$('nasFolderValue').value=folder;$('selectedNASLabel').textContent=folderName||folder;}
+ if(pickerType==='drive'||pickerType==='dropbox'){
+  $('remoteValue').value=folder;$('selectedDriveLabel').textContent=folderName||folder||'Entire Dropbox';
+ }else if(pickerType==='nas-source'){
+  $('nasSourceFolderValue').value=folder;$('selectedNASSourceLabel').textContent=folderName||'Share root';
+ }else if(pickerType==='nas-target'){
+  $('nas-folder-'+selectedNASTargetID).value=folder;
+  $('nas-label-'+selectedNASTargetID).textContent=folderName||'Share root';
+ }
  closePicker();
 }
 async function createFolder(){
- if(pickerType!=='nas'||!folder)return;
+ if((pickerType!=='nas-source'&&pickerType!=='nas-target')||folder===null)return;
  let name=prompt('New folder on NAS');if(name===null)return;
  name=name.trim();if(!name)return;
- const body=new URLSearchParams({id:$('nasId').value,parent:folder,name});
+ const id=pickerType==='nas-source'?$('nasSourceId').value:selectedNASTargetID;
  try{
-  const resp=await fetch('/api/browse/nas/create',{method:'POST',credentials:'same-origin',body});
-  if(!resp.ok)throw Error((await resp.text()).trim());
+  const body=new URLSearchParams({id,parent:folder,name});
+  const response=await fetch('/api/browse/nas/create',{method:'POST',body,credentials:'same-origin'});
+  if(!response.ok)throw Error((await response.text()).trim());
   await loadFolder(folder);
  }catch(e){$('pickerStatus').textContent='NAS folder creation failed: '+e.message;}
 }

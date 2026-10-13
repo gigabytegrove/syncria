@@ -31,10 +31,17 @@ import (
 	"time"
 )
 
-var appVersion = "v0.5.0-alpha"
+var appVersion = "v0.5.0"
 const folderMime = "application/vnd.google-apps.folder"
 const scope = "https://www.googleapis.com/auth/drive"
 
+type DropboxAccount struct {
+ ID string `json:"id"`
+ Email string `json:"email"`
+ RefreshToken string `json:"refresh_token"`
+ AccessToken string `json:"access_token"`
+ Expires time.Time `json:"expires"`
+}
 type Account struct {
 	ID           string    `json:"id"`
 	Email        string    `json:"email"`
@@ -49,7 +56,42 @@ type Item struct {
 	LocalMD5 string `json:"local_md5"`
 	Folder   bool   `json:"folder"`
 }
+type NASDestination struct {
+  ShareID string `json:"share_id"`
+  Folder string `json:"folder"`
+}
+type BridgeConflict struct {
+ Pair string `json:"pair"`
+ Path string `json:"path"`
+ PrimaryModified time.Time `json:"primary_modified,omitempty"`
+ SecondaryModified time.Time `json:"secondary_modified,omitempty"`
+}
+type PendingDeletion struct {
+  Pair string `json:"pair"`
+  Path string `json:"path"`
+  MissingSide string `json:"missing_side"`
+  RecoveredAt string `json:"recovered_at,omitempty"`
+  RecoveryToken string `json:"recovery_token,omitempty"`
+  Expires time.Time `json:"expires"`
+  Folder bool `json:"folder,omitempty"`
+}
 type Job struct {
+    RelationshipType string `json:"relationship_type,omitempty"`
+    CloudProvider string `json:"cloud_provider,omitempty"`
+    DropboxAccountID string `json:"dropbox_account_id,omitempty"`
+    CloudOriginHashes map[string]string `json:"cloud_origin_hashes,omitempty"`
+    CrossNASPropagation bool `json:"cross_nas_propagation,omitempty"`
+    NASSourceID string `json:"nas_source_id,omitempty"`
+    NASSourceFolder string `json:"nas_source_folder,omitempty"`
+    NASDestinations []NASDestination `json:"nas_destinations,omitempty"`
+    PairStates map[string]map[string]Item `json:"pair_states,omitempty"`
+    ConflictPolicy string `json:"conflict_policy,omitempty"`
+    Direction string `json:"direction,omitempty"`
+    PropagateDeletions *bool `json:"propagate_deletions,omitempty"`
+    RecoveryEnabled *bool `json:"recovery_enabled,omitempty"`
+    PendingDeletions []PendingDeletion `json:"pending_deletions,omitempty"`
+    Conflicts []BridgeConflict `json:"conflicts,omitempty"`
+    ConflictOverrides map[string]string `json:"conflict_overrides,omitempty"`
     NASShareID string `json:"nas_share_id,omitempty"`
     NASFolder string `json:"nas_folder,omitempty"`
     ScheduleMode string `json:"schedule_mode,omitempty"`
@@ -86,11 +128,17 @@ type Config struct {
 	OAuthID      string    `json:"oauth_id"`
 	OAuthSecret  string    `json:"oauth_secret"`
 	BaseURL      string    `json:"base_url"`
+    DropboxOAuthID string `json:"dropbox_oauth_id,omitempty"`
+    DropboxOAuthSecret string `json:"dropbox_oauth_secret,omitempty"`
+    DropboxAccounts []DropboxAccount `json:"dropbox_accounts,omitempty"`
 	Accounts     []Account `json:"accounts"`
 	Jobs         []Job     `json:"jobs"`
 	Shares       []StorageShare `json:"shares,omitempty"`
 }
 type App struct {
+    // Serialize remote writers, including a shared designated cloud NAS
+    // and its downstream NAS-to-NAS relationship.
+    bridgeSyncMu sync.Mutex
 	mu     sync.Mutex
     updateMu sync.Mutex
     updateBusy bool
@@ -110,6 +158,7 @@ type driveFile struct {
 	MD5Checksum string   `json:"md5Checksum"`
 	Parents     []string `json:"parents"`
 	Size        string   `json:"size"`
+    ModifiedTime string `json:"modifiedTime"`
 }
 type tokenResponse struct {
 	AccessToken      string `json:"access_token"`
@@ -281,7 +330,7 @@ func (a *App) folderChildren(ctx context.Context, acc, parent string) ([]driveFi
 	for {
 		q := url.Values{}
 		q.Set("q", fmt.Sprintf("'%s' in parents and trashed = false", strings.ReplaceAll(parent, "'", "\\'")))
-		q.Set("fields", "nextPageToken,files(id,name,mimeType,md5Checksum,parents,size)")
+		q.Set("fields", "nextPageToken,files(id,name,mimeType,md5Checksum,parents,size,modifiedTime)")
 		q.Set("pageSize", "1000")
 		if page != "" {
 			q.Set("pageToken", page)
@@ -302,7 +351,7 @@ func (a *App) folderChildren(ctx context.Context, acc, parent string) ([]driveFi
 	return items, nil
 }
 func safeName(n string) bool {
-	return n != "" && n != "." && n != ".." && !strings.ContainsAny(n, "/\\\x00") && n != ".sync-agent-trash" && n != ".DS_Store"
+	return n != "" && n != "." && n != ".." && !strings.ContainsAny(n, "/\\\x00") && n != ".sync-agent-trash" && !strings.HasPrefix(n,".syncria-") && n != ".DS_Store"
 }
 func (a *App) remoteTree(ctx context.Context, acc, root string) (map[string]driveFile, error) {
 	res := map[string]driveFile{}
@@ -575,6 +624,20 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
 	for k, v := range j.State {
 		job.State[k] = v
 	}
+    job.PairStates=make(map[string]map[string]Item,len(j.PairStates))
+    for key,items:=range j.PairStates {
+      clone:=make(map[string]Item,len(items))
+      for rel,v:=range items {clone[rel]=v}
+      job.PairStates[key]=clone
+    }
+    job.PendingDeletions=append([]PendingDeletion(nil),j.PendingDeletions...)
+    job.Conflicts=append([]BridgeConflict(nil),j.Conflicts...)
+    job.ConflictOverrides=make(map[string]string,len(j.ConflictOverrides))
+    for k,v:=range j.ConflictOverrides{job.ConflictOverrides[k]=v}
+
+    job.CloudOriginHashes=make(map[string]string,len(j.CloudOriginHashes))
+    for k,v:=range j.CloudOriginHashes{job.CloudOriginHashes[k]=v}
+
     a.mu.Unlock()
     a.setSyncProgress(jobID,func(p *SyncProgress){*p=SyncProgress{Phase:"scanning",Running:true,Started:time.Now()}})
     job.progressHook=func(up,down,upBytes,downBytes int64){
@@ -592,12 +655,17 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     job.LastUploads, job.LastDownloads = 0, 0
     job.LastUploadBytes, job.LastDownloadBytes = 0, 0
     var err error
-    if job.Provider == "bridge" {
-        err = a.syncBridge(ctx,&job)
-    } else {
-        // Historical mount-path jobs are preserved for migration but never
-        // executed in the streaming-only Syncria architecture.
-        err = errors.New("Legacy filesystem job is disabled in bridge mode. Recreate it with explicit cloud and NAS connections; no files were touched")
+    switch job.Provider {
+    case "bridge","nas_bridge":
+      a.bridgeSyncMu.Lock()
+      err=a.syncBridge(ctx,&job)
+      a.bridgeSyncMu.Unlock()
+    case "storage":
+      err=a.executeStorage(ctx,&job)
+    case "","google_drive":
+      err=a.execute(ctx,&job)
+    default:
+      err=fmt.Errorf("Unsupported sync provider: %s",job.Provider)
     }
 	a.mu.Lock()
 	if actual := a.job(jobID); actual != nil {
@@ -614,6 +682,11 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
 		}
 		actual.LastSummary = job.LastSummary
 		actual.State = job.State
+        actual.PairStates = job.PairStates
+        actual.PendingDeletions = job.PendingDeletions
+        actual.Conflicts=job.Conflicts
+        actual.ConflictOverrides=job.ConflictOverrides
+        actual.CloudOriginHashes=job.CloudOriginHashes
 		_ = a.save()
 	}
     a.mu.Unlock()
@@ -1005,12 +1078,39 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		redirect(w, r, "OAuth settings saved")
+    case "dropbox_oauth_settings":
+        id:=strings.TrimSpace(r.FormValue("client_id"))
+        secret:=strings.TrimSpace(r.FormValue("client_secret"))
+        if id==""||len(id)>256||len(secret)>512{redirect(w,r,"Enter a valid Dropbox app key and secret");return}
+        a.mu.Lock()
+        a.cfg.DropboxOAuthID=id
+        if secret!=""{a.cfg.DropboxOAuthSecret=secret}
+        e:=a.save()
+        a.mu.Unlock()
+        if e!=nil{http.Error(w,"Unable to save Dropbox OAuth settings",500);return}
+        redirect(w,r,"Dropbox OAuth settings saved")
+        return
+    case "remove_dropbox_account":
+        id:=r.FormValue("id")
+        a.mu.Lock()
+        for _,job:=range a.cfg.Jobs{
+          if job.Provider=="bridge"&&job.CloudProvider=="dropbox"&&job.DropboxAccountID==id {
+           a.mu.Unlock();redirect(w,r,"Remove connected relationships before disconnecting this Dropbox account");return
+          }
+        }
+        index:=-1
+        for i,acct:=range a.cfg.DropboxAccounts{if acct.ID==id{index=i;break}}
+        if index<0{a.mu.Unlock();redirect(w,r,"Dropbox account not found");return}
+        a.cfg.DropboxAccounts=append(a.cfg.DropboxAccounts[:index],a.cfg.DropboxAccounts[index+1:]...)
+        e:=a.save()
+        a.mu.Unlock()
+        if e!=nil{http.Error(w,"Unable to save account removal",500);return}
+        redirect(w,r,"Dropbox account disconnected; remote data unchanged")
+        return
     case "add_bridge":
         a.addBridge(w,r)
         return
     case "add_job":
-        redirect(w,r,"Local storage mappings are discontinued. Configure a direct cloud ↔ NAS bridge instead")
-        return
         provider := strings.TrimSpace(r.FormValue("provider"))
         if provider == "" {provider = "google_drive"}
         if provider != "google_drive" && provider != "storage" {
@@ -1305,6 +1405,7 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	cfg := a.cfg
 	cfg.Accounts = append([]Account(nil), a.cfg.Accounts...)
+    cfg.DropboxAccounts=append([]DropboxAccount(nil),a.cfg.DropboxAccounts...)
 	cfg.Jobs = append([]Job(nil), a.cfg.Jobs...)
 	cfg.Shares = append([]StorageShare(nil), a.cfg.Shares...)
 	a.mu.Unlock()
@@ -1313,15 +1414,25 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 	if base == "" {
 		base = "http://localhost:9764"
 	}
-	data := struct {
-		Version, Message, ClientID, BaseURL, Callback string
-		Configured, Logged                            bool
-		Accounts                                      []Account
-		Jobs                                          []Job
-		Shares                                        []StorageShare
-        Metrics DashboardTotals
-        MountingEnabled bool
-	}{appVersion, r.URL.Query().Get("msg"), cfg.OAuthID, base, base + "/oauth/callback", cfg.PasswordHash != "", a.authenticated(r), cfg.Accounts, cfg.Jobs, cfg.Shares, summarizeMetrics(cfg.Jobs), os.Getenv("SYNCRIA_ENABLE_MOUNTS")=="1" && runtime.GOOS=="linux"}
+    data:=struct{
+      Version,Message,ClientID,BaseURL,Callback string
+      DropboxClientID,DropboxCallback string
+      Configured,Logged bool
+      Accounts []Account
+      DropboxAccounts []DropboxAccount
+      Jobs []Job
+      Shares []StorageShare
+      Metrics DashboardTotals
+      MountingEnabled bool
+    }{
+      Version:appVersion,Message:r.URL.Query().Get("msg"),ClientID:cfg.OAuthID,
+      BaseURL:base,Callback:base+"/oauth/callback",
+      DropboxClientID:cfg.DropboxOAuthID,DropboxCallback:base+"/oauth/dropbox/callback",
+      Configured:cfg.PasswordHash!="",Logged:a.authenticated(r),
+      Accounts:cfg.Accounts,DropboxAccounts:cfg.DropboxAccounts,
+      Jobs:cfg.Jobs,Shares:cfg.Shares,Metrics:summarizeMetrics(cfg.Jobs),
+      MountingEnabled:os.Getenv("SYNCRIA_ENABLE_MOUNTS")=="1" && runtime.GOOS=="linux",
+    }
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -1340,13 +1451,14 @@ func (a *App) scheduler(ctx context.Context) {
 		a.mu.Lock()
 		jobs := append([]Job(nil), a.cfg.Jobs...)
 		a.mu.Unlock()
+        a.expireRecoveries(ctx)
 		for _, j := range jobs {
-			if j.Enabled && j.Provider=="bridge" && j.ScheduleMode=="changes" {
+			if j.Enabled && j.ScheduleMode=="changes" {
              if _,loaded:=a.watchers.LoadOrStore(j.ID,true);!loaded{go a.watchChangedJob(ctx,j.ID)}
             }
             cadence:=j.Interval
             if j.ScheduleMode=="changes"{cadence=5}
-            if j.Enabled && j.Provider=="bridge" && (j.LastRun.IsZero() || time.Since(j.LastRun) >= time.Duration(cadence)*time.Minute) {
+            if j.Enabled && (j.LastRun.IsZero() || time.Since(j.LastRun) >= time.Duration(cadence)*time.Minute) {
 				id := j.ID
 				go func() {
 					if e := a.syncJob(ctx, id); e != nil && e.Error() != "job already running" {
@@ -1399,8 +1511,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go a.scheduler(ctx)
-    // Legacy kernel mount management is not part of the streaming bridge.
-    // Old connection definitions remain in config for explicit migration.
+    // New direct NAS connections never mount filesystems. Legacy connections
+    // remain supported only when their existing opt-in mounting is configured.
+    if os.Getenv("SYNCRIA_ENABLE_MOUNTS")=="1" {go a.restoreShares()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.home)
 	mux.HandleFunc("/assets/syncria-logo.svg", serveBrandLogo)
@@ -1409,6 +1522,9 @@ func main() {
     mux.HandleFunc("/api/update/progress", a.updateProgressAPI)
 	mux.HandleFunc("/api/update/manual", a.manualUpdate)
     mux.HandleFunc("/api/browse/nas", a.browseNAS)
+    mux.HandleFunc("/api/browse/dropbox",a.browseDropbox)
+    mux.HandleFunc("/api/recovery/undo",a.recoveryAction)
+    mux.HandleFunc("/api/conflicts/resolve",a.conflictAction)
     mux.HandleFunc("/api/browse/nas/create", a.createNASFolder)
     mux.HandleFunc("/api/nas/action", a.directNASAction)
 	mux.HandleFunc("/api/dashboard/status", a.dashboardStatus)
@@ -1416,6 +1532,8 @@ func main() {
 	mux.HandleFunc("/action", a.action)
 	mux.HandleFunc("/oauth/start", a.oauthStart)
 	mux.HandleFunc("/oauth/callback", a.oauthCallback)
+    mux.HandleFunc("/oauth/dropbox/start",a.dropboxOAuthStart)
+    mux.HandleFunc("/oauth/dropbox/callback",a.dropboxOAuthCallback)
 	server := &http.Server{Addr: *listen, Handler: mux, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 1 << 20}
 	log.Printf("Syncria %s listening on %s (data: %s, OS: %s)", appVersion, *listen, dir, runtime.GOOS)
 	if e := server.ListenAndServe(); e != nil && e != http.ErrServerClosed {

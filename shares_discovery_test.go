@@ -12,7 +12,7 @@ func TestNoAutomaticPageReload(t *testing.T) {
  }
 }
 func TestDirectNASConnectionControls(t *testing.T) {
- for _,part:=range []string{"id=\"shareServer\"","/api/nas/action","/api/browse/nas","/api/browse/nas/create","id=\"nasId\""} {
+ for _,part:=range []string{"id=\"shareServer\"","/api/nas/action","/api/browse/nas","/api/browse/nas/create","id=\"nasTargets\"","id=\"nasSourceId\""} {
   if !strings.Contains(newUI,part) {t.Fatalf("missing direct NAS UI %q",part)}
  }
  if strings.Contains(newUI,"Connect a new SMB / NFS mount") {t.Fatal("kernel mounting returned to the NAS connection interface")}
@@ -29,7 +29,7 @@ func TestNFSDiscoveryRejectsPublicAndMalformedTargets(t *testing.T){
  }
 }
 func TestDirectNASProviderAvailabilityIsAccurate(t *testing.T){
- for _,part:=range []string{"SMB2 / SMB3 (direct network connection)","NFS — direct adapter not yet available","Dropbox — integration not yet implemented"} {
+ for _,part:=range []string{"SMB2 / SMB3 (direct network connection)","NFS — direct adapter not yet available","<option value=\"dropbox\">Dropbox</option>"} {
   if !strings.Contains(newUI,part){t.Errorf("missing provider status %q",part)}
  }
 }
@@ -43,7 +43,7 @@ func TestDiscoveryTCPProbe(t *testing.T){
  }
 }
 func TestNASBrowserIgnoresStaleRequests(t *testing.T){
- if !strings.Contains(newUI,"pickSeq++")||!strings.Contains(newUI,"if(seq!==pickSeq)") {
+ if !strings.Contains(newUI,"pickSeq++")||!strings.Contains(newUI,"if(sequence!==pickSeq)") {
   t.Fatal("Remote folder browser must ignore stale responses after selecting another folder")
  }
 }

@@ -12,6 +12,7 @@ import (
  "path"
  "strconv"
  "strings"
+ "time"
 
  smb2 "github.com/cloudsoda/go-smb2"
 )
@@ -65,12 +66,14 @@ func (a *App) dialSMB(ctx context.Context,s StorageShare)(*directSMB,error){
  host,err:=validateDiscoveryIP(s.Server);if err!=nil{return nil,err}
  username,password,err:=a.smbCredentials(s.ID);if err!=nil{return nil,err}
  target:=net.JoinHostPort(host,strconv.Itoa(445))
+ conn,err:=(&net.Dialer{Timeout:8*time.Second}).DialContext(ctx,"tcp",target)
+ if err!=nil{return nil,fmt.Errorf("NAS SMB port 445 is unavailable: %w",err)}
  d:=&smb2.Dialer{Initiator:&smb2.NTLMInitiator{User:username,Password:password}}
- session,err:=d.Dial(ctx,target)
- if err!=nil{return nil,fmt.Errorf("SMB authentication failed or port 445 unavailable: %w",err)}
- fs,err:=session.Mount(s.Export)
- if err!=nil{session.Logoff();return nil,fmt.Errorf("SMB share unavailable: %w",err)}
- return &directSMB{session:session,share:fs.WithContext(ctx)},nil
+ session,err:=d.DialConn(ctx,conn,target)
+ if err!=nil{_ =conn.Close();return nil,fmt.Errorf("SMB authentication failed: %w",err)}
+ fs,err:=session.WithContext(ctx).Mount(s.Export)
+ if err!=nil{_ =session.Logoff();_ =conn.Close();return nil,fmt.Errorf("SMB share unavailable: %w",err)}
+ return &directSMB{socket:conn,session:session,share:fs.WithContext(ctx)},nil
 }
 func (s *directSMB) Close(){
  if s.share!=nil{_ =s.share.Umount()}
@@ -81,6 +84,7 @@ type smbObject struct {
  File bool
  Size int64
  Fingerprint string
+ Modified time.Time
 }
 func (s *directSMB) scan(ctx context.Context,root string)(map[string]smbObject,error){
  root,err:=safeRemotePath(root);if err!=nil{return nil,err}
@@ -94,6 +98,9 @@ func (s *directSMB) scan(ctx context.Context,root string)(map[string]smbObject,e
   seen:=map[string]bool{}
   for _,info:=range infos {
    name:=info.Name()
+   // Internal recovery files remain on the NAS for Undo and are never
+   // treated as ordinary files or a fatal scan error.
+   if name==".syncria-recovery" {continue}
    if !safeName(name){return fmt.Errorf("Unsafe NAS item name %q",name)}
    folded:=strings.ToLower(name);if seen[folded]{return fmt.Errorf("Case-colliding NAS filenames under %q",dir)}
    seen[folded]=true
@@ -101,7 +108,7 @@ func (s *directSMB) scan(ctx context.Context,root string)(map[string]smbObject,e
    childRel:=path.Join(rel,name)
    child,err:=joinRemotePath(root,childRel);if err!=nil{return err}
    if len(found)>100000{return errors.New("NAS listing exceeds 100,000 objects")}
-   found[childRel]=smbObject{File:!info.IsDir(),Size:info.Size(),Fingerprint:fmt.Sprintf("%d:%d",info.Size(),info.ModTime().UnixNano())}
+   found[childRel]=smbObject{File:!info.IsDir(),Size:info.Size(),Fingerprint:fmt.Sprintf("%d:%d",info.Size(),info.ModTime().UnixNano()),Modified:info.ModTime()}
    if info.IsDir(){if err:=walk(child,childRel,depth+1);err!=nil{return err}}
   }
   return nil
@@ -144,6 +151,7 @@ func (s *directSMB) put(ctx context.Context,root,rel string,source io.Reader,exp
  buf:=make([]byte,chunk)
  var n int64
  checksum:=md5.New()
+ dropboxChecksum:=newDropboxHash()
  for {
   if err:=ctx.Err();err!=nil{f.Close();return err}
   count,readErr:=source.Read(buf)
@@ -152,6 +160,7 @@ func (s *directSMB) put(ctx context.Context,root,rel string,source io.Reader,exp
    if writeErr!=nil{f.Close();return writeErr}
    if written!=count{f.Close();return io.ErrShortWrite}
    if _,e:=checksum.Write(buf[:written]);e!=nil{f.Close();return e}
+   if _,e:=dropboxChecksum.Write(buf[:written]);e!=nil{f.Close();return e}
    if report!=nil{report(n)}
   }
   if readErr==io.EOF{break}
@@ -159,11 +168,30 @@ func (s *directSMB) put(ctx context.Context,root,rel string,source io.Reader,exp
  }
  if err=f.Close();err!=nil{return err}
  if expectedSize>=0&&expectedSize!=n{return fmt.Errorf("Transfer length mismatch: expected %d, wrote %d",expectedSize,n)}
- if expectedMD5!=""&&!strings.EqualFold(hex.EncodeToString(checksum.Sum(nil)),expectedMD5){return errors.New("Source checksum mismatch; original NAS file preserved")}
+ if expectedMD5!=""{
+  switch len(expectedMD5){
+  case 32:
+   if !strings.EqualFold(hex.EncodeToString(checksum.Sum(nil)),expectedMD5){return errors.New("Source MD5 mismatch; original NAS file preserved")}
+  case 64:
+   if !strings.EqualFold(dropboxChecksum.HexSum(),expectedMD5){return errors.New("Dropbox source content hash mismatch; original NAS file preserved")}
+  default:return errors.New("Unrecognized source checksum; NAS destination unchanged")
+  }
+ }
  // Renaming a completed staging file is performed on the NAS. Existing
  // destination files are never removed first; if the NAS disallows
  // replacement the operation fails safely rather than deleting user data.
- if err=s.share.Rename(temp,dest);err!=nil{return fmt.Errorf("NAS commit failed (original preserved): %w",err)}
+ previous:=""
+ if _,e:=s.share.Stat(dest);e==nil {
+  previous=dest+".syncria-old-"+newID()
+  if err=s.share.Rename(dest,previous);err!=nil{return fmt.Errorf("Cannot safely preserve existing NAS file: %w",err)}
+ }
+ if err=s.share.Rename(temp,dest);err!=nil{
+  if previous!="" {
+   if restoreErr:=s.share.Rename(previous,dest);restoreErr!=nil{return fmt.Errorf("NAS commit failed and previous file could not be restored at %s: %v / %v",dest,err,restoreErr)}
+  }
+  return fmt.Errorf("NAS commit failed; original preserved: %w",err)
+ }
+ if previous!="" { _=s.share.Remove(previous) }
  complete=true
  return nil
 }
