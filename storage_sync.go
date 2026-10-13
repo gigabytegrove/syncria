@@ -95,7 +95,7 @@ func (a *App) executeStorage(ctx context.Context, j *Job) error {
     var uploaded, downloaded int64
     for i, rel := range keys {
         if err := ctx.Err(); err != nil { return err }
-        if j.itemHook!=nil{j.itemHook(int64(i+1),int64(len(keys)),rel)}
+        if j.itemHook!=nil{j.itemHook(int64(i),int64(len(keys)),rel)}
         src, hasSource := sources[rel]
         dst, hasTarget := targets[rel]
         prior, tracked := j.State[rel]
@@ -105,6 +105,7 @@ func (a *App) executeStorage(ctx context.Context, j *Job) error {
         if err != nil { return err }
         if !hasSource && !hasTarget {
             delete(next, rel)
+            if j.itemHook!=nil{j.itemHook(int64(i+1),int64(len(keys)),rel)}
             continue
         }
         if hasSource && hasTarget && src.Folder != dst.Folder {
@@ -118,6 +119,7 @@ func (a *App) executeStorage(ctx context.Context, j *Job) error {
             if !hasSource { if err := os.MkdirAll(sourcePath,0700);err != nil{return err} }
             if !hasTarget { if err := os.MkdirAll(targetPath,0700);err != nil{return err} }
             next[rel] = Item{Folder:true}
+            if j.itemHook!=nil{j.itemHook(int64(i+1),int64(len(keys)),rel)}
             continue
         }
         switch {
@@ -151,6 +153,7 @@ func (a *App) executeStorage(ctx context.Context, j *Job) error {
             next[rel] = Item{LocalMD5:dst.LocalMD5,MD5:dst.LocalMD5}
         }
         j.State = next
+        if j.itemHook!=nil{j.itemHook(int64(i+1),int64(len(keys)),rel)}
     }
     j.State = next
     if uploaded == 0 && downloaded == 0 {j.LastSummary="No file changes"} else {
