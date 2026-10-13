@@ -552,10 +552,16 @@ func sameRemote(prev Item, now driveFile) bool {
 	return prev.ID == now.ID && prev.Folder == (now.MimeType == folderMime) && (prev.Folder || prev.MD5 == now.MD5Checksum)
 }
 func (a *App) syncJob(ctx context.Context, jobID string) error {
-	if _, loaded := a.runs.LoadOrStore(jobID, true); loaded {
-		return errors.New("job already running")
-	}
-	defer a.runs.Delete(jobID)
+    // Serialize new sync starts against update staging. An update cannot
+    // begin with a running job, and no job may begin mid-update.
+    a.updateMu.Lock()
+    if a.updateBusy {a.updateMu.Unlock();return errors.New("Syncria update in progress")}
+    if _,loaded:=a.runs.LoadOrStore(jobID,true);loaded{
+      a.updateMu.Unlock()
+      return errors.New("job already running")
+    }
+    a.updateMu.Unlock()
+    defer a.runs.Delete(jobID)
 	a.mu.Lock()
 	j := a.job(jobID)
 	if j == nil {
