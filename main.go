@@ -1052,7 +1052,7 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
         e = a.save()
         a.mu.Unlock()
         if e != nil {http.Error(w,e.Error(),500);return}
-        redirect(w,r,"Relationship created paused. Review and enable when ready")
+        http.Redirect(w,r,"/?msg="+url.QueryEscape("Relationship created paused. Enable or run it below to start syncing.")+"#sync",http.StatusSeeOther)
 	case "toggle_job", "run_job", "delete_job":
 		id := r.FormValue("id")
 		a.mu.Lock()
