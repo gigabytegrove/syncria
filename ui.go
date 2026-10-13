@@ -377,89 +377,206 @@ async function verifyConnectedAccount(id,button){
  finally{button.disabled=false;}
 }
 let updatePollingBusy=false,updateSubmitting=false,updateRunning=false,updateInstallAvailable=false;
-const updatePhaseTitles={checking:'Checking for updates',downloading:'Downloading update',verifying:'Verifying integrity',staging:'Installing verified update',restarting:'Restarting Syncria',complete:'Update completed',failed:'Update failed'};
-const updateSequence=['checking','downloading','verifying','staging','restarting','complete'];
+let lastUpdatePhase='idle',lastUpdateLog='',lastConfirmedUpdateStatus='';
+const updatePhaseTitles={
+ checking:'Checking published release',manifest:'Reading release checksums',
+ receiving:'Receiving manual update',downloading:'Downloading exact executable',
+ verifying:'Verifying SHA-256 bytes',staging:'Installing verified executable',
+ restarting:'Restart requested',complete:'Installed and verified',failed:'Update failed',idle:'No update'
+};
+const updateSequence=['checking','manifest','receiving','downloading','verifying','staging','restarting','complete'];
+function updateClock(value){
+ if(!value)return 'Time unavailable';
+ const date=new Date(value);
+ return Number.isFinite(date.getTime())?date.toLocaleString():'Time unavailable';
+}
+function renderUpdateEvents(events,phase){
+ if(!$('updateEventTimeline'))return;
+ const serialized=JSON.stringify(events||[]);
+ if(serialized===lastUpdateLog)return;
+ lastUpdateLog=serialized;
+ const list=$('updateEventTimeline');list.replaceChildren();
+ if(!Array.isArray(events)||!events.length){
+  const li=document.createElement('li');
+  const strong=document.createElement('strong');strong.textContent='No recorded events';
+  li.appendChild(strong);list.appendChild(li);return;
+ }
+ for(const [i,event] of events.entries()){
+  const li=document.createElement('li');
+  const final=i===events.length-1;
+  li.classList.toggle('active',final&&phase!=='failed');
+  li.classList.toggle('failed',final&&phase==='failed');
+  const strong=document.createElement('strong');strong.textContent=event.detail||event.phase||'Update event';
+  const small=document.createElement('small');small.textContent=updateClock(event.at);
+  li.append(strong,small);list.appendChild(li);
+ }
+}
+function setUpdateProgressBar(phase,current,total){
+ const bar=$('updateProgressBar'),label=$('updatePercent');
+ if(!bar||!label)return;
+ if(phase==='complete'){bar.value=100;label.textContent='Completed';return;}
+ if((phase==='downloading'||phase==='verifying'||phase==='receiving')&&total>0){
+  const pc=Math.min(100,Math.max(0,Math.floor(current*100/total)));
+  bar.value=pc;label.textContent=pc+'% of '+(phase==='verifying'?'SHA-256 hash':phase==='receiving'?'upload':'download');
+ }else{
+  bar.removeAttribute('value');
+  label.textContent=phase==='failed'?'Failed':'Measured progress only';
+ }
+}
 function renderUpdateProgress(p){
- if(!p||p.phase==='idle'||!p.phase)return;
- const box=$('updateFlow');if(!box)return;
- box.classList.remove('hidden');
- const phase=p.phase,index=updateSequence.indexOf(phase);
+ if(!p||!p.phase)return;
+ lastUpdatePhase=p.phase;
  updateRunning=!!p.active;
- $('updatePhaseTitle').textContent=updatePhaseTitles[phase]||p.message||phase;
- $('updateProgressMessage').textContent=p.message||'';
- $('updateProgressTarget').textContent=p.target?('Version: '+p.target):'';
+ const phase=p.phase;
+ if(phase!=='idle')$('updateFlow')?.classList.remove('hidden');
+ const events=Array.isArray(p.events)?p.events:[];
+ renderUpdateEvents(events,phase);
+ const logState=$('updateLogState');
+ if(logState)logState.textContent=phase==='complete'?'Verified':phase==='failed'?'Failed':p.active?'Recording live':'Last update';
+ const set=(id,value)=>{const el=$(id);if(el)el.textContent=value;};
+ set('updatePhaseTitle',updatePhaseTitles[phase]||phase);
+ set('updateProgressMessage',p.message||'No stage description provided by the server');
+ set('updateProgressOperation',p.operation==='rollback'?'Rollback':p.operation==='manual'?'Manual update':'Release install');
+ set('updateFromVersion',p.from||p.current||'—');
+ set('updateToVersion',p.target||'Awaiting release metadata');
+ set('updateProgressAsset',p.asset||'Awaiting asset selection');
+ set('updateProgressTarget',p.target?'Target release: '+p.target:'');
  const bytes=Number(p.downloaded||0),total=Number(p.total||0);
- $('updateProgressBytes').textContent=bytes>0||total>0?formatBytes(bytes)+' downloaded'+(total>0?' of '+formatBytes(total):''):'';
- const percent=Math.max(0,Math.min(100,Number(p.percent||0))),bar=$('updateProgressBar');
- if(phase==='downloading'&&total===0){bar.removeAttribute('value');$('updatePercent').textContent='Receiving data…';}
- else{bar.value=percent;$('updatePercent').textContent=percent+'%';}
- $('updateError').classList.toggle('hidden',phase!=='failed');
- $('updateError').textContent=phase==='failed'?(p.error||'Update failed. The previous version remains available.'):'';
- $('updateReloadButton').classList.toggle('hidden',phase!=='complete');
+ const verified=Number(p.verified_bytes||0),verificationTotal=Number(p.verified_total||0);
+ set('updateProgressBytes',bytes>0||total>0?formatBytes(bytes)+(total>0?' / '+formatBytes(total):' · size not reported'):'No binary bytes received yet');
+ set('updateVerifiedBytes',verified>0||verificationTotal>0?formatBytes(verified)+(verificationTotal>0?' / '+formatBytes(verificationTotal):''):'Not started');
+ const secs=Math.max(0,Number(p.elapsed_seconds||0));
+ set('updateElapsed',Math.floor(secs/60)+'m '+Math.floor(secs%60)+'s');
+ setUpdateProgressBar(phase,phase==='verifying'?verified:bytes,phase==='verifying'?verificationTotal:total);
+ const error=$('updateError');
+ if(error){
+  error.classList.toggle('hidden',phase!=='failed');
+  error.textContent=phase==='failed'?(p.error||'The updater recorded a failure without a reason'):'';
+ }
+ const reconnect=$('updateConnectionStatus');
+ if(reconnect){
+  reconnect.classList.remove('lost');
+  reconnect.textContent='Connected · status verified at '+updateClock(p.updated_at)+(p.current?' · running '+p.current:'');
+ }
+ const button=$('updateReloadButton');
+ if(button)button.classList.toggle('hidden',phase!=='complete'||!p.target||p.current!==p.target);
  for(const li of document.querySelectorAll('[data-update-phase]')){
-  const i=updateSequence.indexOf(li.dataset.updatePhase);
+  const index=updateSequence.indexOf(li.dataset.updatePhase);
+  const phaseIndex=updateSequence.indexOf(phase);
   li.classList.toggle('active',li.dataset.updatePhase===phase);
-  li.classList.toggle('done',phase==='complete'||(i>=0&&index>=0&&i<index));
-  li.classList.toggle('failed',phase==='failed'&&i===4);
+  li.classList.toggle('done',phase==='complete'||(index>=0&&phaseIndex>=0&&index<phaseIndex));
+  li.classList.toggle('failed',phase==='failed'&&li.dataset.updatePhase==='restarting');
+ }
+ if(p.current){
+  set('installedVersion',p.current);set('sidebarVersion',p.current);
  }
  const install=$('installUpdateButton'),rollback=$('rollbackUpdateButton');
  if(install)install.disabled=updateRunning||updateSubmitting||!updateInstallAvailable;
  if(rollback)rollback.disabled=updateRunning||updateSubmitting;
- if(p.current&&$('installedVersion'))$('installedVersion').textContent=p.current;
- if(phase==='restarting')$('updateProgressMessage').textContent='Waiting for Syncria to reconnect and confirm the installed version…';
+ const banner=$('updateLiveBanner'),bannerText=$('updateLiveBannerStatus');
+ if(banner){
+  banner.classList.toggle('hidden',!updateRunning||currentView==='updates');
+  if(bannerText)bannerText.textContent=(p.target||'Release')+' · '+(p.message||phase);
+ }
 }
 async function pollUpdateProgress(){
  if(updatePollingBusy||!$('updateFlow'))return;
- if(!updateRunning&&currentView!=='updates')return;
+ if(!updateRunning&&currentView!=='updates'&&lastUpdatePhase==='idle')return;
  updatePollingBusy=true;
  try{
-  const res=await fetch('/api/update/progress',{cache:'no-store',credentials:'same-origin'});
-  if(res.status===401)return;
-  if(!res.ok)throw Error('Progress request failed: HTTP '+res.status);
-  renderUpdateProgress(await res.json());
- }catch(e){
-  if(updateRunning)$('updateProgressMessage').textContent='Reconnecting after restart…';
+  const response=await fetch('/api/update/progress',{credentials:'same-origin',cache:'no-store'});
+  if(response.status===401){throw Error('Authentication expired (401)');}
+  if(!response.ok)throw Error('HTTP '+response.status);
+  const payload=await response.json();
+  lastConfirmedUpdateStatus=payload.updated_at||'';
+  renderUpdateProgress(payload);
+ }catch(error){
+  if(updateRunning||currentView==='updates'){
+   const reconnect=$('updateConnectionStatus');
+   if(reconnect){
+    reconnect.classList.add('lost');
+    reconnect.textContent='Status endpoint unreachable: '+error.message+'. Last recorded step: '+(updatePhaseTitles[lastUpdatePhase]||lastUpdatePhase)+'. The browser cannot confirm completion until the new Syncria process responds.';
+   }
+  }
  }finally{updatePollingBusy=false;}
 }
 async function startUpdate(operation){
  if(updateSubmitting||updateRunning)return;
- if(!confirm(operation==='rollback'?'Restore the previous Syncria binary and restart?':'Download, verify and install the latest Syncria release?'))return;
- updateSubmitting=true;
+ if(!confirm(operation==='rollback'?'Restore Syncria\'s saved previous executable?':'Download, verify and install the latest published Syncria release?'))return;
+ navigate('updates');
  $('updateFlow').classList.remove('hidden');
- $('updatePhaseTitle').textContent=operation==='rollback'?'Preparing rollback':'Starting update…';
- $('updateProgressMessage').textContent='Connecting to the built-in updater…';
+ updateSubmitting=true;
+ const set=(id,value)=>{const el=$(id);if(el)el.textContent=value;};
+ set('updatePhaseTitle','Requesting update');
+ set('updateProgressMessage','Submitting update request to this Syncria instance.');
+ set('updateConnectionStatus','Connecting to the update status endpoint…');
  $('updateError').classList.add('hidden');$('updateReloadButton').classList.add('hidden');
  $('installUpdateButton').disabled=true;$('rollbackUpdateButton').disabled=true;
  try{
-  const res=await fetch('/api/update/progress',{method:'POST',credentials:'same-origin',cache:'no-store',body:new URLSearchParams({operation})});
-  if(!res.ok)throw Error((await res.text()).trim()||('HTTP '+res.status));
-  renderUpdateProgress(await res.json());
+  const response=await fetch('/api/update/progress',{method:'POST',credentials:'same-origin',cache:'no-store',body:new URLSearchParams({operation})});
+  if(!response.ok)throw Error((await response.text()).trim()||('HTTP '+response.status));
+  renderUpdateProgress(await response.json());
   updateRunning=true;
- }catch(e){
+ }catch(error){
   updateRunning=false;
-  $('updatePhaseTitle').textContent='Update could not start';
-  $('updateProgressMessage').textContent='No changes installed.';
-  $('updateError').textContent=e.message;$('updateError').classList.remove('hidden');
+  set('updatePhaseTitle','Update request rejected');
+  set('updateProgressMessage','Updater did not accept this request. No new release has been installed.');
+  set('updateError',error.message);$('updateError').classList.remove('hidden');
  }finally{updateSubmitting=false;await pollUpdateProgress();}
 }
 async function checkUpdate(force=false){
  if(!$('latestVersion'))return;
- $('latestVersion').textContent='Checking GitHub releases…';
+ $('latestVersion').textContent='Checking GitHub Releases…';
  $('updateMessage').textContent='';updateInstallAvailable=false;
- if($('installUpdateButton'))$('installUpdateButton').disabled=true;
+ $('installUpdateButton').disabled=true;
  try{
-  const res=await fetch('/api/update/status'+(force?'?refresh=1':''),{cache:'no-store',credentials:'same-origin'});
-  if(!res.ok)throw Error('HTTP '+res.status);
-  const obj=await res.json();
-  if(obj.error)throw Error(obj.error);
-  $('latestVersion').textContent=obj.latest||'No release found';
-  $('updateMessage').textContent=obj.pending?' · '+(obj.message||'Waiting for binaries'):obj.available?' · Ready to install':' · You are up to date';
-  updateInstallAvailable=!!obj.available;
-  if($('installUpdateButton'))$('installUpdateButton').disabled=updateRunning||updateSubmitting||!updateInstallAvailable;
- }catch(e){$('latestVersion').textContent='Unable to check releases';$('updateMessage').textContent=e.message;}
+  const res=await fetch('/api/update/status'+(force?'?refresh=1':''),{credentials:'same-origin',cache:'no-store'});
+  if(!res.ok)throw Error('Release check HTTP '+res.status);
+  const result=await res.json();
+  if(result.error)throw Error(result.error);
+  $('latestVersion').textContent=result.latest||'No published release';
+  $('updateAvailableVersion').textContent=result.latest||'None';
+  $('updateMessage').textContent=result.pending?result.message||'Awaiting release binaries':result.available?'Verified release assets available for this platform':'Installed release is current';
+  updateInstallAvailable=!!result.available;
+  $('installUpdateButton').disabled=updateRunning||updateSubmitting||!updateInstallAvailable;
+ }catch(error){
+  $('latestVersion').textContent='Release check failed';
+  $('updateAvailableVersion').textContent='Unavailable';
+  $('updateMessage').textContent=error.message;
+ }
  await pollUpdateProgress();
 }
-setInterval(pollUpdateProgress,1200);
+async function submitManualUpdate(event){
+ event.preventDefault();
+ if(updateSubmitting||updateRunning)return false;
+ if(!confirm('Install the selected executable after verifying its SHA256SUMS?'))return false;
+ navigate('updates');
+ const form=event.currentTarget,button=$('manualUpdateButton');
+ updateSubmitting=true;button.disabled=true;
+ $('updateFlow').classList.remove('hidden');
+ $('updatePhaseTitle').textContent='Submitting manual update';
+ $('updateProgressMessage').textContent='Uploading the selected executable to Syncria.';
+ try{
+  const request=new XMLHttpRequest();
+  const result=await new Promise((resolve,reject)=>{
+   request.open('POST','/api/update/manual',true);
+   request.responseType='text';
+   request.upload.onprogress=e=>{
+    if(e.lengthComputable)setUpdateProgressBar('receiving',e.loaded,e.total);
+    $('updateProgressBytes').textContent=formatBytes(e.loaded)+(e.lengthComputable?' / '+formatBytes(e.total):'');
+   };
+   request.onload=()=>request.status>=200&&request.status<300?resolve(request.responseText):reject(Error(request.responseText||'Manual install HTTP '+request.status));
+   request.onerror=()=>reject(Error('Manual update upload connection failed'));
+   request.send(new FormData(form));
+  });
+  await pollUpdateProgress();
+ }catch(error){
+  $('updatePhaseTitle').textContent='Manual update request failed';
+  $('updateError').textContent=error.message;$('updateError').classList.remove('hidden');
+ }finally{updateSubmitting=false;button.disabled=false;await pollUpdateProgress();}
+ return false;
+}
+setInterval(pollUpdateProgress,1000);
 function openPicker(type){
  const nas=type==='nas-source'||type==='nas-target';
  if(!nas&&type!=='drive'&&type!=='dropbox')return;
