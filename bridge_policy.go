@@ -104,10 +104,12 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    // primary, never propagated backwards.
    if oneWay&&!hasR{
     if !hasL {continue}
-    if l.Folder{r,err=secondary.Mkdir(ctx,rel)}else{r,err=bridgeCopy(ctx,primary,secondary,rel,"",nil)}
+    if l.Folder{r,err=secondary.Mkdir(ctx,rel)}else{r,err=bridgeCopy(ctx,primary,secondary,rel,"",func(n int64){
+      if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}
+     })}
     if err!=nil{return err}
     next[rel]=Item{ID:l.ID,MD5:l.Fingerprint,LocalMD5:r.Fingerprint,Folder:l.Folder}
-    countForward++
+    recordTransfer(j,true,0);countForward++
     continue
    }
    surviving:=secondary;survivor:=r
@@ -143,14 +145,14 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
   if !hasL{
    if oneWay {continue}
    var bytes int64
-   l,err=bridgeCopy(ctx,secondary,primary,rel,"",func(n int64){bytes=n})
+   l,err=bridgeCopy(ctx,secondary,primary,rel,"",func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
    if err!=nil{return err}
    recordTransfer(j,false,bytes);countBack++
   }else if !hasR{
    var bytes int64
    lChecksum:=""
    if len(l.Fingerprint)==32{lChecksum=l.Fingerprint}
-   r,err=bridgeCopy(ctx,primary,secondary,rel,lChecksum,func(n int64){bytes=n})
+   r,err=bridgeCopy(ctx,primary,secondary,rel,lChecksum,func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
    if err!=nil{return err}
    recordTransfer(j,true,bytes);countForward++
   }else if !tracked{
@@ -175,13 +177,13 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    }else if changedPrimary{
     var bytes int64
     checksum:="";if len(l.Fingerprint)==32{checksum=l.Fingerprint}
-    r,err=bridgeCopy(ctx,primary,secondary,rel,checksum,func(n int64){bytes=n})
+    r,err=bridgeCopy(ctx,primary,secondary,rel,checksum,func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
     if err!=nil{return err}
     recordTransfer(j,true,bytes);countForward++
    }else if changedSecondary{
     if oneWay{return fmt.Errorf("One-way destination was modified at %s; no overwrite attempted",rel)}
     var bytes int64
-    l,err=bridgeCopy(ctx,secondary,primary,rel,"",func(n int64){bytes=n})
+    l,err=bridgeCopy(ctx,secondary,primary,rel,"",func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes,j.LastDownloadBytes+n)}})
     if err!=nil{return err}
     recordTransfer(j,false,bytes);countBack++
    }
@@ -231,10 +233,10 @@ func resolveBridgeConflict(ctx context.Context,j *Job,p,s recoverableBridgeEndpo
  var err error
  if direction=="primary"{
   sum:="";if len(l.Fingerprint)==32{sum=l.Fingerprint}
-  *r,err=bridgeCopy(ctx,p,s,rel,sum,func(n int64){bytes=n})
+  *r,err=bridgeCopy(ctx,p,s,rel,sum,func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
   if err==nil{recordTransfer(j,true,bytes)}
  }else{
-  *l,err=bridgeCopy(ctx,s,p,rel,"",func(n int64){bytes=n})
+  *l,err=bridgeCopy(ctx,s,p,rel,"",func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes,j.LastDownloadBytes+n)}})
   if err==nil{recordTransfer(j,false,bytes)}
  }
  return err
