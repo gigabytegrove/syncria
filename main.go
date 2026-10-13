@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-var appVersion = "0.1.0-alpha"
+var appVersion = "v0.4.0"
 const folderMime = "application/vnd.google-apps.folder"
 const scope = "https://www.googleapis.com/auth/drive"
 
@@ -50,6 +50,7 @@ type Item struct {
 	Folder   bool   `json:"folder"`
 }
 type Job struct {
+	Provider    string `json:"provider,omitempty"`
 	ID          string          `json:"id"`
 	Name        string          `json:"name"`
 	AccountID   string          `json:"account_id"`
@@ -61,6 +62,17 @@ type Job struct {
 	LastRun     time.Time       `json:"last_run"`
 	LastError   string          `json:"last_error"`
 	LastSummary string          `json:"last_summary"`
+    SuccessfulRuns int64 `json:"successful_runs"`
+    FailedRuns int64 `json:"failed_runs"`
+    LastDurationMillis int64 `json:"last_duration_ms"`
+    LastUploads int64 `json:"last_uploads"`
+    LastDownloads int64 `json:"last_downloads"`
+    LastUploadBytes int64 `json:"last_upload_bytes"`
+    LastDownloadBytes int64 `json:"last_download_bytes"`
+    TotalUploads int64 `json:"total_uploads"`
+    TotalDownloads int64 `json:"total_downloads"`
+    TotalUploadBytes int64 `json:"total_upload_bytes"`
+    TotalDownloadBytes int64 `json:"total_download_bytes"`
 }
 type Config struct {
 	Salt         string    `json:"salt"`
@@ -549,12 +561,28 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
 	}
 	a.mu.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Minute)
-	defer cancel()
-	err := a.execute(ctx, &job)
+    defer cancel()
+    started := time.Now()
+    job.LastUploads, job.LastDownloads = 0, 0
+    job.LastUploadBytes, job.LastDownloadBytes = 0, 0
+    var err error
+    if job.Provider == "storage" {
+        err = a.executeStorage(ctx, &job)
+    } else if job.Provider == "" || job.Provider == "google_drive" {
+        err = a.execute(ctx, &job)
+    } else {
+        err = fmt.Errorf("unsupported sync provider %q", job.Provider)
+    }
 	a.mu.Lock()
 	if actual := a.job(jobID); actual != nil {
 		actual.LastRun = time.Now()
-		actual.LastError = ""
+        actual.LastDurationMillis = time.Since(started).Milliseconds()
+        if err != nil {actual.FailedRuns++} else {actual.SuccessfulRuns++}
+        actual.LastUploads, actual.LastDownloads = job.LastUploads, job.LastDownloads
+        actual.LastUploadBytes, actual.LastDownloadBytes = job.LastUploadBytes, job.LastDownloadBytes
+        actual.TotalUploads, actual.TotalDownloads = job.TotalUploads, job.TotalDownloads
+        actual.TotalUploadBytes, actual.TotalDownloadBytes = job.TotalUploadBytes, job.TotalDownloadBytes
+        actual.LastError = ""
 		if err != nil {
 			actual.LastError = err.Error()
 		}
@@ -683,12 +711,14 @@ func (a *App) execute(ctx context.Context, j *Job) error {
 					return er
 				}
 				next[rel] = Item{ID: f.ID, MD5: lv.LocalMD5, LocalMD5: lv.LocalMD5}
+				recordTransfer(j, true, fileSize(path))
 				count["uploaded"]++
 			} else {
 				if e = a.download(ctx, j.AccountID, rv.ID, path); e != nil {
 					return e
 				}
 				next[rel] = Item{ID: rv.ID, MD5: rv.MD5Checksum, LocalMD5: rv.MD5Checksum}
+				recordTransfer(j, false, fileSize(path))
 				count["downloaded"]++
 			}
 		case hasR && !hasL:
@@ -706,6 +736,7 @@ func (a *App) execute(ctx context.Context, j *Job) error {
 					return e
 				}
 				next[rel] = Item{ID: rv.ID, MD5: rv.MD5Checksum, LocalMD5: rv.MD5Checksum}
+				recordTransfer(j, false, fileSize(path))
 				count["downloaded"]++
 			}
 		case !hasR && hasL:
@@ -731,6 +762,7 @@ func (a *App) execute(ctx context.Context, j *Job) error {
 					return er
 				}
 				next[rel] = Item{ID: f.ID, MD5: lv.LocalMD5, LocalMD5: lv.LocalMD5}
+				recordTransfer(j, true, fileSize(path))
 				count["uploaded"]++
 			}
 		default:
