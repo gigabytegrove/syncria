@@ -148,9 +148,9 @@ code{color:#076bd3}
 <div class="update-workspace">
 <div>
 <section class="panel"><div class="panel-head"><h2>Application updates</h2><span class="pill">In-app updater</span></div>
-<div class="update-hero"><div><span class="card-label">Latest published release</span><strong id="latestVersion">Checking releases…</strong><p id="updateMessage">Release metadata is being checked.</p></div>
+<div class="update-hero"><div><span class="card-label">Newest available version</span><strong id="latestVersion">Checking releases…</strong><p id="updateMessage">Release metadata is being checked.</p></div>
 <button class="secondary" type="button" onclick="checkUpdate(true)">Check again</button></div>
-<div class="update-revisions"><div><small>Currently running</small><strong id="installedVersion">{{.Version}}</strong></div><div><small>Available version</small><strong id="updateAvailableVersion">Checking…</strong></div></div>
+<div class="update-revisions"><div><small>Version running right now</small><strong id="installedVersion">{{.Version}}</strong></div><div><small>Version you can install</small><strong id="updateAvailableVersion">Checking…</strong></div></div>
 <div class="row"><button id="installUpdateButton" class="primary" disabled type="button" onclick="startUpdate('install')">Download & install update</button><button id="rollbackUpdateButton" class="secondary" type="button" onclick="startUpdate('rollback')">Restore previous version</button></div>
 <p class="muted" style="margin-top:13px">Updates remain in this container using Syncria's existing launcher and persistent configuration. No image pull, replacement container, external updater, or manual compilation is required.</p>
 </section>
@@ -199,7 +199,7 @@ code{color:#076bd3}
 <script>
 const $=id=>document.getElementById(id);
 let currentView='overview',pickerType='',folder='',parent='',folderName='',pickSeq=0;
-function navigate(view){if(!$('view-'+view))return;currentView=view;document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+view));document.querySelectorAll('.nav button').forEach(el=>el.classList.toggle('active',el.dataset.view===view));$('pageTitle').textContent=({'overview':'Overview','sync':'Sync relationships','storage':'Storage connections','accounts':'Accounts','activity':'Activity & stats','updates':'Updates','settings':'Settings'})[view]||view;history.replaceState(null,'','#'+view);if(view==='updates')checkUpdate();}
+function navigate(view){if(!$('view-'+view))return;currentView=view;document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+view));document.querySelectorAll('.nav button').forEach(el=>el.classList.toggle('active',el.dataset.view===view));$('pageTitle').textContent=({'overview':'Home','sync':'My Syncs','storage':'My NAS Boxes','accounts':'Cloud Accounts','activity':'What Happened?','updates':'App Updates','settings':'Settings'})[view]||view;history.replaceState(null,'','#'+view);if(view==='updates')checkUpdate();}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.view)));
 let syncReviewed=false,syncStep=1,selectedNASTargetID='';
 function showSyncStep(step){
@@ -232,7 +232,7 @@ function relationshipTypeChanged(){
  $('syncDropboxAccount').required=cloud&&$('sourceProvider').value==='dropbox';
  $('nasSourceId').required=!cloud;
  nasDirectionChanged();
- setWizardStatus(cloud?'Choose your Google Drive or Dropbox account.':'Choose the primary NAS for independent NAS-to-NAS synchronization.');
+ setWizardStatus(cloud?'Choose the account and folder where your files are now.':'Choose the first NAS box and the folder that already has your files.');
 }
 function sourceProviderChanged(){
  syncReviewed=false;
@@ -254,7 +254,7 @@ function nasSourceChanged(){
 function nasDestChanged(){
  syncReviewed=false;
  const chosen=selectedNASDestinations();
- $('nasDestStatus').textContent=chosen.length?chosen.length+' NAS destination(s) selected. Each can use a different folder.':'Select at least one NAS destination.';
+ $('nasDestStatus').textContent=chosen.length?chosen.length+' NAS box(es) chosen. Each box can have a different folder.':'Choose at least one NAS box to receive copies.';
 }
 function selectedNASDestinations(){
  return [...document.querySelectorAll('#nasTargets input[name=nas_ids]:checked')].map(el=>({id:el.value,
@@ -290,24 +290,24 @@ async function verifyNAS(id,pathValue){
 }
 async function verifySource(){
  if($('relationshipType').value==='nas'){
-  if(!$('nasSourceId').reportValidity())throw Error('Select the primary NAS');
+  if(!$('nasSourceId').reportValidity())throw Error('Choose the NAS box that already has your files.');
   await verifyNAS($('nasSourceId').value,$('nasSourceFolderValue').value);
-  return 'Primary NAS verified.';
+  return 'Good! Syncria can open your first NAS folder.';
  }
  const provider=$('sourceProvider').value;
  if(provider==='dropbox'){
-  if(!$('syncDropboxAccount').reportValidity())throw Error('Select a Dropbox account');
+  if(!$('syncDropboxAccount').reportValidity())throw Error('Choose the Dropbox account that has your files.');
   const url='/api/browse/dropbox?account='+encodeURIComponent($('syncDropboxAccount').value)+'&path='+encodeURIComponent($('remoteValue').value);
   const resp=await fetch(url,{credentials:'same-origin',cache:'no-store'});
   if(!resp.ok)throw Error((await resp.text()).trim());
-  return 'Dropbox account and folder verified.';
+  return 'Good! Syncria can open this Dropbox folder.';
  }
- if(!$('syncAccount').reportValidity())throw Error('Select a Google account');
+ if(!$('syncAccount').reportValidity())throw Error('Choose the Google Drive account that has your files.');
  return verifyWizard('drive',{account:$('syncAccount').value,folder:$('remoteValue').value});
 }
 async function wizardNext(){
  if(!$('syncName').reportValidity())return;
- const btn=$('verifySourceButton');btn.disabled=true;setWizardStatus('Verifying source…');
+ const btn=$('verifySourceButton');btn.disabled=true;setWizardStatus('Checking that Syncria can open this folder…');
  try{setWizardStatus(await verifySource());showSyncStep(2);}
  catch(e){setWizardStatus(e.message,true);}
  finally{btn.disabled=false;}
@@ -316,19 +316,19 @@ async function wizardReview(){
  const btn=$('verifyTargetButton');btn.disabled=true;
  try{
   const targets=selectedNASDestinations();
-  if(targets.length<1)throw Error('Choose at least one destination NAS');
+  if(targets.length<1)throw Error('Choose at least one NAS box for the copies.');
   if($('relationshipType').value==='nas'){
    const source=$('nasSourceId').value,pathValue=$('nasSourceFolderValue').value;
    for(const target of targets){
     const p=pathValue.replace(/\/$/,'')||'.',q=target.folder.replace(/\/$/,'')||'.';
-    if(source===target.id&&(p===q||p==='.'||q==='.'||p.startsWith(q+'/')||q.startsWith(p+'/')))throw Error('The source folder overlaps destination '+target.label);
+    if(source===target.id&&(p===q||p==='.'||q==='.'||p.startsWith(q+'/')||q.startsWith(p+'/')))throw Error('The same folder cannot be both the starting folder and a copy. Pick another folder on '+target.label+'.');
    }
   }
   for(const target of targets)await verifyNAS(target.id,target.folder);
   await verifySource();
-  $('nasDestStatus').textContent='Verified '+targets.length+' NAS destination(s).';
+  $('nasDestStatus').textContent='Good! Syncria can open '+targets.length+' chosen NAS folder'+(targets.length===1?'':'s')+'.';
   showSyncStep(3);
- }catch(e){$('nasDestStatus').textContent=e.message;alert('Verification failed: '+e.message);}
+ }catch(e){$('nasDestStatus').textContent=e.message;alert('Syncria could not open a folder yet. Check your folder and sign-in details, then try again.\n\nDetails: '+e.message);}
  finally{btn.disabled=false;}
 }
 function wizardFinalize(){
@@ -339,11 +339,11 @@ function wizardFinalize(){
  $('reviewSource').textContent=nas?$('nasSourceId').selectedOptions[0]?.textContent+' / '+$('selectedNASSourceLabel').textContent:
   ($('sourceProvider').value==='dropbox' ? $('syncDropboxAccount').selectedOptions[0]?.textContent:$('syncAccount').selectedOptions[0]?.textContent)+' / '+$('selectedDriveLabel').textContent;
  $('reviewTarget').textContent=selectedNASDestinations().map(x=>x.label+' ('+x.folder+')').join(', ');
- $('reviewInterval').textContent=$('scheduleMode').value==='changes'?'On NAS changes · 5-minute cloud reconciliation':$('syncInterval').selectedOptions[0]?.textContent||'';
- $('reviewDirection').textContent=nas?($('nasDirection').value==='one_way'?'One-way · Primary → Destination(s)':'Bidirectional · '+$('conflictPolicy').selectedOptions[0]?.textContent):
-  ('Cloud ↔ NAS'+($('crossNASField').querySelector('input').checked?' · Cross-NAS propagation enabled':' · Cross-NAS propagation off'));
- $('reviewDeletion').textContent=($('propagateDeletions').checked?'Propagate deletions':'Do not propagate deletions')+
-  ($('recoveryEnabled').checked?' · 10-minute Undo enabled':' · Undo disabled');
+ $('reviewInterval').textContent=$('scheduleMode').value==='changes'?'When files change, plus checks every 5 minutes':$('syncInterval').selectedOptions[0]?.textContent||'';
+ $('reviewDirection').textContent=nas?($('nasDirection').value==='one_way'?'One way: first NAS to the others':'Both ways · '+$('conflictPolicy').selectedOptions[0]?.textContent):
+  ('Cloud and NAS'+($('crossNASField').querySelector('input').checked?' · Copy changes between NAS boxes through cloud':' · No cross-NAS copying through cloud'));
+ $('reviewDeletion').textContent=($('propagateDeletions').checked?'Delete matching copies too':'Keep other copies if I delete a file')+
+  ($('recoveryEnabled').checked?' · 10-minute Undo on':' · No Undo window');
  showSyncStep(4);syncReviewed=true;
 }
 function submitSyncWizard(event){
@@ -373,7 +373,7 @@ function showAccountStep(step){
 async function verifyConnectedAccount(id,button){
  button.disabled=true;button.textContent='Verifying…';
  try{const result=await verifyWizard('drive',{account:id,folder:'root'});button.textContent='Verified';button.title=result;}
- catch(e){button.textContent='Verification failed';button.title=e.message;}
+ catch(e){button.textContent='Could not connect';button.title='Check the account sign-in or try again. Details: '+e.message;}
  finally{button.disabled=false;}
 }
 let updatePollingBusy=false,updateSubmitting=false,updateRunning=false,updateInstallAvailable=false;
