@@ -2,9 +2,68 @@
 
 **Pronunciation:** Sink-Re-Ah. **Default local web UI:** `http://127.0.0.1:9764` (configurable with `-listen`). The repository and Go module are named `syncria`. Existing default data directories may retain the historical `gdsync` name to preserve configurations during upgrades. Restart the agent after upgrading; existing instances launched with an explicit `-listen` argument continue using that chosen port.
 
-A lightweight, self-hosted, **experimental** cloud and filesystem synchronization agent written in Go. Single binary, embedded browser UI, no external database, and no JavaScript build tool. Suitable for Windows and Linux (including servers with mounted NAS shares).
+A lightweight, self-hosted cloud and NAS synchronization agent written in Go. Single binary, embedded browser UI, no external database, and no JavaScript build tool. Suitable for Windows and Linux (including servers with mounted NAS shares).
 
-> **Alpha warning:** This version has not been live-tested with Google Drive accounts. Make backups before enabling synchronization. Native Google Docs/Sheets/Slides, shortcuts, shared drives, files with duplicate names, and complicated rename/move scenarios are not fully supported. The agent **stops with a visible error** instead of silently processing unsupported Google-native formats. Do not use for your only copy of important data.
+> **Data safety:** Keep an independent backup when enabling a new relationship. Google-native Docs/Sheets/Slides, shortcuts, shared drives, and complex rename/move cases may require separate handling. Syncria stops rather than treating unsupported cloud items as ordinary files. Remote account and NAS permissions are specific to your environment.
+
+## Syncria v0.5.0 — streaming cloud/NAS bridge
+
+Syncria is **not a storage server**. Its Docker deployment keeps only
+credentials, synchronization indexes, activity and updater state under
+`/data`. File payloads are streamed between remote cloud and NAS
+endpoints and are not deposited in a container folder or on the Docker host.
+Temporary write files and short-term deletion recovery remain on the
+NAS/cloud endpoints themselves.
+
+The approved v0.5.0 relationship capabilities:
+
+- Multiple independent Google Drive and Dropbox accounts, plus multiple
+  NAS shares on different physical devices. No single-device limitation.
+- Cloud ↔ NAS relationships with one or several explicitly selected NAS
+  destinations. NAS-to-NAS propagation through the cloud is opt-in and is
+  **off by default**.
+- NAS ↔ NAS relationships independent of any cloud account. Select one-way
+  primary → secondary transfer or bidirectional transfer. Choose only:
+  **Newer file wins**, **Primary NAS wins**, **Secondary NAS wins**,
+  **Keep both files**, or **Manual conflict resolution**. Conflict
+  decisions are stored per relationship and surfaced in the UI.
+- If an independent NAS-to-NAS relationship is configured, the designated
+  primary NAS can also be the only cloud-connected NAS; Syncria then
+  defers remaining NAS distribution to the separate relationship.
+- File-deletion propagation is **on by default**, switchable for every
+  relationship. Its remote-endpoint **10-minute Undo** protection is also
+  on by default and independently switchable per relationship.
+  The Undo window begins when Syncria detects and stages the deletion,
+  not necessarily when a user pressed Delete.
+- Scheduling offers intervals and SMB NAS change notifications. Cloud-side
+  changes and missed NAS notifications still get a five-minute
+  reconciliation scan in change-triggered mode. These are **remote SMB
+  notifications**, not local Linux `inotifywait` events.
+- Existing configuration data and filesystem relationships remain in the
+  database; do not erase them to migrate. Older filesystem relationships
+  may require their pre-existing host-mounted paths and are not
+  automatically converted into network connections.
+- The embedded app updater, rollback, and in-container restart remain the
+  update path. No secondary updater container, host-side recurring service,
+  management platform or Docker socket is introduced.
+
+Direct NAS connectivity currently uses SMB2/3. Existing opt-in NFS/mount
+logic remains in the source for older installations; a native direct NFS
+adapter is **not yet implemented**. Network protocols, cloud accounts and
+NAS types that cannot support the exact behavior should fail visibly,
+without fabricating successful synchronization.
+
+**Deletion and retention details:** A NAS-side deletion is moved into
+a reserved NAS recovery folder. Google Drive uses its remote trash.
+Dropbox uses its provider-side deleted-file revision recovery. Undo is
+available in Syncria for 10 minutes when supported; the cloud provider
+may retain deleted revisions beyond that time under its own policy.
+No synchronized file content is stored in Syncria's `/data`.
+
+**Updates:** Open **Updates → Check again → Install latest** in the existing
+Syncria dashboard. Syncria verifies the published binary and checksum
+and restarts inside its existing container. GHCR images, Docker Compose
+and standalone binaries remain alternative installation methods.
 
 ## Zero1Local companion — coming soon
 
@@ -239,7 +298,9 @@ In Docker, the launcher monitors the child agent and activates staged binaries f
 
 Syncria requests the **full Google Drive scope**, which Google classifies as **restricted**. A publicly distributed OAuth app must meet Google's restricted-scope verification requirements. The owner of an installation must currently provide their own OAuth credentials; there is no embedded shared client secret.
 
-## Sync behavior
+## Legacy filesystem sync behavior (v0.4.1 and earlier)
+
+The following section documents pre-existing local-path relationships. It is not a description of how newly created v0.5.0 direct cloud/NAS or NAS/NAS bridge relationships store or recover files.
 
 - `root` represents the entire **My Drive file hierarchy**, not Google Shared Drives or items merely under “Shared with me”.
 - New files on one side copy to the other. Identical files are tracked. **Different files at the same path on first sync cause a conflict error** and are left untouched.
