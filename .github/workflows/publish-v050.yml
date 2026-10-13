@@ -60,11 +60,17 @@ jobs:
           else
             gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs"               -f ref="refs/tags/${REL}" -f sha="$GITHUB_SHA" >/dev/null
           fi
-          if gh release view "$REL" --json isDraft --jq '.isDraft' >/dev/null 2>&1; then
-            echo "Release $REL already exists; not overwriting published assets."
-            exit 1
+          if gh release view "$REL" --json assets >/dev/null 2>&1; then
+            echo "Release $REL exists; uploading only missing artifacts."
+            for file in dist/*; do
+              name="${file##*/}"
+              if ! gh release view "$REL" --json assets --jq '.assets[].name' | grep -Fqx "$name"; then
+                gh release upload "$REL" "$file"
+              fi
+            done
+          else
+            gh release create "$REL" dist/* --verify-tag --title "Syncria v0.5.0" --notes-file docs/RELEASE-v0.5.0.md
           fi
-          gh release create "$REL" dist/*             --verify-tag             --title "Syncria v0.5.0"             --notes-file docs/RELEASE-v0.5.0.md
           gh release view "$REL" --json assets --jq '.assets[].name'
       - name: Verify public updater manifest
         shell: bash
