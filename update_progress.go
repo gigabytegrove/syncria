@@ -157,7 +157,9 @@ func (a *App) updateProgressAPI(w http.ResponseWriter,r *http.Request) {
   }{func() UpdateProgress {return a.updateProgressSnapshot()}(),appVersion,func()int64 {
     p:=a.updateProgressSnapshot()
     if p.StartedAt.IsZero(){return 0}
-    seconds:=int64(time.Since(p.StartedAt).Seconds())
+    end:=time.Now()
+    if (p.Phase=="complete"||p.Phase=="failed")&&!p.UpdatedAt.IsZero(){end=p.UpdatedAt}
+    seconds:=int64(end.Sub(p.StartedAt).Seconds())
     if seconds<0{return 0}
     return seconds
   }()})
