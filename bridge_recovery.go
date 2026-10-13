@@ -25,7 +25,14 @@ func (b *bridgeSMBEndpoint) StageDelete(ctx context.Context, rel, jobID string)(
  original,err:=joinRemotePath(b.root,rel);if err!=nil{return "",err}
  if strings.HasPrefix(original,".syncria-recovery/"){return "",errors.New("Recovery internals cannot be synchronized")}
  directory:=path.Join(".syncria-recovery",jobID)
- if err=b.client.mkdir(".",directory);err!=nil{return "",err}
+ // Internal recovery names are never accepted as user-selected paths.
+ // Create the reserved directories directly, outside the public browser.
+ if err=b.client.share.Mkdir(".syncria-recovery",0700);err!=nil{
+  if info,e:=b.client.share.Stat(".syncria-recovery");e!=nil||!info.IsDir(){return "",err}
+ }
+ if err=b.client.share.Mkdir(directory,0700);err!=nil{
+  if info,e:=b.client.share.Stat(directory);e!=nil||!info.IsDir(){return "",err}
+ }
  token:=path.Join(directory,newID())
  if err=b.client.share.Rename(original,token);err!=nil{return "",fmt.Errorf("Moving deleted NAS item to recovery: %w",err)}
  return token,nil
