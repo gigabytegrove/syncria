@@ -2,6 +2,8 @@ package main
 
 import (
     "context"
+    "crypto/md5"
+    "encoding/hex"
     "errors"
     "fmt"
     "io"
@@ -41,7 +43,7 @@ func pathsOverlap(a, b string) bool {
     return a == b || strings.HasPrefix(a, b+string(os.PathSeparator)) || strings.HasPrefix(b, a+string(os.PathSeparator))
 }
 
-func copyStorageFile(src, dst string) (int64, error) {
+func copyStorageFile(src, dst, expectedMD5 string) (int64, error) {
     source, err := os.Open(src)
     if err != nil { return 0, err }
     defer source.Close()
@@ -52,8 +54,13 @@ func copyStorageFile(src, dst string) (int64, error) {
     temp, err := os.CreateTemp(filepath.Dir(dst), ".syncria-transfer-*")
     if err != nil { return 0, err }
     defer os.Remove(temp.Name())
-    n, err := io.Copy(temp, source)
+    digest := md5.New()
+    n, err := io.Copy(io.MultiWriter(temp, digest), source)
     if err != nil { _ = temp.Close(); return 0, err }
+    if expectedMD5 != "" && hex.EncodeToString(digest.Sum(nil)) != expectedMD5 {
+        _ = temp.Close()
+        return 0, errors.New("Source changed during copy; destination left untouched")
+    }
     if err := temp.Sync(); err != nil { _ = temp.Close(); return 0, err }
     if err := temp.Close(); err != nil { return 0, err }
     if err := os.Rename(temp.Name(), dst); err != nil { return 0, err }
@@ -121,23 +128,23 @@ func (a *App) executeStorage(ctx context.Context, j *Job) error {
             targetChanged := dst.LocalMD5 != prior.MD5
             if sourceChanged == targetChanged { return fmt.Errorf("Conflicting changes at %s: neither side overwritten", rel) }
             if sourceChanged {
-                n, err := copyStorageFile(sourcePath,targetPath)
+                n, err := copyStorageFile(sourcePath,targetPath,src.LocalMD5)
                 if err != nil{return err}
                 recordTransfer(j, true, n); uploaded++
                 next[rel] = Item{LocalMD5:src.LocalMD5,MD5:src.LocalMD5}
             } else {
-                n, err := copyStorageFile(targetPath,sourcePath)
+                n, err := copyStorageFile(targetPath,sourcePath,dst.LocalMD5)
                 if err != nil{return err}
                 recordTransfer(j, false, n); downloaded++
                 next[rel] = Item{LocalMD5:dst.LocalMD5,MD5:dst.LocalMD5}
             }
         case hasSource:
-            n, err := copyStorageFile(sourcePath,targetPath)
+            n, err := copyStorageFile(sourcePath,targetPath,src.LocalMD5)
             if err != nil{return err}
             recordTransfer(j,true,n); uploaded++
             next[rel] = Item{LocalMD5:src.LocalMD5,MD5:src.LocalMD5}
         case hasTarget:
-            n, err := copyStorageFile(targetPath,sourcePath)
+            n, err := copyStorageFile(targetPath,sourcePath,dst.LocalMD5)
             if err != nil{return err}
             recordTransfer(j,false,n); downloaded++
             next[rel] = Item{LocalMD5:dst.LocalMD5,MD5:dst.LocalMD5}
