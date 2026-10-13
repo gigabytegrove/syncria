@@ -29,7 +29,7 @@ func TestNFSDiscoveryRejectsPublicAndMalformedTargets(t *testing.T){
  }
 }
 func TestDirectNASProviderAvailabilityIsAccurate(t *testing.T){
- for _,part:=range []string{"SMB2 / SMB3 (direct network connection)","NFS — direct adapter not yet available","Dropbox — integration not yet implemented"} {
+ for _,part:=range []string{"SMB2 / SMB3 (direct network connection)","NFS — direct adapter not yet available","<option value=\"dropbox\">Dropbox</option>"} {
   if !strings.Contains(newUI,part){t.Errorf("missing provider status %q",part)}
  }
 }
