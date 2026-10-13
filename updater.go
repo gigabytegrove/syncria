@@ -135,21 +135,50 @@ func latestRelease(ctx context.Context)(releaseInfo,error){
 }
 func assetName()string{return "syncria-"+runtime.GOOS+"-"+runtime.GOARCH+func()string{if runtime.GOOS=="windows"{return ".exe"};return ""}()}
 func assetFor(r releaseInfo,name string)(releaseAsset,bool){for _,a:=range r.Assets{if a.Name==name{return a,true}};return releaseAsset{},false}
-func downloadAsset(ctx context.Context,a releaseAsset, dst string)error{
+// downloadAssetWithProgress exposes actual received bytes and Content-Length;
+// no extrapolation is used if the server omits the total size.
+func downloadAssetWithProgress(ctx context.Context,a releaseAsset,dst string,onBytes func(int64,int64)) error {
  if a.URL==""{return errors.New("release asset has no API URL")}
  resp,err:=releaseRequest(ctx,a.URL,"application/octet-stream");if err!=nil{return err};defer resp.Body.Close()
  if resp.StatusCode!=200{return fmt.Errorf("asset download HTTP %d",resp.StatusCode)}
- if strings.Contains(resp.Header.Get("Content-Type"),"json") {return errors.New("GitHub returned JSON instead of release asset; check permissions")}
+ if strings.Contains(resp.Header.Get("Content-Type"),"json"){return errors.New("GitHub returned JSON instead of release asset; check permissions")}
+ if resp.ContentLength>1<<31{return errors.New("release asset exceeds safe size limit")}
  out,err:=os.OpenFile(dst,os.O_CREATE|os.O_EXCL|os.O_WRONLY,0700);if err!=nil{return err}
- _,copyErr:=io.Copy(out,io.LimitReader(resp.Body,1<<31));syncErr:=out.Sync();closeErr:=out.Close()
- if copyErr!=nil{return copyErr};if syncErr!=nil{return syncErr};return closeErr
+ const limit int64=1<<31
+ buf:=make([]byte,128*1024)
+ var received int64
+ last:=time.Time{}
+ total:=resp.ContentLength
+ if total<0{total=0}
+ if onBytes!=nil{onBytes(0,total)}
+ for {
+  n,readErr:=resp.Body.Read(buf)
+  if n>0{
+   received+=int64(n)
+   if received>limit{out.Close();return errors.New("release binary exceeds safe size limit")}
+   if _,err=out.Write(buf[:n]);err!=nil{out.Close();return err}
+   if onBytes!=nil&&time.Since(last)>250*time.Millisecond{onBytes(received,total);last=time.Now()}
+  }
+  if readErr==io.EOF{break}
+  if readErr!=nil{out.Close();return readErr}
+ }
+ if onBytes!=nil{onBytes(received,total)}
+ if total>0&&received!=total{out.Close();return fmt.Errorf("download incomplete: received %d of %d bytes",received,total)}
+ if received==0{out.Close();return errors.New("downloaded release asset is empty")}
+ if err=out.Sync();err!=nil{out.Close();return err}
+ return out.Close()
+}
+func downloadAsset(ctx context.Context,a releaseAsset,dst string) error {
+ return downloadAssetWithProgress(ctx,a,dst,nil)
 }
 func expectedChecksum(b []byte,name string)(string,error){
  sc:=bufio.NewScanner(strings.NewReader(string(b)))
  for sc.Scan(){p:=strings.Fields(sc.Text());if len(p)==2&&strings.TrimPrefix(p[1],"*")==name&&len(p[0])==64{if _,err:=hex.DecodeString(p[0]);err==nil{return strings.ToLower(p[0]),nil}}}
  return "",fmt.Errorf("no valid SHA256 for %s",name)
 }
-func updateBinary(ctx context.Context, dir string, r releaseInfo)(string,error){
+type updateBinaryProgress func(phase string, downloaded,total int64)
+func updateBinary(ctx context.Context, dir string, r releaseInfo)(string,error){return updateBinaryWithProgress(ctx,dir,r,nil)}
+func updateBinaryWithProgress(ctx context.Context, dir string, r releaseInfo,progress updateBinaryProgress)(string,error){
  binary,ok:=assetFor(r,assetName());if !ok{return "",fmt.Errorf("release %s has no binary for %s/%s",r.Tag,runtime.GOOS,runtime.GOARCH)}
  sums,ok:=assetFor(r,"SHA256SUMS");if !ok{return "",errors.New("release lacks SHA256SUMS")}
  base:=filepath.Join(dir,"runtime");if err:=os.MkdirAll(base,0700);err!=nil{return "",err}
@@ -157,10 +186,12 @@ func updateBinary(ctx context.Context, dir string, r releaseInfo)(string,error){
  if err=downloadAsset(ctx,sums,sumPath);err!=nil{return "",err};sumData,err:=os.ReadFile(sumPath);if err!=nil{return "",err}
  want,err:=expectedChecksum(sumData,binary.Name);if err!=nil{return "",err}
  tmp,err:=os.CreateTemp(base,".binary-");if err!=nil{return "",err};path:=tmp.Name();tmp.Close();os.Remove(path);defer os.Remove(path)
- if err=downloadAsset(ctx,binary,path);err!=nil{return "",err}
+ if err=downloadAssetWithProgress(ctx,binary,path,func(downloaded,total int64){if progress!=nil{progress("downloading",downloaded,total)}});err!=nil{return "",err}
+ if progress!=nil{progress("verifying",-1,-1)}
  f,err:=os.Open(path);if err!=nil{return "",err};hash:=sha256.New();_,err=io.Copy(hash,f);f.Close();if err!=nil{return "",err}
  if hex.EncodeToString(hash.Sum(nil))!=want{return "",errors.New("download checksum mismatch; update rejected")}
  if err=os.Chmod(path,0700);err!=nil{return "",err}
+ if progress!=nil{progress("staging",-1,-1)}
  ext:="";if runtime.GOOS=="windows"{ext=".exe"}
  current:=filepath.Join(base,"current"+ext);previous:=filepath.Join(base,"previous"+ext)
  if _,err=os.Stat(current);err==nil{os.Remove(previous);if err=os.Rename(current,previous);err!=nil{return "",err}}else if !os.IsNotExist(err){return "",err}else{
