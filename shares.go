@@ -49,7 +49,7 @@ func shareMounted(path string)bool{
 }
 func (a *App) mountShare(s StorageShare)error{
  if runtime.GOOS!="linux"{return errors.New("Managed NFS/SMB mounts currently require Linux")}
- if os.Getenv("SYNCRIA_ENABLE_MOUNTS")!="1"{return errors.New("Network mounting is disabled. Set SYNCRIA_ENABLE_MOUNTS=1 on a Linux host with mount privileges")}
+ if os.Getenv("SYNCRIA_ENABLE_MOUNTS")!="1"{return errors.New("This container cannot create new NAS mounts. Select a NAS folder already available under /storage, or explicitly allow managed mounts in the container configuration")}
  if shareMounted(s.Local){return nil}
  root,e:=resolvedPath(browseStorageRoot());if e!=nil{return fmt.Errorf("storage root: %w",e)}
  dest:=filepath.Join(root,"syncria-shares",s.ID)
@@ -108,7 +108,7 @@ func (a *App) shareAction(w http.ResponseWriter,r *http.Request){
   export:=strings.TrimSpace(r.FormValue("export"))
   label:=strings.TrimSpace(r.FormValue("label"))
   if e:=validateShare(protocol,server,export,label);e!=nil{redirect(w,r,e.Error());return}
-  if os.Getenv("SYNCRIA_ENABLE_MOUNTS")!="1"{redirect(w,r,"Mounting disabled on this host; set SYNCRIA_ENABLE_MOUNTS=1 and grant Linux mount capability");return}
+  if os.Getenv("SYNCRIA_ENABLE_MOUNTS")!="1"{redirect(w,r,"This container cannot create new SMB/NFS mounts. Use an existing NAS folder under /storage, or enable Linux mount capability and SYNCRIA_ENABLE_MOUNTS=1 for managed mounts");return}
   a.mu.Lock()
   for _,s:=range a.cfg.Shares{if s.Protocol==protocol&&s.Server==server&&s.Export==export{a.mu.Unlock();redirect(w,r,"That network share is already configured");return}}
   a.mu.Unlock()
