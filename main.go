@@ -60,6 +60,12 @@ type NASDestination struct {
   ShareID string `json:"share_id"`
   Folder string `json:"folder"`
 }
+type BridgeConflict struct {
+ Pair string `json:"pair"`
+ Path string `json:"path"`
+ PrimaryModified time.Time `json:"primary_modified,omitempty"`
+ SecondaryModified time.Time `json:"secondary_modified,omitempty"`
+}
 type PendingDeletion struct {
   Pair string `json:"pair"`
   Path string `json:"path"`
@@ -84,6 +90,8 @@ type Job struct {
     PropagateDeletions *bool `json:"propagate_deletions,omitempty"`
     RecoveryEnabled *bool `json:"recovery_enabled,omitempty"`
     PendingDeletions []PendingDeletion `json:"pending_deletions,omitempty"`
+    Conflicts []BridgeConflict `json:"conflicts,omitempty"`
+    ConflictOverrides map[string]string `json:"conflict_overrides,omitempty"`
     NASShareID string `json:"nas_share_id,omitempty"`
     NASFolder string `json:"nas_folder,omitempty"`
     ScheduleMode string `json:"schedule_mode,omitempty"`
@@ -620,6 +628,10 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
       job.PairStates[key]=clone
     }
     job.PendingDeletions=append([]PendingDeletion(nil),j.PendingDeletions...)
+    job.Conflicts=append([]BridgeConflict(nil),j.Conflicts...)
+    job.ConflictOverrides=make(map[string]string,len(j.ConflictOverrides))
+    for k,v:=range j.ConflictOverrides{job.ConflictOverrides[k]=v}
+
     job.CloudOriginHashes=make(map[string]string,len(j.CloudOriginHashes))
     for k,v:=range j.CloudOriginHashes{job.CloudOriginHashes[k]=v}
 
@@ -667,6 +679,8 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
 		actual.State = job.State
         actual.PairStates = job.PairStates
         actual.PendingDeletions = job.PendingDeletions
+        actual.Conflicts=job.Conflicts
+        actual.ConflictOverrides=job.ConflictOverrides
         actual.CloudOriginHashes=job.CloudOriginHashes
 		_ = a.save()
 	}
@@ -1505,6 +1519,7 @@ func main() {
     mux.HandleFunc("/api/browse/nas", a.browseNAS)
     mux.HandleFunc("/api/browse/dropbox",a.browseDropbox)
     mux.HandleFunc("/api/recovery/undo",a.recoveryAction)
+    mux.HandleFunc("/api/conflicts/resolve",a.conflictAction)
     mux.HandleFunc("/api/browse/nas/create", a.createNASFolder)
     mux.HandleFunc("/api/nas/action", a.directNASAction)
 	mux.HandleFunc("/api/dashboard/status", a.dashboardStatus)
