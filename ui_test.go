@@ -14,7 +14,7 @@ func TestReplacementUINavigation(t *testing.T){
   "view-overview","view-sync","view-storage","view-accounts",
   "view-updates","view-settings","id=\"picker\"",
   "id=\"syncWizard\"","/api/browse/drive",
-  "/api/browse/local","/api/shares/action",
+  "/api/browse/nas","/api/nas/action",
   "/api/update/status","/api/update/progress",
  }
  for _,part:=range required{
