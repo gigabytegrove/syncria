@@ -391,9 +391,6 @@ func (a *App) remoteTreeProgress(ctx context.Context, acc, root string, onScan f
 			if p != "" {
 				path = p + "/" + component
 			}
-			if f.MimeType != folderMime && strings.HasPrefix(f.MimeType, "application/vnd.google-apps.") {
-				return fmt.Errorf("Google-native document %q requires export; sync paused to protect data", path)
-			}
 			res[path] = f
             scanned++
             if onScan!=nil{onScan(path,scanned)}
