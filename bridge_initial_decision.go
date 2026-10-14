@@ -33,7 +33,7 @@ func fileModifiedText(t time.Time) string {
 
 func decideFirstRun(j *Job,key,rel string,l,r bridgeEntry,oneWay bool,ongoingPolicy string) firstRunDecision {
  if oneWay {
-  return firstRunDecision{Reason:"Both locations already contain this file. One-way synchronization cannot overwrite an existing destination without an explicit resolution."}
+  return firstRunDecision{Direction:"primary",Method:conflictPrimary,Reason:"One-way relationship: source wins; content is checked first, and NAS changes are never uploaded to the source."}
  }
  if override:=j.ConflictOverrides[key+"|"+rel];override!=""{
   switch override {
