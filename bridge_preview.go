@@ -42,6 +42,7 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
  for x:=range left{keys[x]=true};for x:=range right{keys[x]=true};for x:=range prev{keys[x]=true}
  names:=make([]string,0,len(keys));for x:=range keys{names=append(names,x)};sort.Strings(names)
  for _,name:=range names{
+  if ignoredSyncPath(name){continue}
   l,hasL:=left[name];r,hasR:=right[name];old,tracked:=prev[name]
   row:=syncPreviewRow{Path:name}
   if hasL&&!l.Modified.IsZero(){row.PrimaryModified=l.Modified.UTC().Format(time.RFC3339)}
