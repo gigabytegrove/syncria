@@ -1551,6 +1551,7 @@ func main() {
 	mux.HandleFunc("/api/dashboard/status", a.dashboardStatus)
     mux.HandleFunc("/api/live", a.liveStatus)
     mux.HandleFunc("/api/sync/preview", a.previewSyncAPI)
+    mux.HandleFunc("/api/sync/preview/live", a.previewStreamAPI)
 	mux.HandleFunc("/api/wizard/verify", a.verifyWizard)
 	mux.HandleFunc("/action", a.action)
 	mux.HandleFunc("/oauth/start", a.oauthStart)
