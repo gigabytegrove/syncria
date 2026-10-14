@@ -38,6 +38,27 @@ form.inline{display:inline}
 .nas-target button{white-space:nowrap}
 .progress-topline{display:flex;justify-content:space-between;gap:12px}
 code{overflow-wrap:anywhere}
+
+.live-sync-workspace{margin-bottom:18px}
+.active-sync-list{display:grid;gap:14px}
+.active-sync-card{padding:17px;border:1px solid #d8e5f2;border-radius:12px;background:#fff;min-width:0}
+.active-sync-heading{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap}
+.active-sync-title{display:grid;gap:3px;min-width:0}
+.active-sync-title>strong{font-size:16px;color:#102c4d}
+.active-sync-title>small{color:#55728f}
+.active-sync-current{font-size:13px;overflow-wrap:anywhere;margin:13px 0 8px}
+.active-sync-stats{display:flex;gap:10px 20px;flex-wrap:wrap;font-size:12px;color:#41617e;margin-bottom:12px}
+.active-sync-plan-label{font-weight:700;font-size:13px;margin:14px 0 8px}
+.active-sync-file-list{display:grid;gap:0;border:1px solid #dbe5ef;border-radius:9px;max-height:360px;overflow:auto}
+.active-sync-file{padding:9px 12px;border-bottom:1px solid #edf2f7;display:flex;align-items:center;gap:10px;justify-content:space-between;min-width:0}
+.active-sync-file:last-child{border-bottom:none}
+.active-sync-file-main{display:flex;gap:10px;min-width:0;align-items:center}
+.active-sync-file-action{min-width:72px;text-transform:capitalize;font-size:11px;color:#31658c}
+.active-sync-file-path{font-size:12px;overflow-wrap:anywhere;min-width:0}
+.active-sync-file-state{color:#5e7992;white-space:nowrap;flex-shrink:0}
+.active-sync-file.is-active{background:#edf8ff}
+.active-sync-file.is-done{opacity:.65}
+@media(max-width:700px){.active-sync-file{align-items:flex-start;flex-direction:column}.active-sync-file-state{padding-left:0}}
 ` + v051Theme + `</style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">
 {{if and .Configured .Logged}}
@@ -143,6 +164,7 @@ code{overflow-wrap:anywhere}
  <details class="sync-run-events hidden" data-job-events="{{.ID}}"><summary>What actually changed in the last run</summary><div class="sync-run-event-list" data-job-events-list="{{.ID}}"></div></details>
  <div class="flow-card-actions">
  <button type="button" class="secondary" onclick="previewSync('{{.ID}}')">Test run · Preview changes</button>
+  <button type="button" class="secondary hidden" data-job-cancel="{{.ID}}" onclick="requestStopSync('{{.ID}}',this)">Stop current run</button>
  {{if or (eq .Provider "bridge") (eq .Provider "nas_bridge")}}<button type="button" class="secondary" onclick="editSync('{{.ID}}')">Edit sync</button>{{end}}
  <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="run_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="primary">Sync now <span aria-hidden="true">→</span></button></form>
  <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="toggle_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="secondary">{{if .Enabled}}Pause automatic sync{{else}}Turn on automatic sync{{end}}</button></form>
@@ -253,6 +275,7 @@ code{overflow-wrap:anywhere}
 </section>
 </section>
 <section class="view" id="view-activity">
+<section class="panel live-sync-workspace" aria-label="Active synchronization runs"><div class="section-heading"><div><span class="mini-overline">WORK IN PROGRESS</span><h2>Active syncs</h2><p>Watch what needs copying, what is transferring, and stop a run without restarting Syncria.</p></div><span class="pill">Live</span></div><div id="activeSyncList" class="active-sync-list"><p class="muted">No sync is running right now.</p></div></section>
 <section class="panel live-activity-panel"><div class="section-heading"><div><h2>Live file activity</h2><p>Changes appear automatically as files are copied, replaced, or removed.</p></div><span class="pill">Live</span></div><div id="liveActivityFeed" class="live-activity-feed" aria-live="off"><p class="muted">Waiting for activity…</p></div></section>
 <div class="workspace-intro"><div><p>Transfer counts and recent results, updated as your syncs run.</p></div><button class="secondary" type="button" onclick="refreshDashboardStatus()">Refresh activity ↻</button></div>
 <div class="activity-scoreboard grid gap-3">
@@ -1041,11 +1064,99 @@ function formatBytes(value){
   do{n/=1024;i++;}while(n>=1024&&i<units.length-1);
   return n.toFixed(n<10?1:0)+' '+units[i];
 }
+
+async function requestStopSync(id,button){
+ if(!confirm('Stop this sync run? Files already copied will stay in place. Automatic checks will remain enabled unless you pause them separately.'))return;
+ if(button){button.disabled=true;button.textContent='Stopping…'}
+ try{
+  const response=await fetch('/action',{method:'POST',body:new URLSearchParams({action:'cancel_job',id}),credentials:'same-origin',cache:'no-store'});
+  if(!response.ok)throw Error('Stop request was not accepted (HTTP '+response.status+').');
+  await refreshDashboardStatus();
+ }catch(error){
+  alert(error.message);
+  if(button){button.disabled=false;button.textContent='Stop current run'}
+ }
+}
+function liveText(parent,tag,className,value){
+ const el=document.createElement(tag);
+ if(className)el.className=className;
+ if(value!==undefined)el.textContent=value;
+ parent.append(el);return el;
+}
+function renderActiveSyncs(jobs){
+ const root=$('activeSyncList');if(!root)return;
+ const running=jobs.filter(job=>job.running);
+ if(!running.length){
+  if(root.dataset.running!=='none'){root.dataset.running='none';root.replaceChildren();liveText(root,'p','muted','No sync is running right now.')}
+  return;
+ }
+ root.dataset.running='active';
+ for(const child of [...root.children])if(!running.some(j=>j.id===child.dataset.runId))child.remove();
+ for(const job of running){
+  const p=job.progress||{};
+  let card=[...root.children].find(el=>el.dataset.runId===job.id);
+  if(!card){
+   card=document.createElement('article');card.className='active-sync-card';card.dataset.runId=job.id;
+   const heading=liveText(card,'div','active-sync-heading');
+   const names=liveText(heading,'div','active-sync-title');
+   liveText(names,'strong','active-sync-name',job.name||'Sync');
+   liveText(names,'small','active-sync-stage','Preparing…');
+   const stop=liveText(heading,'button','secondary active-sync-stop','Stop current run');stop.type='button';
+   stop.addEventListener('click',()=>requestStopSync(job.id,stop));
+   liveText(card,'p','active-sync-current','');
+   const stats=liveText(card,'div','active-sync-stats');
+   liveText(stats,'span','active-sync-scanned','');
+   liveText(stats,'span','active-sync-count','');
+   liveText(stats,'span','active-sync-bytes','');
+   liveText(card,'p','active-sync-plan-label','Files waiting to sync');
+   liveText(card,'div','active-sync-file-list');
+   root.append(card);
+  }
+  const set=(q,value)=>{const el=card.querySelector(q);if(el&&el.textContent!==value)el.textContent=value};
+  let phase=p.phase||'working';
+  set('.active-sync-stage',phase==='scanning'?'Scanning locations':phase==='stopping'?'Stopping safely…':phase==='transferring'?'Transferring files':phase==='processing'?'Checking changes':phase);
+  const scanned=Number(p.processed||0),total=Number(p.total||0);
+  set('.active-sync-scanned',phase==='scanning'?scanned.toLocaleString()+' items discovered':total>0?scanned.toLocaleString()+' / '+total.toLocaleString()+' entries checked':'Preparing file list');
+  set('.active-sync-current',p.current?(phase==='scanning'?'Scanning: ':'Current file: ')+p.current:'Comparing file metadata…');
+  set('.active-sync-bytes',formatBytes(Number(p.upload_bytes||0)+Number(p.download_bytes||0))+' transferred this run');
+  const counts=p.plan_counts||{};
+  const actionable=Object.entries(counts).filter(([a])=>!['unchanged','skip'].includes(a)).reduce((sum,[,n])=>sum+Number(n||0),0);
+  set('.active-sync-count',p.plan_counts?actionable.toLocaleString()+' planned changes':'Building transfer plan');
+  set('.active-sync-plan-label',p.plan_counts?'Planned work ('+actionable.toLocaleString()+' items)':'Planning transfers after the scans finish');
+  const rows=p.plan||[];
+  const signature=JSON.stringify(rows);
+  if(card.dataset.planSignature!==signature){
+   card.dataset.planSignature=signature;
+   const list=card.querySelector('.active-sync-file-list');list.replaceChildren();
+   if(!rows.length)liveText(list,'p','muted',p.plan_counts?'No file changes planned.':'Waiting for the initial scan to finish…');
+   else for(const row of rows){
+    const item=liveText(list,'div','active-sync-file');item.dataset.filePath=row.path;
+    const main=liveText(item,'div','active-sync-file-main');
+    liveText(main,'strong','active-sync-file-action',row.action||'check');
+    liveText(main,'span','active-sync-file-path',row.path||'');
+    const meta=liveText(item,'small','active-sync-file-state',row.bytes?formatBytes(row.bytes)+' · queued':'Queued');
+    meta.dataset.base=meta.textContent;
+   }
+   if(p.plan_truncated)liveText(list,'p','muted','Showing the first 120 planned changes; additional files will appear as current transfers.');
+  }
+  const changed=new Set((p.events||[]).map(e=>e.path));
+  for(const item of card.querySelectorAll('.active-sync-file')){
+   const state=item.querySelector('.active-sync-file-state');if(!state)continue;
+   const path=item.dataset.filePath;
+   let status=changed.has(path)?'Completed':p.current===path?'Processing now':state.dataset.base||'Queued';
+   if(state.textContent!==status)state.textContent=status;
+   item.classList.toggle('is-active',status==='Processing now');
+   item.classList.toggle('is-done',status==='Completed');
+  }
+ }
+}
+
 let dashboardPollBusy=false,dashboardSessionExpired=false;
 function applyLiveStatus(data){
  if(!data||!Array.isArray(data.jobs))return;
  const jobs=data.jobs;
  const active=jobs.filter(j=>j.running);
+ renderActiveSyncs(jobs);
  const banner=$('liveSystemBar'),detail=$('liveSystemDetail'),dot=$('liveSystemDot');
  if(banner&&detail&&dot){
   banner.dataset.liveState=active.length?'running':'idle';
@@ -1053,7 +1164,7 @@ function applyLiveStatus(data){
   if(active.length){
    const current=active[0];
    const p=current.progress||{};
-   detail.textContent=active.length+' sync'+(active.length===1?'':'s')+' running · '+(p.phase||'Working')+(p.current?' · '+p.current:'')+' · '+Number(p.processed||0)+' / '+Number(p.total||0)+' items';
+   detail.textContent=active.length+' sync'+(active.length===1?'':'s')+' running · '+(p.phase||'Working')+(p.current?' · '+p.current:'')+(Number(p.total||0)>0?' · '+Number(p.processed||0)+' / '+Number(p.total)+' checked':' · '+Number(p.processed||0)+' scanned');
   }else{
    const failures=jobs.filter(j=>j.error);
    detail.textContent=failures.length?failures.length+' sync'+(failures.length===1?'':'s')+' need attention':'All syncs idle · Live monitoring connected';
@@ -1110,6 +1221,8 @@ function applyLiveStatus(data){
     if(el.lastChild?.nodeType===Node.TEXT_NODE){el.lastChild.textContent=label;}
     else{el.appendChild(document.createTextNode(label));}
    }
+   const cancel=document.querySelector('[data-job-cancel="'+CSS.escape(job.id)+'"]');
+   if(cancel)cancel.classList.toggle('hidden',!job.running);
    const run=document.querySelector('[data-job-run="'+CSS.escape(job.id)+'"]');
    if(run)run.textContent=job.last_run==='Never run'?'Never run':'Last run '+job.last_run;
    const summary=document.querySelector('[data-job-summary="'+CSS.escape(job.id)+'"]');

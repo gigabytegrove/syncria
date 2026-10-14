@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-var appVersion = "v0.7.0"
+var appVersion = "v0.7.1"
 const folderMime = "application/vnd.google-apps.folder"
 const scope = "https://www.googleapis.com/auth/drive"
 
@@ -149,6 +149,8 @@ type App struct {
     updateProgress UpdateProgress
     syncProgress map[string]SyncProgress
     watchers sync.Map
+    runCancels sync.Map // job ID -> context.CancelFunc
+    stopRequests sync.Map // job ID -> explicit user-requested stop
 	runs   sync.Map
 	cfg    Config
 	file   string
@@ -627,8 +629,11 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
       a.updateMu.Unlock()
       return errors.New("job already running")
     }
+    runCtx,runCancel:=context.WithCancel(ctx)
+    a.runCancels.Store(jobID,runCancel)
     a.updateMu.Unlock()
-    defer a.runs.Delete(jobID)
+    defer func(){runCancel();a.runCancels.Delete(jobID);a.stopRequests.Delete(jobID);a.runs.Delete(jobID)}()
+    ctx=runCtx
 	a.mu.Lock()
 	j := a.job(jobID)
 	if j == nil {
@@ -676,8 +681,6 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     job.itemHook=func(done,total int64,current string){
       a.setSyncProgress(jobID,func(p *SyncProgress){p.Phase="processing";p.Processed=done;p.Total=total;p.Current=current})
     }
-	ctx, cancel := context.WithCancel(ctx)
-    defer cancel()
     started := time.Now()
     job.LastUploads, job.LastDownloads = 0, 0
     job.LastUploadBytes, job.LastDownloadBytes = 0, 0
@@ -700,16 +703,17 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
         actual.RecentEvents=append([]SyncActionEvent(nil),recent...)
 		actual.LastRun = time.Now()
         actual.LastDurationMillis = time.Since(started).Milliseconds()
-        if err != nil {actual.FailedRuns++} else {actual.SuccessfulRuns++}
+        _,userStopped:=a.stopRequests.Load(jobID)
+        if userStopped {actual.LastSummary="Stopped by user"} else if err != nil {actual.FailedRuns++} else {actual.SuccessfulRuns++}
         actual.LastUploads, actual.LastDownloads = job.LastUploads, job.LastDownloads
         actual.LastUploadBytes, actual.LastDownloadBytes = job.LastUploadBytes, job.LastDownloadBytes
         actual.TotalUploads, actual.TotalDownloads = job.TotalUploads, job.TotalDownloads
         actual.TotalUploadBytes, actual.TotalDownloadBytes = job.TotalUploadBytes, job.TotalDownloadBytes
         actual.LastError = ""
-		if err != nil {
-			actual.LastError = err.Error()
-		}
-		actual.LastSummary = job.LastSummary
+        if err != nil {
+            if _,userStopped:=a.stopRequests.Load(jobID);!userStopped{actual.LastError=err.Error()}
+        }
+        if _,userStopped:=a.stopRequests.Load(jobID);!userStopped{actual.LastSummary=job.LastSummary}
 		actual.State = job.State
         actual.PairStates = job.PairStates
         actual.PendingDeletions = job.PendingDeletions
@@ -721,7 +725,7 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     a.mu.Unlock()
     a.setSyncProgress(jobID,func(p *SyncProgress){
       p.Running=false
-      if err!=nil {p.Phase="failed";p.Error=err.Error()} else {p.Phase="complete"}
+      if _,stopped:=a.stopRequests.Load(jobID);stopped {p.Phase="cancelled";p.Error=""} else if err!=nil {p.Phase="failed";p.Error=err.Error()} else {p.Phase="complete"}
     })
     return err
 }
@@ -1195,7 +1199,7 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
         a.mu.Unlock()
         if e != nil {http.Error(w,e.Error(),500);return}
         http.Redirect(w,r,"/?msg="+url.QueryEscape("Relationship created paused. Enable or run it below to start syncing.")+"#sync",http.StatusSeeOther)
-	case "toggle_job", "run_job", "delete_job":
+	case "toggle_job", "run_job", "delete_job", "cancel_job":
 		id := r.FormValue("id")
 		a.mu.Lock()
 		j := a.job(id)
@@ -1204,6 +1208,12 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 			redirect(w, r, "Job not found")
 			return
 		}
+        if action=="cancel_job" {
+            a.mu.Unlock()
+            if !a.stopRunningJob(id){redirect(w,r,"Sync is not currently running or is starting; try again");return}
+            redirect(w,r,"Stop requested. The current file operation will finish or cancel safely; automatic scheduling is unchanged.")
+            return
+        }
 		if action == "toggle_job" {
 			j.Enabled = !j.Enabled
 			e := a.save()
