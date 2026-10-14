@@ -985,6 +985,9 @@ async function refreshDashboardStatus(){
  finally{dashboardPollBusy=false;}
 }
 refreshDashboardStatus();
+// Check quietly on startup so the nav can signal a verified available update.
+checkUpdate();
+setInterval(()=>{if(!document.hidden&&!updateRunning&&!updateSubmitting)checkUpdate()},30*60*1000);
 setInterval(refreshDashboardStatus,2500);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDashboardStatus()});
 window.addEventListener('pageshow',event=>{if(event.persisted)refreshDashboardStatus();});
