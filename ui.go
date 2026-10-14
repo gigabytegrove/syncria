@@ -780,6 +780,9 @@ async function refreshDashboardStatus(){
     if(progressBox){
       const stage=el('data-job-phase'),bar=el('data-job-bar'),info=el('data-job-progress-detail');
       const running=!!liveProgress.running,done=Number(liveProgress.processed||0),total=Number(liveProgress.total||0);
+      // A sync card should be quiet when it isn't doing work.
+      // Persistent errors have their own separate, visible message.
+      progressBox.classList.toggle('hidden',!running);
       if(stage)stage.textContent=running?'Syncing · '+(liveProgress.phase||'working'):liveProgress.phase==='failed'?'Last run failed':liveProgress.phase==='complete'?'Last run complete':'Idle';
       if(bar){if(running&&total===0){bar.removeAttribute('value');}else{bar.value=total>0?Math.min(100,Math.round(done*100/total)):(liveProgress.phase==='complete'?100:0);}}
       if(info)info.textContent=(total>0?done+' / '+total+' entries processed · ':'')+
