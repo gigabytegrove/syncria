@@ -169,7 +169,7 @@ func (a *App) previewBridgeProgress(ctx context.Context,j *Job,notify func(strin
   label:=d.ShareID
   if share,e:=a.directShare(d.ShareID);e==nil&&share.Label!=""{label=share.Label}
   if d.Folder!=""{label+="/"+d.Folder}
-  primaryName:="Google Drive"
+  primaryName="Google Drive"
   if j.Provider=="nas_bridge"{
     primaryName=j.NASSourceID
     if share,e:=a.directShare(j.NASSourceID);e==nil&&share.Label!=""{primaryName=share.Label}
