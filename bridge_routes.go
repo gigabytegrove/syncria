@@ -218,6 +218,11 @@ func (a *App) addBridge(w http.ResponseWriter,r *http.Request){
   for _,d:=range selected{if relationshipOverlap(origin,d){redirect(w,r,"Primary NAS source cannot overlap a destination folder");return}}
  }else{
   j.Provider="bridge";j.RelationshipType="cloud"
+  j.InitialConflictPolicy=r.FormValue("initial_conflict_policy")
+  if j.InitialConflictPolicy==""{j.InitialConflictPolicy=conflictNewer}
+  if j.InitialConflictPolicy!=conflictNewer&&j.InitialConflictPolicy!=conflictManual{
+   redirect(w,r,"Choose newer copy or manual review for the first sync");return
+  }
   j.CloudProvider=r.FormValue("cloud_provider")
   if j.CloudProvider==""{j.CloudProvider="google_drive"}
   j.RemoteID=strings.TrimSpace(r.FormValue("remote"))
