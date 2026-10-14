@@ -66,10 +66,11 @@ type bridgeDriveEndpoint struct {
  account,root string
  folders map[string]string
  files map[string]driveFile
+ scanHook func(string,int64)
 }
 func (b *bridgeDriveEndpoint) Close(){}
 func (b *bridgeDriveEndpoint) Scan(ctx context.Context)(map[string]bridgeEntry,error){
- files,err:=b.app.remoteTree(ctx,b.account,b.root);if err!=nil{return nil,err}
+ files,err:=b.app.remoteTreeProgress(ctx,b.account,b.root,b.scanHook);if err!=nil{return nil,err}
  b.folders=map[string]string{"":b.root}
  b.files=files
  out:=make(map[string]bridgeEntry,len(files))
