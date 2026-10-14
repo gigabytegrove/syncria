@@ -1,0 +1,56 @@
+name: Verify Syncria Tailwind UI
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ui.go'
+      - 'ui_theme.go'
+      - 'ui_product_test.go'
+      - 'assets/syncria.css'
+      - 'assets/syncria.tailwind.css'
+      - 'package.json'
+      - 'tailwind.config.cjs'
+      - 'Dockerfile'
+      - '.github/workflows/verify-ui.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+      - name: Compile local Tailwind CSS
+        run: |
+          npm install --no-audit --no-fund
+          npm run build:css
+          test -s assets/syncria.css
+          ! grep -Eq '@tailwind|@apply' assets/syncria.css
+      - name: Validate Go application and embedded UI
+        run: |
+          go mod tidy
+          go test -count=1 ./...
+          go test -race -count=1 ./...
+          go vet ./...
+          CGO_ENABLED=0 go build -trimpath -o /tmp/syncria .
+      - name: Parse embedded JavaScript and verify DOM IDs
+        run: |
+          node <<'JS'
+          const fs=require('node:fs'),vm=require('node:vm');
+          const src=fs.readFileSync('ui.go','utf8');
+          const start=src.indexOf('<script>')+8,end=src.indexOf('</script>',start);
+          if(start<8||end<start)throw Error('Missing embedded script');
+          new vm.Script(src.slice(start,end));
+          const ids=new Set([...src.matchAll(/\\bid="([^"]+)"/g)].map(x=>x[1]));
+          const refs=[...src.matchAll(/\\$\\('([A-Za-z0-9_-]+)'\\)/g)].map(x=>x[1]);
+          const missing=[...new Set(refs.filter(x=>!ids.has(x)))];
+          if(missing.length)throw Error('Missing UI IDs: '+missing.join(','));
+          JS
