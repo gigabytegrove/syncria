@@ -68,12 +68,7 @@ code{overflow-wrap:anywhere}
 {{else if not .Logged}}<section class="panel" style="max-width:550px"><h2>Sign in</h2><p>Access your synchronization workspace.</p><form method="post" action="/action"><input type="hidden" name="action" value="login"><label class="field">Administrator password<input type="password" name="password" required autocomplete="current-password"></label><button class="primary">Sign in</button></form></section>
 {{else}}
 <section class="view active" id="view-overview">
-<div class="command-hero">
- <div class="hero-text"><h2>Files and storage</h2>
- <p>Manage your syncs between Google Drive, Dropbox, and your NAS devices.</p>
- <div class="hero-actions flex flex-wrap gap-3"><button class="hero-cta" type="button" onclick="startWizard()">Create sync</button>
- <button class="hero-text-link" type="button" onclick="navigate('sync')">View syncs</button></div></div>
-</div>
+<div class="overview-toolbar"><div><strong>Workspace</strong><p>Manage your connected folders, transfers, and storage in one place.</p></div><button class="primary" type="button" onclick="startWizard()">+ Create sync</button></div>
 <div class="overview-metrics grid gap-3" aria-label="Your current Syncria numbers">
  <div class="overview-metric"><span class="metric-symbol">↗</span><div><small>YOUR SYNCS</small><strong>{{len .Jobs}}</strong><span>configured connections</span></div></div>
  <div class="overview-metric"><span class="metric-symbol">▦</span><div><small>FILES TRACKED</small><strong id="metricFiles">{{.Metrics.TrackedFiles}}</strong><span>across your syncs</span></div></div>
@@ -110,7 +105,7 @@ code{overflow-wrap:anywhere}
 <details class="glossary-fold"><summary>New to syncing? A few words explained.</summary><div class="glossary-layout"><span><strong>NAS</strong> — A NAS is a storage box on your network.</span><span><strong>Cloud</strong> — Online files, like Google Drive.</span><span><strong>Sync</strong> — Keeping folders matched.</span><span><strong>Undo</strong> — Bringing back a recently deleted file.</span></div></details>
 </section>
 <section class="view" id="view-sync">
-<div class="workspace-intro"><div><span class="mini-overline">Configured syncs</span><h2>Your syncs</h2><p>Manage where files travel and when they move. Nothing happens automatically until you turn a sync on.</p></div><button class="primary" type="button" onclick="startWizard()">+ Create sync</button></div>
+<div class="workspace-intro"><div><p>Manage where files travel and when they move. New syncs are paused until you enable them.</p></div><button class="primary" type="button" onclick="startWizard()">+ Create sync</button></div>
 <section class="sync-library" aria-label="Your file syncs">
 {{range .Jobs}}{{$job := .}}
 <article class="relationship-card">
@@ -198,7 +193,7 @@ code{overflow-wrap:anywhere}
 <p class="wizard-status good" id="reviewStatus">Your new sync starts turned off. Files will not be copied until you click Turn on sync or Sync now.</p>
 <div class="row"><button type="button" class="secondary" onclick="showSyncStep(3)">← Back</button><button type="submit" class="primary" id="createSyncButton">Save my sync (keep it off)</button></div></div></form></section></section>
 <section class="view" id="view-storage">
-<div class="workspace-intro"><div><span class="mini-overline">Network storage</span><h2>Network storage</h2><p>Add NAS boxes here, then use their folders in any sync. Syncria doesn't move your files just by connecting a NAS.</p></div><button class="primary" type="button" onclick="toggleDirectNAS()">+ Add NAS</button></div>
+<div class="workspace-intro"><div><p>Connect and manage the network storage used by your syncs. Adding a NAS does not transfer files.</p></div><button class="primary" type="button" onclick="toggleDirectNAS()">+ Add NAS</button></div>
 <section id="directNASPanel" class="connection-drawer hidden" aria-label="Add a NAS connection"><div class="drawer-heading"><div><span class="mini-overline">New NAS</span><h3>Connect a NAS box</h3><p>You'll need the address, shared folder, and sign-in details from your NAS.</p></div><button type="button" class="secondary" onclick="toggleDirectNAS(false)">Close ✕</button></div>
 <form method="post" action="/api/nas/action"><input type="hidden" name="operation" value="connect">
 <div class="settings-grid">
@@ -235,7 +230,7 @@ code{overflow-wrap:anywhere}
 </section>
 </section>
 <section class="view" id="view-activity">
-<div class="workspace-intro"><div><span class="mini-overline">Activity</span><h2>Transfer activity</h2><p>Actual transfer counts and results from your syncs, updated as they run.</p></div><button class="secondary" type="button" onclick="refreshDashboardStatus()">Refresh activity ↻</button></div>
+<div class="workspace-intro"><div><p>Transfer counts and recent results, updated as your syncs run.</p></div><button class="secondary" type="button" onclick="refreshDashboardStatus()">Refresh activity ↻</button></div>
 <div class="activity-scoreboard grid gap-3">
  <div class="activity-score activity-score-highlight"><small>CHECKS THAT WORKED</small><strong id="activitySuccessful">{{.Metrics.Runs}}</strong><span>completed checks</span></div>
  <div class="activity-score"><small>CHECKS WITH ERRORS</small><strong id="activityFailed">{{.Metrics.Failures}}</strong><span>need attention</span></div>
@@ -254,7 +249,7 @@ code{overflow-wrap:anywhere}
 </div><p class="activity-row-detail" data-job-detail="{{.ID}}">Loading most recent result…</p></div>{{else}}<div class="flow-library-empty"><strong>No activity yet</strong><p>Create a sync to see its results here.</p></div>{{end}}</section>
 </section>
 <section class="view" id="view-updates">
-<div class="workspace-intro"><div><span class="mini-overline">Application updates</span><h2>Updates</h2><p>Syncria installs updates from inside the app. See real download progress, verification, and restart status when an update runs.</p></div></div>
+<div class="workspace-intro"><div><p>Install updates here. Download, verification, and restart progress appear when an update runs.</p></div></div>
 <div class="update-workspace">
 <div>
 <section class="panel release-panel"><div class="release-panel-heading"><span class="mini-overline">Stable releases</span><span class="pill">In-app updater</span></div>
@@ -281,7 +276,7 @@ code{overflow-wrap:anywhere}
 <section class="panel"><details class="advanced-update"><summary>Install from files (advanced)</summary><div class="advanced-update-body"><h2>Manual installation</h2><p class="muted">Use this only when automatic downloads are unavailable. Supply a matching app file and SHA256SUMS. Your previous version remains available for rollback.</p><form id="manualUpdateForm" action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return submitManualUpdate(event)"><label class="field">App executable<input type="file" name="binary" id="manualBinary" required></label><label class="field">SHA256SUMS<input type="file" name="checksums" required></label><button id="manualUpdateButton" class="secondary" type="submit">Verify & install files</button></form></div></details></section>
 </div></div>
 </section>
-<section class="view" id="view-settings"><div class="workspace-intro"><div><span class="mini-overline">Settings</span><h2>Settings</h2><p>Advanced connection settings live here, away from everyday syncing. You usually only set these once.</p></div></div><section class="panel"><h2>Google sign-in settings (advanced)</h2><p>For an administrator: create a Google Cloud web sign-in app, enable the Google Drive API, and add the address shown below as its redirect URL:</p><div class="selected"><code>{{.Callback}}</code></div><form method="post" action="/action"><input type="hidden" name="action" value="oauth_settings"><label class="field">Google app ID (Client ID)<input name="client_id" value="{{.ClientID}}" required></label><label class="field">Google app secret<input name="client_secret" type="password" placeholder="Leave blank to keep existing secret"></label><label class="field">Your Syncria web address<input name="base_url" value="{{.BaseURL}}" required></label><button class="primary">Save Google sign-in settings</button></form></section><section class="panel"><h2>Dropbox sign-in settings (advanced)</h2>
+<section class="view" id="view-settings"><div class="workspace-intro"><div><p>Manage account credentials and connection settings. These usually only need to be configured once.</p></div></div><section class="panel"><h2>Google sign-in settings (advanced)</h2><p>For an administrator: create a Google Cloud web sign-in app, enable the Google Drive API, and add the address shown below as its redirect URL:</p><div class="selected"><code>{{.Callback}}</code></div><form method="post" action="/action"><input type="hidden" name="action" value="oauth_settings"><label class="field">Google app ID (Client ID)<input name="client_id" value="{{.ClientID}}" required></label><label class="field">Google app secret<input name="client_secret" type="password" placeholder="Leave blank to keep existing secret"></label><label class="field">Your Syncria web address<input name="base_url" value="{{.BaseURL}}" required></label><button class="primary">Save Google sign-in settings</button></form></section><section class="panel"><h2>Dropbox sign-in settings (advanced)</h2>
 <p>For an administrator: add this return address to your Dropbox developer app:</p><div class="selected"><code>{{.DropboxCallback}}</code></div>
 <form method="post" action="/action"><input type="hidden" name="action" value="dropbox_oauth_settings">
 <label class="field">Dropbox app key<input name="client_id" value="{{.DropboxClientID}}" required></label>
