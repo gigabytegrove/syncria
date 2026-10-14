@@ -747,6 +747,7 @@ func (a *App) execute(ctx context.Context, j *Job) error {
 	}
 	next := map[string]Item{}
 	for k, v := range j.State {
+        if ignoredSyncPath(k){continue}
 		next[k] = v
 	}
 	count := map[string]int{}
