@@ -86,6 +86,7 @@ type Job struct {
     NASDestinations []NASDestination `json:"nas_destinations,omitempty"`
     PairStates map[string]map[string]Item `json:"pair_states,omitempty"`
     ConflictPolicy string `json:"conflict_policy,omitempty"`
+    InitialConflictPolicy string `json:"initial_conflict_policy,omitempty"`
     Direction string `json:"direction,omitempty"`
     PropagateDeletions *bool `json:"propagate_deletions,omitempty"`
     RecoveryEnabled *bool `json:"recovery_enabled,omitempty"`
