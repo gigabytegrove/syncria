@@ -10,3 +10,11 @@ import "strings"
 func ignoredSyncMetadata(name string) bool {
  return strings.EqualFold(name,"sync.ffs_db")
 }
+
+// Ignore an FFS database at any depth, including entries retained in
+// checkpoints from an earlier Syncria version. Removing its checkpoint
+// must never be interpreted as a remote/local deletion instruction.
+func ignoredSyncPath(rel string) bool {
+ if rel=="" {return false}
+ return ignoredSyncMetadata(rel[strings.LastIndex(rel,"/")+1:])
+}
