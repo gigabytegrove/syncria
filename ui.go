@@ -69,7 +69,7 @@ code{overflow-wrap:anywhere}
 {{else}}
 <section class="view active" id="view-overview">
 <div class="command-hero">
-  <div class="hero-text"><div class="hero-overline"><span class="hero-overline-dot"></span> YOUR FILES. CONNECTED.</div><h2>Everything in sync.<br><em>Wherever it lives.</em></h2><p>Google Drive, Dropbox, NAS boxes. Syncria keeps the folders you choose together without keeping your files on this server.</p><div class="hero-actions"><button class="hero-cta" type="button" onclick="startWizard()">Create a sync <span aria-hidden="true">↗</span></button><button class="hero-text-link" type="button" onclick="navigate('sync')">Explore my syncs <span aria-hidden="true">→</span></button></div></div>
+  <div class="hero-text"><div class="hero-overline"><span class="hero-overline-dot"></span> </div><h2>Keep your files in sync.</h2><p>Google Drive, Dropbox, NAS boxes. Syncria keeps the folders you choose together without keeping your files on this server.</p><div class="hero-actions"><button class="hero-cta" type="button" onclick="startWizard()">Create a sync <span aria-hidden="true">↗</span></button><button class="hero-text-link" type="button" onclick="navigate('sync')">Explore my syncs <span aria-hidden="true">→</span></button></div></div>
   <div class="hero-illustration" aria-hidden="true">
     <svg class="hero-flow-art" viewBox="0 0 420 255" fill="none" xmlns="http://www.w3.org/2000/svg">
      <path class="hero-path" d="M75 128C140 128 140 70 210 70C280 70 279 128 345 128" stroke="currentColor" stroke-width="2" stroke-dasharray="5 9"/>
@@ -94,7 +94,7 @@ code{overflow-wrap:anywhere}
  <div class="overview-metric"><span class="metric-symbol">✓</span><div><small>SYNC RUNS</small><strong id="metricRuns">{{.Metrics.Runs}}</strong><span><span id="metricFailures">{{.Metrics.Failures}}</span> with errors</span></div></div>
 </div>
 {{if not .Jobs}}
-<div class="welcome-track"><div class="welcome-track-intro"><span class="mini-overline">YOUR FIRST SYNC</span><h2>Make your first connection.</h2><p>New here? Start with these three steps. You only need to set this up once.</p></div>
+<div class="welcome-track"><div class="welcome-track-intro"><span class="mini-overline">YOUR FIRST SYNC</span><h2>Set up your first sync</h2><p>New here? Start with these three steps. You only need to set this up once.</p></div>
 <div class="welcome-track-steps">
  <div><span class="track-index">01</span><strong>Connect your cloud</strong><p>Google Drive or Dropbox. Skip this if you're using two NAS boxes.</p><button type="button" onclick="startAccountWizard()">Cloud accounts →</button></div>
  <div><span class="track-index">02</span><strong>Add a NAS box</strong><p>Tell Syncria where your storage box lives.</p><button type="button" onclick="toggleDirectNAS(true)">Storage →</button></div>
@@ -123,7 +123,7 @@ code{overflow-wrap:anywhere}
 <details class="glossary-fold"><summary>New to syncing? A few words explained.</summary><div class="glossary-layout"><span><strong>NAS</strong> — A NAS is a storage box on your network.</span><span><strong>Cloud</strong> — Online files, like Google Drive.</span><span><strong>Sync</strong> — Keeping folders matched.</span><span><strong>Undo</strong> — Bringing back a recently deleted file.</span></div></details>
 </section>
 <section class="view" id="view-sync">
-<div class="workspace-intro"><div><span class="mini-overline">FLOWS / YOUR CONNECTIONS</span><h2>Every sync, one place.</h2><p>Manage where files travel and when they move. Nothing happens automatically until you turn a sync on.</p></div><button class="primary" type="button" onclick="startWizard()">+ Create sync</button></div>
+<div class="workspace-intro"><div><span class="mini-overline">FLOWS / YOUR CONNECTIONS</span><h2>Your syncs</h2><p>Manage where files travel and when they move. Nothing happens automatically until you turn a sync on.</p></div><button class="primary" type="button" onclick="startWizard()">+ Create sync</button></div>
 <section class="sync-library" aria-label="Your file syncs">
 {{range .Jobs}}{{$job := .}}
 <article class="relationship-card">
@@ -211,7 +211,7 @@ code{overflow-wrap:anywhere}
 <p class="wizard-status good" id="reviewStatus">Your new sync starts turned off. Files will not be copied until you click Turn on sync or Sync now.</p>
 <div class="row"><button type="button" class="secondary" onclick="showSyncStep(3)">← Back</button><button type="submit" class="primary" id="createSyncButton">Save my sync (keep it off)</button></div></div></form></section></section>
 <section class="view" id="view-storage">
-<div class="workspace-intro"><div><span class="mini-overline">CONNECTIONS / NETWORK STORAGE</span><h2>Give your files another home.</h2><p>Add NAS boxes here, then use their folders in any sync. Syncria doesn't move your files just by connecting a NAS.</p></div><button class="primary" type="button" onclick="toggleDirectNAS()">+ Add NAS</button></div>
+<div class="workspace-intro"><div><span class="mini-overline">CONNECTIONS / NETWORK STORAGE</span><h2>Network storage</h2><p>Add NAS boxes here, then use their folders in any sync. Syncria doesn't move your files just by connecting a NAS.</p></div><button class="primary" type="button" onclick="toggleDirectNAS()">+ Add NAS</button></div>
 <section id="directNASPanel" class="connection-drawer hidden" aria-label="Add a NAS connection"><div class="drawer-heading"><div><span class="mini-overline">NEW CONNECTION</span><h3>Connect a NAS box</h3><p>You'll need the address, shared folder, and sign-in details from your NAS.</p></div><button type="button" class="secondary" onclick="toggleDirectNAS(false)">Close ✕</button></div>
 <form method="post" action="/api/nas/action"><input type="hidden" name="operation" value="connect">
 <div class="settings-grid">
