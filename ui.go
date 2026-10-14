@@ -276,7 +276,7 @@ code{overflow-wrap:anywhere}
 <div id="updateProgressTarget" class="muted"></div>
 <ol class="update-steps" id="updateSteps"><li data-update-phase="checking">Check</li><li data-update-phase="manifest">Manifest</li><li data-update-phase="downloading">Download</li><li data-update-phase="verifying">Verify</li><li data-update-phase="staging">Install</li><li data-update-phase="restarting">Restart</li><li data-update-phase="complete">Ready</li></ol>
 <p id="updateError" class="update-alert hidden" role="alert"></p>
-<button id="updateReloadButton" type="button" class="primary hidden" onclick="window.location.assign('/?updated=1#updates')">Open updated Syncria →</button></div></section>
+</div></section>
 
 <section class="panel hidden" id="updateHistoryPanel"><div class="panel-head"><h2>Live update log</h2><span class="status" id="updateLogState">Waiting</span></div><p class="muted">Real events recorded by Syncria, with timestamps.</p><ol class="update-timeline" id="updateEventTimeline" aria-live="polite"><li><strong>Ready</strong><small>Events appear here during an update.</small></li></ol></section>
 <section class="update-advanced-section"><details class="advanced-update"><summary>Advanced options</summary><div class="advanced-update-body"><div class="update-rollback-section"><h2>Restore previous version</h2><p class="muted">Return to the saved executable if a recent update has caused problems. Your sync settings are retained.</p><button id="rollbackUpdateButton" class="secondary" type="button" onclick="startUpdate('rollback')">Restore previous version</button></div><p class="muted">For troubleshooting or installations without access to automatic updates. Most people won't need these options.</p><h2>Manual installation</h2><p class="muted">Use this only when automatic downloads are unavailable. Supply a matching app file and SHA256SUMS. Your previous version remains available for rollback.</p><form id="manualUpdateForm" action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return submitManualUpdate(event)"><label class="field">App executable<input type="file" name="binary" id="manualBinary" required></label><label class="field">SHA256SUMS<input type="file" name="checksums" required></label><button id="manualUpdateButton" class="secondary" type="submit">Verify & install files</button></form></div></details></section>
@@ -598,9 +598,25 @@ function setUpdateProgressBar(phase,current,total){
   label.textContent=phase==='failed'?'Failed':'Measured progress only';
  }
 }
+// Only navigate after the new process confirms the expected version.
+function finishVerifiedUpdate(version){
+ if(!version || sessionStorage.getItem('syncria-update-refreshing')===version)return;
+ sessionStorage.setItem('syncria-update-refreshing',version);
+ sessionStorage.removeItem('syncria-update-expected');
+ window.location.replace('/?updated='+encodeURIComponent(version)+'#updates');
+}
 function renderUpdateProgress(p){
  if(!p||!p.phase)return;
  const phase=p.phase;
+ const expectedVersion=sessionStorage.getItem('syncria-update-expected');
+ if(expectedVersion&&p.current===expectedVersion&&phase!=='failed'&&!p.active){
+  finishVerifiedUpdate(expectedVersion);
+  return;
+ }
+ if(phase==='complete'&&p.current&&(p.operation==='rollback'||p.operation==='manual'||p.target===p.current)){
+  finishVerifiedUpdate(p.current);
+  return;
+ }
  if(phase==='idle'){resetUpdateView();return;}
  const completionKey=phase==='complete'?((p.started_at||'')+'|'+(p.target||'')+'|'+(p.updated_at||'')):'';
  if(phase==='complete'&&completionKey===hiddenCompletedUpdate){resetUpdateView();return;}
@@ -653,8 +669,6 @@ function renderUpdateProgress(p){
   reconnect.classList.remove('lost');
   reconnect.textContent='Connected · status verified at '+updateClock(p.updated_at)+(p.current?' · running '+p.current:'');
  }
- const button=$('updateReloadButton');
- if(button)button.classList.toggle('hidden',phase!=='complete'||(p.operation!=='manual'&&(!p.target||p.current!==p.target)));
  for(const li of document.querySelectorAll('[data-update-phase]')){
   const index=updateSequence.indexOf(li.dataset.updatePhase);
   const phaseIndex=updateSequence.indexOf(phase);
@@ -684,6 +698,8 @@ async function pollUpdateProgress(){
   if(!response.ok)throw Error('HTTP '+response.status);
   const payload=await response.json();
   lastConfirmedUpdateStatus=payload.updated_at||'';
+  const expected=sessionStorage.getItem('syncria-update-expected');
+  if(expected&&payload.current===expected&&payload.phase!=='failed'&&!payload.active){finishVerifiedUpdate(expected);return;}
   renderUpdateProgress(payload);
  }catch(error){
   if(updateRunning||currentView==='updates'){
@@ -707,12 +723,15 @@ async function startUpdate(operation){
  set('updatePhaseTitle','Requesting update');
  set('updateProgressMessage','Submitting update request to this Syncria instance.');
  set('updateConnectionStatus','Connecting to the update status endpoint…');
- $('updateError').classList.add('hidden');$('updateReloadButton').classList.add('hidden');
+ $('updateError').classList.add('hidden');
  $('installUpdateButton').disabled=true;$('rollbackUpdateButton').disabled=true;
  try{
   const response=await fetch('/api/update/progress',{method:'POST',credentials:'same-origin',cache:'no-store',body:new URLSearchParams({operation})});
   if(!response.ok)throw Error((await response.text()).trim()||('HTTP '+response.status));
-  renderUpdateProgress(await response.json());
+  const started=await response.json();
+  if(started.target)sessionStorage.setItem('syncria-update-expected',started.target);
+  sessionStorage.removeItem('syncria-update-refreshing');
+  renderUpdateProgress(started);
   updateRunning=true;
  }catch(error){
   updateRunning=false;
@@ -1041,6 +1060,10 @@ async function refreshDashboardStatus(){
   if(res.ok)applyLiveStatus(await res.json());
  }catch(_e){}
  finally{dashboardPollBusy=false}
+}
+if(new URLSearchParams(location.search).has('updated')){
+ sessionStorage.removeItem('syncria-update-refreshing');
+ sessionStorage.removeItem('syncria-update-expected');
 }
 connectLiveStatus();
 // Check quietly on startup so the nav can signal a verified available update.
