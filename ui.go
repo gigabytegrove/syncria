@@ -443,7 +443,7 @@ function startWizard(){
  $('relationshipType').disabled=false;
  $('editMappingWarning').classList.add('hidden');$('editResetMapping').checked=false;
  $('wizardModeLabel').textContent='New sync';$('wizardHeading').textContent='Connect your files.';
- $('createSyncButton').textContent='Save new sync (keep paused)';
+ $('createSyncButton').textContent='Save my sync (keep it off)';
  $('cloudDirection').value='bidirectional';
  $('createSyncButton').disabled=false;$('wizard').classList.remove('hidden');
  $('remoteValue').value='root';$('selectedDriveLabel').textContent='Entire My Drive';
