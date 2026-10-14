@@ -269,7 +269,7 @@ func pickConflict(policy string,l,r bridgeEntry)(string,error){
 // content MD5 for ordinary files, so only the NAS file needs to be read.
 // Dropbox's content_hash is NOT a normal SHA256 and must not be treated as one.
 func bridgeSameFirstRun(ctx context.Context,primary,secondary bridgeEndpoint,rel string,l,r bridgeEntry)(bool,error){
- if l.Size!=r.Size{return false,nil}
+ if l.Size>=0&&r.Size>=0&&l.Size!=r.Size{return false,nil}
  if _,drive:=primary.(*bridgeDriveEndpoint);drive&&len(l.Fingerprint)==32 {
   valid:=true
   for _,c:=range l.Fingerprint{
