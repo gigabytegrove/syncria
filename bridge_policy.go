@@ -212,6 +212,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
      return fmt.Errorf("Initial file conflict at %s: %s",rel,decision.Reason)
     }
     if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,decision.Direction,decision.Method,&l,&r);err!=nil{return err}
+    if decision.Direction=="primary"{countForward++}else{countBack++}
     if j.operationHook!=nil{
      target:="Secondary";if decision.Direction=="secondary"{target="Primary"}
      j.operationHook("resolve first-run conflict",rel,decision.Direction,target)
@@ -225,11 +226,13 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     if oneWay&&j.Provider=="nas_bridge"{return fmt.Errorf("Both files changed at %s; one-way NAS relationship will not overwrite them",rel)}
     if oneWay{
      if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,"primary",conflictPrimary,&l,&r);err!=nil{return err}
+     countForward++
      if j.operationHook!=nil{j.operationHook("one-way source wins",rel,"Primary","Secondary")}
     }else{
     direction,method,resolveErr:=a.selectResolution(j,key,rel,policy,l,r)
     if resolveErr!=nil{_ =a.checkpointBridge(j);return fmt.Errorf("File conflict at %s: %w",rel,resolveErr)}
     if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,direction,method,&l,&r);err!=nil{return err}
+    if direction=="primary"{countForward++}else{countBack++}
     if j.operationHook!=nil{j.operationHook("resolve conflict",rel,direction,func()string{if direction=="primary"{return "Secondary"};return "Primary"}())}
     a.clearConflict(j,key,rel)
     }
