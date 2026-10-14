@@ -37,10 +37,11 @@ type bridgeEndpoint interface {
 type bridgeSMBEndpoint struct {
  client *directSMB
  root string
+ scanHook func(string,int64)
 }
 func (b *bridgeSMBEndpoint) Close(){if b.client!=nil{b.client.Close()}}
 func (b *bridgeSMBEndpoint) Scan(ctx context.Context)(map[string]bridgeEntry,error){
- files,err:=b.client.scan(ctx,b.root);if err!=nil{return nil,err}
+ files,err:=b.client.scanWithProgress(ctx,b.root,b.scanHook);if err!=nil{return nil,err}
  out:=make(map[string]bridgeEntry,len(files))
  for rel,f:=range files{out[rel]=bridgeEntry{Size:f.Size,Fingerprint:f.Fingerprint,Folder:!f.File,Modified:f.Modified}}
  return out,nil
