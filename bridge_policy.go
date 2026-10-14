@@ -239,7 +239,12 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     if err!=nil{return err}
     recordTransfer(j,true,bytes);countForward++;if j.operationHook!=nil{j.operationHook("copy",rel,"Primary","Secondary")}
    }else if changedSecondary{
-    if oneWay{return fmt.Errorf("One-way destination was modified at %s; no overwrite attempted",rel)}
+    if oneWay{
+     checksum:="";if len(l.Fingerprint)==32||len(l.Fingerprint)==64{checksum=l.Fingerprint}
+     r,err=bridgeCopy(ctx,primary,secondary,rel,checksum,func(n int64){if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
+     if err!=nil{return err}
+     if j.operationHook!=nil{j.operationHook("one-way source wins",rel,"Primary","Secondary")}
+    }else{
     var bytes int64
     l,err=bridgeCopy(ctx,secondary,primary,rel,"",func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes,j.LastDownloadBytes+n)}})
     if err!=nil{return err}
