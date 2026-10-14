@@ -102,7 +102,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
  right,err:=secondary.Scan(ctx);if err!=nil{return fmt.Errorf("Secondary scan: %w",err)}
  if j.PairStates==nil{j.PairStates=map[string]map[string]Item{}}
  prev:=j.PairStates[key];if prev==nil{prev=map[string]Item{}}
- next:=make(map[string]Item,len(prev));for k,v:=range prev{next[k]=v}
+ next:=make(map[string]Item,len(prev));for k,v:=range prev{if !ignoredSyncPath(k){next[k]=v}}
  keys:=map[string]bool{}
  for k:=range left{keys[k]=true}
  for k:=range right{keys[k]=true}
