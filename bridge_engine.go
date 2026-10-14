@@ -87,7 +87,7 @@ func (b *bridgeDriveEndpoint) Mkdir(ctx context.Context,rel string)(bridgeEntry,
  if id:=b.folders[rel];id!=""{return bridgeEntry{ID:id,Folder:true},nil}
  parent:=b.folders[parentRel(rel)]
  if parent==""{return bridgeEntry{},fmt.Errorf("Google Drive parent missing for %q",rel)}
- f,err:=b.app.makeFolder(ctx,b.account,parent,basename(rel));if err!=nil{return bridgeEntry{},err}
+ f,err:=b.app.makeFolder(ctx,b.account,parent,originalDriveName(basename(rel)));if err!=nil{return bridgeEntry{},err}
  b.folders[rel]=f.ID
  return bridgeEntry{ID:f.ID,Folder:true},nil
 }
@@ -101,7 +101,7 @@ func (b *bridgeDriveEndpoint) Open(ctx context.Context,rel string)(io.ReadCloser
 }
 func (b *bridgeDriveEndpoint) Put(ctx context.Context,rel string,input io.Reader,size int64,expectedMD5 string,onBytes func(int64))(bridgeEntry,error){
  if size<0{return bridgeEntry{},errors.New("Google Drive uploads require a known source file size")}
- name:=basename(rel)
+ name:=originalDriveName(basename(rel))
  parent:=b.folders[parentRel(rel)]
  if parent==""{return bridgeEntry{},fmt.Errorf("Google Drive parent missing for %s",rel)}
  meta:=map[string]any{"name":name}
