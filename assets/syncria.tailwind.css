@@ -136,3 +136,118 @@ input:not([type=checkbox]):not([type=radio]),select,textarea{border-color:#cdd9e
 @media(max-width:530px){.overview-toolbar{align-items:flex-start;flex-direction:column}.page-heading h1{font-size:24px}.header-version{display:none}.topline{align-items:flex-start}.overview-metric{min-height:99px;padding:15px}.overview-metric strong{font-size:23px}.overview-list-panel,.welcome-track,.release-panel{padding:18px}.workspace-intro{align-items:flex-start;gap:12px}.workspace-intro .primary{min-width:max-content}.overview-metric small{font-size:9px}}
 
 .action-feedback{display:flex;align-items:center;justify-content:space-between;gap:15px}.feedback-dismiss{border:0;background:transparent;color:#688396;font-size:23px;line-height:1;padding:1px 5px;cursor:pointer;border-radius:5px}.feedback-dismiss:hover{background:#daeef7;color:#225f7e}
+
+
+/* Syncria balanced visual system — recognizable product character without
+   marketing-dashboard effects. Shared by every screen and responsive state. */
+:root{--bg:#f2f5f9;--surface:#fff;--surface2:#f8fafc;--line:#dce6ef;--ink:#18344b;--sub:#62798f;--accent:#166b9b;--accent2:#eaf5fb;--nav:#fbfdff;--radius:12px;--shadow:0 3px 16px rgba(33,70,103,.045)}
+body{background:var(--bg);color:var(--ink)}
+.sidebar{background:linear-gradient(180deg,#fcfeff 0%,#f5f9fd 100%);border-right:1px solid #d7e4ee;box-shadow:3px 0 15px rgba(24,58,86,.025)}
+.sidebar-brand{padding:2px 10px 5px}
+.sidebar-logo img{width:171px;height:51px}
+.sidebar-edition{display:flex;align-items:center;height:auto;min-height:19px;font-size:10px;color:#6790a9;font-weight:650;letter-spacing:.01em}
+.sidebar-edition:after{content:"Local sync management"}
+.sidebar-edition .pulse-dot{width:7px;height:7px;background:#2b9b7d;box-shadow:0 0 0 3px #e1f4ed;margin-right:9px}
+.sidebar-navigation{gap:26px}
+.nav-section-label{color:#849bb0;font-size:10px;letter-spacing:.1em;margin-bottom:6px}
+.nav{gap:4px}
+.nav button{padding:11px 13px;border:1px solid transparent;border-radius:9px;color:#4b657b}
+.nav button:hover{background:#eef5fa;border-color:#e2edf5;color:#1b5377}
+.nav button.active{background:#e7f3fb;border-color:#d4e8f5;color:#0c5987;box-shadow:inset 0 0 0 1px #e8f5fd}
+.nav button.active:before{background:#288ac0}
+.nav-icon{color:#6289a4}
+.nav button.active .nav-icon{color:#146fa2}
+.nav-copy strong{font-weight:620}
+.sidebar-bottom{border-color:#dce8f1;color:#8498aa}
+.sidebar-version strong{color:#426782}
+.content{max-width:1490px}
+.topline{border-bottom:1px solid #d9e4ed;margin-bottom:26px}
+.eyebrow{color:#5e88a4;font-size:10px;letter-spacing:.1em;font-weight:730;text-transform:uppercase}
+.page-heading h1{color:#142f44;font-size:28px;letter-spacing:-.04em;font-weight:720}
+.header-version{background:#eaf2f8;border:1px solid #d9e7f0;color:#547a94;border-radius:99px;padding:5px 11px;font-size:11px}
+.primary,.hero-cta{background:#156c9e;border-color:#156c9e;box-shadow:0 2px 5px rgba(21,108,158,.13);font-weight:650}
+.primary:hover,.hero-cta:hover{background:#0b5886;border-color:#0b5886;box-shadow:0 3px 8px rgba(21,108,158,.17)}
+.secondary,.logout{background:#fff;border-color:#cbdce8;box-shadow:0 1px 2px rgba(20,54,80,.035)}
+.secondary:hover,.logout:hover{background:#f2f8fc;border-color:#a8cade;color:#145f8c}
+.panel,.overview-list-panel,.relationship-card,.connection-drawer,.provider-account,.activity-table-shell,.release-panel,.sync-builder,.flow-library-empty,.welcome-track,.overview-metric,.provider-panel{border:1px solid #dce6ef;border-radius:12px;box-shadow:0 3px 16px rgba(31,71,103,.043)}
+.notice{background:#eaf5fc;border:1px solid #cfe5f2;border-left:3px solid #3b94c1;color:#285c7a;border-radius:9px}
+.overview-toolbar{border:1px solid #d4e5f0;background:linear-gradient(115deg,#f9fcfe,#eaf5fc);border-radius:12px;padding:21px 25px;margin-bottom:19px;min-height:101px}
+.overview-toolbar strong{color:#134f74;font-size:21px;font-weight:720;letter-spacing:-.035em}
+.overview-toolbar p{font-size:13px;color:#587d98;margin-top:6px}
+.overview-metrics{gap:15px;margin-bottom:23px}
+.overview-metric{position:relative;min-height:135px;padding:20px 20px 20px 22px;overflow:hidden;align-items:flex-start}
+.overview-metric:before{content:"";position:absolute;left:0;top:16px;bottom:16px;width:3px;border-radius:0 3px 3px 0;background:#83badd}
+.overview-metric:nth-child(2):before{background:#63aaa9}
+.overview-metric:nth-child(3):before{background:#9cabe2}
+.overview-metric:nth-child(4):before{background:#6baa8b}
+.overview-metric>div{flex:1}
+.overview-metric small{font-size:10px;color:#6f8597;font-weight:750;letter-spacing:.065em}
+.overview-metric strong{font-size:30px;color:#183b55;font-weight:730;letter-spacing:-.045em;margin:9px 0 7px}
+.overview-metric span{color:#7a8fa0}
+.metric-symbol{display:grid;width:31px;height:31px;place-items:center;margin-left:auto;order:2;background:#eef6fc;color:#3c7faa;border-radius:8px;font-size:17px;font-weight:600}
+.overview-metric:nth-child(2) .metric-symbol{background:#eaf7f6;color:#438c88}
+.overview-metric:nth-child(3) .metric-symbol{background:#f0f1fa;color:#737fba}
+.overview-metric:nth-child(4) .metric-symbol{background:#edf8f1;color:#4a946b}
+.welcome-track{border-color:#d7e6f0;padding:23px 25px 25px}
+.welcome-track-intro h2{font-size:20px;font-weight:720;color:#1e4965}
+.welcome-track-steps{gap:14px}
+.welcome-track-steps>div{background:#f9fcfe;border:1px solid #ddeaf3;border-radius:10px;padding:19px 20px}
+.track-index{display:inline-flex;align-items:center;justify-content:center;width:29px;height:29px;background:#e6f2fa;color:#246e9b;border:1px solid #d7e9f4;border-radius:8px;letter-spacing:0;margin-bottom:14px;font-weight:730}
+.welcome-track-steps strong{font-weight:690;font-size:14px}
+.welcome-track-steps button{color:#146d9f}
+.welcome-track-steps button:after{content:"  →";font-weight:700}
+.overview-list-panel{padding:23px 25px}
+.section-heading h2{color:#1b425c;font-size:19px;font-weight:710}
+.section-heading p{color:#778b9c}
+.flow-row,.place-summary{padding:14px 0}
+.flow-row-icon,.place-summary-icon,.flow-card-emblem{background:#edf6fc;color:#3b7ea4;border:1px solid #d9eaf5;border-radius:9px}
+.flow-row-open{border-radius:8px;background:#f9fcfe;border-color:#d5e4ee;color:#286e94}
+.flow-row-open:hover{background:#e7f3fb}
+.overview-empty{background:#f9fcfe;border:1px dashed #d8e7f1;border-radius:10px;margin-top:10px;min-height:150px}
+.overview-empty .secondary{font-size:12px;min-height:34px;padding:7px 11px}
+.workspace-intro{padding:14px 0 4px;gap:22px}
+.workspace-intro p{color:#58768e}
+.flow-library-empty{background:radial-gradient(ellipse at 50% 0%,#f0f8fd 0%,#fff 68%);border:1px dashed #cbdfea;min-height:280px}
+.flow-library-empty .empty-symbol{width:57px;height:57px;border:1px solid #dcecf6;background:#eaf5fb;color:#297eaf}
+.flow-library-empty h3{color:#1a4967;font-weight:700;font-size:18px}
+.flow-library-empty p{font-size:13px;color:#6d8496}
+.activity-scoreboard{gap:15px}
+.activity-score{border-radius:12px;border-color:#dce6ef;box-shadow:0 3px 16px rgba(31,71,103,.04);padding:22px 23px}
+.activity-score-highlight{background:linear-gradient(135deg,#f0f9fe,#ffffff);border-color:#cce5f4}
+.activity-score strong{color:#1c4560;font-weight:740;font-size:29px}
+.activity-score small{letter-spacing:.07em}
+.activity-row{border-radius:11px;border-color:#dce6ef;box-shadow:0 2px 11px rgba(31,71,103,.035)}
+.activity-row-head{background:#f9fcfe}
+.activity-row-numbers>div{border:1px solid #e2ebf1;background:#f9fbfd;border-radius:8px}
+.connection-list{padding:22px 25px;gap:14px}
+.connection-row{padding:17px 19px;border-radius:10px;border-color:#dce9f2;background:#fbfdff}
+.connection-emblem{border:1px solid #d5e8f4;border-radius:10px;background:#eaf4fb;color:#34769a}
+.connection-copy strong{font-size:14px;color:#1a4963;font-weight:700}
+.connection-copy p{color:#577b92}
+.provider-panel{overflow:hidden}
+.provider-top{background:linear-gradient(120deg,#f7fbfe,#fff);border-bottom-color:#ddeaf2;padding:23px 24px}
+.provider-icon{border-radius:10px;background:#eaf5fb;border-color:#d5e8f4;color:#176c9e;width:43px;height:43px}
+.provider-top h3{font-weight:720;color:#1c4967}
+.provider-account{padding:17px 0}
+.provider-add{background:#f8fbfd}
+.release-panel{padding:23px 24px}
+.release-well{background:linear-gradient(110deg,#f3f9fd,#fcfdff);border:1px solid #dbe9f3;border-radius:11px;padding:23px 24px}
+.release-well strong{font-size:28px;color:#164665}
+.update-aside{background:#fbfdff;border-color:#dce6ef}
+.update-ready{border-color:#d3e8f4}
+.sync-builder{border-color:#d4e6f2}
+.builder-heading{background:#f4f9fd;border-bottom-color:#dceaf3;padding:24px 26px}
+.builder-heading h2{color:#195176;font-weight:720}
+.sync-builder>.step-indicator{background:#fbfdfe}
+.step-indicator span.active{background:#e0f0fa;color:#145e8e;border:1px solid #cce2f1}
+.selected,.review-grid>div{background:#f9fcfe;border-color:#dceaf3;border-radius:9px}
+.settings-grid{gap:20px}
+#view-settings .panel{padding:25px 27px;border-color:#dce6ef}
+#view-settings .panel h2{color:#194969;font-size:19px;font-weight:700}
+.field{color:#35566e}
+input:not([type=checkbox]):not([type=radio]),select,textarea{background:#fff;border-color:#cbdce8;border-radius:8px;min-height:41px}
+input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{border-color:#419bc9;box-shadow:0 0 0 3px rgba(65,155,201,.10)}
+@media(max-width:1000px){.overview-metric{min-height:125px}.metric-symbol{width:27px;height:27px}.overview-toolbar{min-height:auto}.overview-list-panel{padding:20px}}
+@media(max-width:800px){.sidebar{background:#fbfdff;box-shadow:none}.sidebar-brand{display:none}.nav button.active:before{display:none}.overview-toolbar{padding:19px 21px}.page-heading h1{font-size:25px}.header-version{display:none}}
+@media(max-width:530px){.overview-toolbar{padding:17px}.overview-toolbar strong{font-size:19px}.overview-metric{min-height:115px;padding:17px 14px}.overview-metric strong{font-size:24px}.metric-symbol{width:24px;height:24px;font-size:14px}.welcome-track-steps>div{padding:16px}.activity-score{padding:17px}.release-well{padding:19px}.connection-list{padding:16px}}
+@media(prefers-reduced-motion:reduce){.nav button,.primary,.secondary{transition:none}}
