@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/syncria-logo.svg" alt="Syncria logo" width="520">
+</p>
+
 # Syncria
 
 **Keep your files together, wherever you save them.**
