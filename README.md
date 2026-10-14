@@ -6,7 +6,7 @@
 
 **Keep your files together, wherever you save them.**
 
-**Interface (v0.6.11):** Syncria uses a quieter, locally bundled Tailwind CSS design with straightforward navigation, forms, progress, and storage management. No browser CDN or external UI service is needed.
+**Interface (v0.7.0):** Syncria uses a quieter, locally bundled Tailwind CSS design with straightforward navigation, forms, progress, and storage management. No browser CDN or external UI service is needed.
 
 Syncria helps you keep folders matched between Google Drive, Dropbox, and storage boxes on your home or work network. Those storage boxes are called **NAS devices**.
 
@@ -68,7 +68,7 @@ Cloud-to-NAS relationships support **Both ways: cloud ↔ NAS** (the legacy defa
 
 Open **My Syncs** and choose **Test run · Preview changes** on a sync. Syncria reads both locations without copying or deleting files. You can inspect the planned file-by-file actions, see the named source and destination of each transfer, and identify conflicts or deletions before a real run.
 
-The preview is a read-only estimate based on the current scan. During a first cloud-to-NAS sync, if both locations contain the same file path, Syncria proposes the copy with the newer modification timestamp, shows both timestamps, and labels the proposed replacement **Replace if contents differ**. The real sync checks file contents first; equal or unreliable timestamps require manual review. The first-run preference can be changed to manual in the cloud sync wizard. Be aware that moving a file between NAS devices can reset its timestamp, so newer does not always mean better. The view includes counts across the complete scan and up to 500 file rows. A live sync shows the current filename and a recent history of up to 100 **actual** operations.
+The preview is a read-only estimate based on the current scan. During a first cloud-to-NAS sync, if both locations contain the same file path, Syncria proposes the copy with the newer modification timestamp, shows both timestamps, and labels the proposed timestamp-based replacement **Replace**. The real sync uses modification timestamps and size metadata without reading file contents merely to decide whether a transfer is needed; ambiguous metadata requires review. The first-run preference can be changed to manual in the cloud sync wizard. Be aware that moving a file between NAS devices can reset its timestamp, so newer does not always mean better. The view includes counts across the complete scan and up to 500 file rows. A live sync shows the current filename and a recent history of up to 100 **actual** operations.
 
 **FreeFileSync interoperability:** Syncria intentionally excludes the exact filename `sync.ffs_db` (case-insensitive) from all connected storage types and from legacy sync checkpoints. A prior failure message remains labeled as the last failed run until a newer sync completes. This file is FreeFileSync's private comparison database, and Google Drive can hold multiple copies with that name. Existing copies are left untouched in their original location. Other filenames, including other `.ffs_db` files, are not silently excluded. Drive sibling files with the same name are represented on NAS using distinct, stable names derived from their Drive IDs. Existing Drive files are not renamed.
 
