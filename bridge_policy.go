@@ -137,7 +137,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     }
     if err!=nil{return err}
     next[rel]=Item{ID:l.ID,MD5:l.Fingerprint,LocalMD5:r.Fingerprint,Folder:l.Folder}
-    if !l.Folder{recordTransfer(j,true,copied);countForward++}
+    if !l.Folder{recordTransfer(j,true,copied);countForward++;if j.operationHook!=nil{j.operationHook("copy",rel,"Primary","Secondary")}}
     continue
    }
    surviving:=secondary;survivor:=r
@@ -159,6 +159,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    }else{
     if e:=surviving.Delete(ctx,rel);e!=nil{return e}
    }
+   if j.operationHook!=nil{j.operationHook("delete",rel,missingSide,"Other side")}
    delete(next,rel)
    j.PairStates[key]=next
    // A NAS-origin deletion removes the cloud copy on the first relationship.
@@ -180,7 +181,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    var bytes int64
    l,err=bridgeCopy(ctx,secondary,primary,rel,"",func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
    if err!=nil{return err}
-   recordTransfer(j,false,bytes);countBack++
+   recordTransfer(j,false,bytes);countBack++;if j.operationHook!=nil{j.operationHook("copy",rel,"Secondary","Primary")}
    recordCloudOrigin(j,key,rel,l.Fingerprint)
    // Persist the origin marker before another NAS relationship can observe this cloud version.
    if err=a.checkpointBridge(j);err!=nil{return err}
@@ -190,7 +191,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    if len(l.Fingerprint)==32||len(l.Fingerprint)==64{lChecksum=l.Fingerprint}
    r,err=bridgeCopy(ctx,primary,secondary,rel,lChecksum,func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
    if err!=nil{return err}
-   recordTransfer(j,true,bytes);countForward++
+   recordTransfer(j,true,bytes);countForward++;if j.operationHook!=nil{j.operationHook("copy",rel,"Primary","Secondary")}
   }else if !tracked{
    same,err:=bridgeSameStreams(ctx,primary,secondary,rel)
    if err!=nil{return err}
@@ -199,6 +200,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     direction,method,resolveErr:=a.selectResolution(j,key,rel,policy,l,r)
     if resolveErr!=nil{_ =a.checkpointBridge(j);return fmt.Errorf("Initial file conflict at %s: %w",rel,resolveErr)}
     if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,direction,method,&l,&r);err!=nil{return err}
+    if j.operationHook!=nil{j.operationHook("resolve conflict",rel,direction,func()string{if direction=="primary"{return "Secondary"};return "Primary"}())}
     a.clearConflict(j,key,rel)
    }
   }else{
@@ -209,19 +211,20 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     direction,method,resolveErr:=a.selectResolution(j,key,rel,policy,l,r)
     if resolveErr!=nil{_ =a.checkpointBridge(j);return fmt.Errorf("File conflict at %s: %w",rel,resolveErr)}
     if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,direction,method,&l,&r);err!=nil{return err}
+    if j.operationHook!=nil{j.operationHook("resolve conflict",rel,direction,func()string{if direction=="primary"{return "Secondary"};return "Primary"}())}
     a.clearConflict(j,key,rel)
    }else if changedPrimary{
     var bytes int64
     checksum:="";if len(l.Fingerprint)==32||len(l.Fingerprint)==64{checksum=l.Fingerprint}
     r,err=bridgeCopy(ctx,primary,secondary,rel,checksum,func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
     if err!=nil{return err}
-    recordTransfer(j,true,bytes);countForward++
+    recordTransfer(j,true,bytes);countForward++;if j.operationHook!=nil{j.operationHook("copy",rel,"Primary","Secondary")}
    }else if changedSecondary{
     if oneWay{return fmt.Errorf("One-way destination was modified at %s; no overwrite attempted",rel)}
     var bytes int64
     l,err=bridgeCopy(ctx,secondary,primary,rel,"",func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes,j.LastDownloadBytes+n)}})
     if err!=nil{return err}
-    recordTransfer(j,false,bytes);countBack++
+    recordTransfer(j,false,bytes);countBack++;if j.operationHook!=nil{j.operationHook("copy",rel,"Secondary","Primary")}
    recordCloudOrigin(j,key,rel,l.Fingerprint)
    // Persist the origin marker before another NAS relationship can observe this cloud version.
    if err=a.checkpointBridge(j);err!=nil{return err}
