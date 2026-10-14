@@ -105,41 +105,71 @@ func (a *App) beginUpdate(operation string) error {
  a.updateBusy=true
  return nil
 }
+// An update must survive a process restart while it is running.
+// Successful updates are NOT history entries: after a brief, in-memory
+// confirmation the Updates page returns to its normal ready state.
+// Failures remain on disk so people can see what went wrong.
+const completedUpdateGrace = 20 * time.Second
+
+func (a *App) clearSuccessfulUpdateLocked() {
+ if a.updateProgress.Phase!="complete" {return}
+ if err:=os.Remove(a.updateProgressPath());err!=nil&&!os.IsNotExist(err){
+  log.Printf("cannot clear completed Syncria update state: %v",err)
+ }
+}
 func (a *App) finishUpdate(phase,message,detail string) {
  a.setUpdateProgress(phase,message,"",func()int{if phase=="complete"{return 100};return -1}(),-1,-1,detail)
  if detail!=""{a.updateEvent(phase,detail)}
  a.updateMu.Lock()
+ if phase=="complete"{a.clearSuccessfulUpdateLocked()}
  a.updateBusy=false
  a.updateMu.Unlock()
 }
 func (a *App) updateProgressSnapshot() UpdateProgress {
  a.updateMu.Lock()
  defer a.updateMu.Unlock()
- if a.updateProgress.Phase!="" {return a.updateProgress}
- b,err:=os.ReadFile(a.updateProgressPath())
- if err==nil{_ =json.Unmarshal(b,&a.updateProgress)}
- if a.updateProgress.Phase==""{return UpdateProgress{Phase:"idle",Message:"No update in progress"}}
+ if a.updateProgress.Phase==""{
+  b,err:=os.ReadFile(a.updateProgressPath())
+  if err==nil{_ =json.Unmarshal(b,&a.updateProgress)}
+ }
+ if a.updateProgress.Phase=="complete"{
+  a.clearSuccessfulUpdateLocked()
+  if a.updateProgress.UpdatedAt.IsZero()||time.Since(a.updateProgress.UpdatedAt)>=completedUpdateGrace{
+   a.updateProgress=UpdateProgress{}
+  }
+ }
+ if a.updateProgress.Phase==""{return UpdateProgress{Phase:"idle",Message:"Syncria is ready"}}
  return a.updateProgress
 }
 
-// Called by the newly launched Syncria binary. No separate host service,
-// Docker socket, update container or fixed-time page reload is necessary.
+// The new executable confirms the restart. At that point the status file is
+// removed: completed updates never remain in persistent user-facing history.
 func (a *App) reconcileUpdateOnStartup() {
  a.updateMu.Lock()
  defer a.updateMu.Unlock()
  b,err:=os.ReadFile(a.updateProgressPath());if err!=nil{return}
  var p UpdateProgress
  if json.Unmarshal(b,&p)!=nil{return}
- if p.Active {
-  if p.Phase=="restarting" && ((p.Operation=="install"&&p.Target==appVersion)||(p.Operation=="rollback"&&p.From!=appVersion)||p.Operation=="manual") {
-   p.Phase="complete";p.Percent=100;p.Message="Verified running version "+appVersion+"; update successful";p.Error="";p.Active=false
-   p.Events=append(p.Events,UpdateEvent{At:time.Now().UTC(),Phase:"complete",Detail:"Application responded as "+appVersion+" after restart"})
-  }else{
-   p.Phase="failed";p.Active=false
-   p.Error="The update was interrupted or the expected version did not start. Inspect startup logs before trying again."
-   p.Events=append(p.Events,UpdateEvent{At:time.Now().UTC(),Phase:"failed",Detail:p.Error})
-   p.Message="Update did not complete"
+ if !p.Active&&p.Phase=="complete"{
+  a.updateProgress=UpdateProgress{}
+  if err:=os.Remove(a.updateProgressPath());err!=nil&&!os.IsNotExist(err){
+   log.Printf("cannot remove old completed update state: %v",err)
   }
+  return
+ }
+ if p.Active {
+  if p.Phase=="restarting"&&((p.Operation=="install"&&p.Target==appVersion)||(p.Operation=="rollback"&&p.From!=appVersion)||p.Operation=="manual"){
+   p.Phase="complete";p.Percent=100;p.Message="Syncria "+appVersion+" is running";p.Error="";p.Active=false
+   p.Events=append(p.Events,UpdateEvent{At:time.Now().UTC(),Phase:"complete",Detail:"Verified running version "+appVersion+" after restart"})
+   p.UpdatedAt=time.Now().UTC()
+   a.updateProgress=p
+   a.clearSuccessfulUpdateLocked()
+   return
+  }
+  p.Phase="failed";p.Active=false
+  p.Error="The update was interrupted or the expected version did not start. Inspect startup logs before trying again."
+  p.Events=append(p.Events,UpdateEvent{At:time.Now().UTC(),Phase:"failed",Detail:p.Error})
+  p.Message="Update did not complete"
   if err:=a.writeUpdateProgressLocked(p);err!=nil{log.Printf("cannot reconcile update progress: %v",err)}
  }else{a.updateProgress=p}
 }
