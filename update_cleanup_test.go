@@ -73,7 +73,7 @@ func TestPolishedUIKeepsAllFunctionality(t *testing.T){
   `id="view-activity"`,`id="view-updates"`,`id="view-settings"`,
   `id="syncWizard"`,`id="nasTargets"`,`id="conflictPolicy"`,`id="scheduleMode"`,
   `id="propagateDeletions"`,`id="recoveryEnabled"`,
-  `id="updateFlow"`,`id="updateHistoryPanel"`,`id="updateReadyPanel"`,
+  `id="updateFlow"`,`id="updateHistoryPanel"`,`id="updateStatusCard"`,`id="updateStatusHeadline"`,`id="updateReleaseNotes"`,
   `id="updateEventTimeline"`,`id="updateVerifiedBytes"`,`id="updateProgressBar"`,
   `/api/recovery/undo`,`/api/conflicts/resolve`,
  }
@@ -81,7 +81,7 @@ func TestPolishedUIKeepsAllFunctionality(t *testing.T){
  for _,term:=range []string{"completedUpdateTimer","resetUpdateView()","hiddenCompletedUpdate","phase==='idle'","progressBox.classList.toggle('hidden',!running)"}{
   if !strings.Contains(newUI,term){t.Errorf("Missing clean completed/idle handling: %s",term)}
  }
- for _,term:=range []string{".sync-library",".onboarding-disclosure",".update-ready",".update-explainer",".relationship-card",".quick-start-grid"}{
+ for _,term:=range []string{".sync-library",".onboarding-disclosure",".update-console",".update-primary",".relationship-card",".quick-start-grid"}{
   if !strings.Contains(v051Theme,term){t.Errorf("Incomplete unified UI styling: %s",term)}
  }
 }
