@@ -1210,12 +1210,7 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 		}
         if action=="cancel_job" {
             a.mu.Unlock()
-            if _,running:=a.runs.Load(id);!running {redirect(w,r,"Sync is not currently running");return}
-            value,exists:=a.runCancels.Load(id)
-            if !exists {redirect(w,r,"Sync is starting; try Stop again in a moment");return}
-            a.stopRequests.Store(id,true)
-            a.setSyncProgress(id,func(p *SyncProgress){p.Phase="stopping"})
-            value.(context.CancelFunc)()
+            if !a.stopRunningJob(id){redirect(w,r,"Sync is not currently running or is starting; try again");return}
             redirect(w,r,"Stop requested. The current file operation will finish or cancel safely; automatic scheduling is unchanged.")
             return
         }
