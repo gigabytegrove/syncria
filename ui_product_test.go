@@ -32,10 +32,10 @@ func TestNewProductUIHasItsOwnVisualIdentity(t *testing.T){
   if !strings.Contains(newUI,part){t.Errorf("Missing redesigned layout: %s",part)}
  }
  for _,part:=range []string{
-  "--nav:#0b1b36","--aqua:#10d7d4",
-  ".command-hero",".flow-card-main",".provider-panel",
+  "--nav:#fff","--accent:#336b92",
+  ".command-hero",".flow-card-main",".provider-account",
   ".activity-scoreboard",".sync-builder",".release-well",
-  "@media(max-width:760px)","@media(max-width:530px)",
+  "@media(max-width:800px)","@media(max-width:530px)",
  }{
   if !strings.Contains(v051Theme,part){t.Errorf("Missing style system: %s",part)}
  }
