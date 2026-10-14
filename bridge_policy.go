@@ -2,10 +2,8 @@ package main
 
 import (
  "context"
- "crypto/md5"
  "errors"
  "fmt"
- "io"
  "path"
  "sort"
  "strings"
@@ -283,30 +281,24 @@ func pickConflict(policy string,l,r bridgeEntry)(string,error){
  default:return "",fmt.Errorf("Unrecognized conflict policy %q",policy)
  }
 }
-// Compare a first-run pair before overwriting. Google Drive publishes a
-// content MD5 for ordinary files, so only the NAS file needs to be read.
-// Dropbox's content_hash is NOT a normal SHA256 and must not be treated as one.
+// First-run comparisons are metadata-only. Reading a 30 GB NAS file just to
+// decide whether to sync is not acceptable: modification time is the agreed
+// source of truth, with size acting only as a safety check for equal times.
+// File contents are streamed only when an actual transfer is needed.
 func bridgeSameFirstRun(ctx context.Context,primary,secondary bridgeEndpoint,rel string,l,r bridgeEntry)(bool,error){
- if l.Size>=0&&r.Size>=0&&l.Size!=r.Size{return false,nil}
- if _,drive:=primary.(*bridgeDriveEndpoint);drive&&len(l.Fingerprint)==32 {
-  valid:=true
-  for _,c:=range l.Fingerprint{
-   if !((c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F')){valid=false;break}
-  }
-  if valid{return bridgeSameContent(ctx,secondary,rel,l.Fingerprint)}
+ if err:=ctx.Err();err!=nil{return false,err}
+ if l.Modified.IsZero()||r.Modified.IsZero(){
+  return false,fmt.Errorf("Cannot compare %s: a file modification timestamp is missing; manual review required",rel)
  }
- return bridgeSameStreams(ctx,primary,secondary,rel)
+ if l.Modified.Equal(r.Modified) {
+  if l.Size!=r.Size{
+   return false,fmt.Errorf("Cannot compare %s: matching timestamps but differing sizes; manual review required",rel)
+  }
+  return true,nil
+ }
+ return false,nil
 }
 
-func bridgeSameStreams(ctx context.Context,a,b bridgeEndpoint,rel string)(bool,error){
- ar,as,err:=a.Open(ctx,rel);if err!=nil{return false,err};defer ar.Close()
- br,bs,err:=b.Open(ctx,rel);if err!=nil{return false,err};defer br.Close()
- if as!=bs{return false,nil}
- ah:=md5.New();bh:=md5.New()
- if _,err=io.Copy(ah,ar);err!=nil{return false,err}
- if _,err=io.Copy(bh,br);err!=nil{return false,err}
- return string(ah.Sum(nil))==string(bh.Sum(nil)),nil
-}
 func resolveBridgeConflict(ctx context.Context,j *Job,p,s recoverableBridgeEndpoint,rel,direction,policy string,l,r *bridgeEntry)error{
  if policy==conflictKeepBoth{
   // Retain the secondary version under an explicitly distinguishable name
