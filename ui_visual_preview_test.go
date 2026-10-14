@@ -26,7 +26,7 @@ func TestProduceUIBrowserPreview(t *testing.T){
   Metrics DashboardTotals
   MountingEnabled bool
  }{
-  Version:"v0.6.2",Configured:true,Logged:true,
+  Version:"v0.6.3",Configured:true,Logged:true,
   Accounts:[]Account{{ID:"google-demo",Email:"home@example.com"}},
   DropboxAccounts:[]DropboxAccount{{ID:"dropbox-demo",Email:"family@example.com"}},
   Shares:[]StorageShare{
