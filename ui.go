@@ -181,6 +181,13 @@ code{overflow-wrap:anywhere}
 <div id="wizard3" class="step"><h2>Step 3: How should this sync work?</h2><p class="muted">The usual choices are already picked for you. You can change them whenever you set up a new sync.</p>
 <label class="field">How often should Syncria check your files? <span class="field-help">Checking looks for files that are new, changed, or missing.</span><select id="syncInterval" name="interval"><option value="5">Every 5 minutes</option><option value="10">Every 10 minutes</option><option value="15">Every 15 minutes</option><option value="30">Every 30 minutes</option><option value="60">Every hour</option><option value="360">Every 6 hours</option><option value="1440">Daily</option></select></label>
 <details class="simple-details"><summary>More choices about when to check</summary><label class="field">When should Syncria check? <span class="field-help">“When a file changes” asks your NAS to tell Syncria when it notices changes. Cloud changes are also checked every 5 minutes.</span><select id="scheduleMode" name="schedule_mode" onchange="scheduleModeChanged()"><option value="interval">Every few minutes (recommended)</option><option value="changes">When a NAS file changes, plus regular checks</option></select></label></details>
+<div id="cloudFirstRunFields" class="panel"><label class="field">If the same file is already on both sides when this sync starts
+<span class="field-help">Syncria compares actual file contents before replacing anything. When the contents differ, decide how to choose the first copy.</span>
+<select id="initialConflictPolicy" name="initial_conflict_policy">
+<option value="newer">Use the file with the newer modification time (recommended)</option>
+<option value="manual">Ask me which copy to keep</option>
+</select></label>
+<p class="muted">Check the dry run first. Copying files between devices can change their modification times, so newer does not always mean better. Later conflicts still require their own resolution.</p></div>
 <div id="nasDirectionFields" class="hidden"><label class="field">Which way should files go? <span class="field-help">One-way copies from the first NAS to the others. Both ways lets changes travel between them.</span><select id="nasDirection" name="direction" onchange="nasDirectionChanged()"><option value="one_way">One way: first NAS → other NAS</option><option value="bidirectional">Both ways: keep both NAS boxes matched</option></select></label>
 <div id="nasConflictFields" class="hidden"><label class="field">What if the same file was changed in both places? <span class="field-help">This only matters when both NAS boxes have different copies of one file.</span><select name="conflict_policy" id="conflictPolicy"><option value="manual">Ask me which copy to keep (safest)</option><option value="newer">Use the copy changed most recently</option><option value="primary">Always choose the first NAS copy</option><option value="secondary">Always choose the other NAS copy</option><option value="keep_both">Save both copies with different names</option></select></label></div></div>
 <details id="crossNASField" class="simple-details"><summary>Extra choice: let several NAS boxes share changes through the cloud</summary><label><input type="checkbox" name="cross_nas_propagation" value="1"> Let changes on one NAS reach my other NAS boxes through the cloud</label><p class="muted">Off by default. If you set up a separate NAS-to-NAS sync, Syncria uses that instead to share files between your boxes.</p></details>
@@ -435,6 +442,7 @@ function relationshipTypeChanged(){
  $('cloudSourceFields').classList.toggle('hidden',!cloud);
  $('nasSourceFields').classList.toggle('hidden',cloud);
  $('nasDirectionFields').classList.toggle('hidden',cloud);
+ $('cloudFirstRunFields').classList.toggle('hidden',!cloud);
  $('crossNASField').classList.toggle('hidden',!cloud);
  $('syncAccount').required=cloud&&$('sourceProvider').value==='google_drive';
  $('syncDropboxAccount').required=cloud&&$('sourceProvider').value==='dropbox';
