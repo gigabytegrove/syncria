@@ -147,3 +147,17 @@ func TestOnlyApprovedNASConflictPolicies(t *testing.T){
  for _,policy:=range []string{"newer","primary","secondary","keep_both","manual"}{if !validNASPolicy(policy){t.Fatal(policy)}}
  for _,policy:=range []string{"oldest","largest","ignore","overwrite_all",""}{if validNASPolicy(policy){t.Fatal(policy)}}
 }
+
+func TestFirstRunMetadataDoesNotReadThirtyGigabytes(t *testing.T){
+ ctx:=context.Background()
+ primary:=newRecoveryFake(map[string]string{})
+ secondary:=newRecoveryFake(map[string]string{})
+ stamp:=time.Date(2026,10,14,12,0,0,0,time.UTC)
+ huge:=int64(30)*1024*1024*1024
+ same,err:=bridgeSameFirstRun(ctx,primary,secondary,"huge.mov",bridgeEntry{Size:huge,Modified:stamp},bridgeEntry{Size:huge,Modified:stamp})
+ if err!=nil||!same{t.Fatalf("Equal metadata must skip even massive files: same=%v err=%v",same,err)}
+ same,err=bridgeSameFirstRun(ctx,primary,secondary,"huge.mov",bridgeEntry{Size:huge,Modified:stamp.Add(time.Hour)},bridgeEntry{Size:huge,Modified:stamp})
+ if err!=nil||same{t.Fatalf("Different timestamps should require sync decision: same=%v err=%v",same,err)}
+ if _,err=bridgeSameFirstRun(ctx,primary,secondary,"huge.mov",bridgeEntry{Size:huge,Modified:stamp},bridgeEntry{Size:huge-1,Modified:stamp});err==nil{t.Fatal("Equal timestamp with different sizes must be reviewed")}
+ if same,err=bridgeSameFirstRun(ctx,primary,secondary,"huge.mov",bridgeEntry{Size:huge},bridgeEntry{Size:huge});err!=nil||same{t.Fatal("Missing timestamps must never be assumed identical")}
+}
