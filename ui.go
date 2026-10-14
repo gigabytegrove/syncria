@@ -62,6 +62,7 @@ code{overflow-wrap:anywhere}
 </aside>
 {{end}}
 <div class="content">{{if not .Logged}}<img class="auth-brand" src="/assets/syncria-logo.svg" alt="Syncria">{{end}}
+<div class="live-system-bar" id="liveSystemBar" data-live-state="idle" role="status" aria-live="off"><span class="live-system-dot" id="liveSystemDot">○</span><span id="liveSystemDetail">Connecting to live sync activity…</span><button type="button" onclick="navigate('activity')">View activity →</button></div>
 <header class="topline"><div class="page-heading"><div class="eyebrow"><span class="breadcrumb-home">SYNC WORKSPACE</span><span class="breadcrumb-divider">/</span><span id="pageBreadcrumb">{{if not .Configured}}GETTING STARTED{{else if not .Logged}}WELCOME BACK{{else}}OVERVIEW{{end}}</span></div><h1 id="pageTitle">{{if not .Configured}}Welcome to Syncria{{else if not .Logged}}Sign in{{else}}Your overview{{end}}</h1></div><div class="header-actions">{{if .Logged}}<span class="header-version">Syncria {{.Version}}</span><form method="post" action="/action"><input type="hidden" name="action" value="logout"><button class="logout" type="submit">Sign out ↗</button></form>{{end}}</div></header>
 {{if .Message}}<div class="notice action-feedback" id="actionFeedback" role="status">{{.Message}}<button type="button" class="feedback-dismiss" onclick="this.parentElement.remove()" aria-label="Dismiss notification">×</button></div>{{end}}{{if and .Configured .Logged}}<div id="updateLiveBanner" class="update-live-banner hidden" role="status"><div><strong>Update running in Syncria</strong><div><small id="updateLiveBannerStatus">Checking the updater status…</small></div></div><button type="button" class="secondary" onclick="navigate('updates')">View exact progress →</button></div>{{end}}{{if and .Configured .Logged}}<div id="sessionExpiredNotice" class="notice bad hidden" role="alert">Your Syncria session has expired. <a href="/">Sign in again</a> to continue.</div>{{end}}
 {{if not .Configured}}<section class="panel" style="max-width:550px"><h2>Welcome to Syncria</h2><p>Create the administrator password to protect your dashboard.</p><form method="post" action="/action"><input type="hidden" name="action" value="setup"><label class="field">Administrator password<input type="password" name="password" minlength="12" required autocomplete="new-password"></label><button class="primary">Secure dashboard</button></form></section>
@@ -236,6 +237,7 @@ code{overflow-wrap:anywhere}
 </section>
 </section>
 <section class="view" id="view-activity">
+<section class="panel live-activity-panel"><div class="section-heading"><div><h2>Live file activity</h2><p>Changes appear automatically as files are copied, replaced, or removed.</p></div><span class="pill">Live</span></div><div id="liveActivityFeed" class="live-activity-feed" aria-live="off"><p class="muted">Waiting for activity…</p></div></section>
 <div class="workspace-intro"><div><p>Transfer counts and recent results, updated as your syncs run.</p></div><button class="secondary" type="button" onclick="refreshDashboardStatus()">Refresh activity ↻</button></div>
 <div class="activity-scoreboard grid gap-3">
  <div class="activity-score activity-score-highlight"><small>CHECKS THAT WORKED</small><strong id="activitySuccessful">{{.Metrics.Runs}}</strong><span>completed checks</span></div>
@@ -881,14 +883,45 @@ function formatBytes(value){
   return n.toFixed(n<10?1:0)+' '+units[i];
 }
 let dashboardPollBusy=false,dashboardSessionExpired=false;
-async function refreshDashboardStatus(){
- if(document.hidden||dashboardPollBusy||dashboardSessionExpired||!$('view-overview'))return;
- dashboardPollBusy=true;
- try{
-  const res=await fetch('/api/dashboard/status',{cache:'no-store',credentials:'same-origin'});
-  if(res.status===401){dashboardSessionExpired=true;const banner=$('sessionExpiredNotice');if(banner)banner.classList.remove('hidden');return;}
-  if(!res.ok)return;
-  const data=await res.json();
+function applyLiveStatus(data){
+ if(!data||!Array.isArray(data.jobs))return;
+ const jobs=data.jobs;
+ const active=jobs.filter(j=>j.running);
+ const banner=$('liveSystemBar'),detail=$('liveSystemDetail'),dot=$('liveSystemDot');
+ if(banner&&detail&&dot){
+  banner.dataset.liveState=active.length?'running':'idle';
+  dot.textContent=active.length?'●':'○';
+  if(active.length){
+   const current=active[0];
+   const p=current.progress||{};
+   detail.textContent=active.length+' sync'+(active.length===1?'':'s')+' running · '+(p.phase||'Working')+(p.current?' · '+p.current:'')+' · '+Number(p.processed||0)+' / '+Number(p.total||0)+' items';
+  }else{
+   const failures=jobs.filter(j=>j.error);
+   detail.textContent=failures.length?failures.length+' sync'+(failures.length===1?'':'s')+' need attention':'All syncs idle · Live monitoring connected';
+  }
+ }
+ const feed=$('liveActivityFeed');
+ if(feed){
+  const rows=[];
+  for(const job of jobs){
+   const events=(job.progress&&Array.isArray(job.progress.events))?job.progress.events:[];
+   for(const event of events)rows.push({name:job.name||job.id,event});
+  }
+  rows.sort((x,y)=>Date.parse(y.event.at||0)-Date.parse(x.event.at||0));
+  const newest=rows.slice(0,60);
+  const signature=JSON.stringify(newest);
+  if(feed.dataset.signature!==signature){
+   feed.dataset.signature=signature;feed.replaceChildren();
+   if(!newest.length){const p=document.createElement('p');p.className='muted';p.textContent='No file operations recorded yet. Changes will appear here while your syncs run.';feed.append(p);}
+   for(const row of newest){
+    const el=document.createElement('div');el.className='live-activity-item';
+    const label=document.createElement('strong');label.textContent=row.event.action||'Changed';
+    const filename=document.createElement('span');filename.textContent=row.event.path||'';
+    const direction=document.createElement('small');direction.textContent=(row.event.from&&row.event.to?row.event.from+' → '+row.event.to:'')+' · '+row.name;
+    el.append(label,filename,direction);feed.append(el);
+   }
+  }
+ }
   if($('installedVersion')&&data.current)$('installedVersion').textContent=data.current;
   if($('sidebarVersion')&&data.current)$('sidebarVersion').textContent=data.current;
    if(data.metrics){
@@ -981,14 +1014,39 @@ async function refreshDashboardStatus(){
     el.classList.toggle('off',!share.direct&&!share.mounted);
    }
   }
- }catch(_e){/* Keep the current UI intact through temporary connection loss. */}
- finally{dashboardPollBusy=false;}
 }
-refreshDashboardStatus();
+let liveSource=null,liveFallback=null;
+function connectLiveStatus(){
+ if(!('EventSource' in window)){beginLiveFallback();return}
+ try{
+  liveSource=new EventSource('/api/live');
+  liveSource.addEventListener('status',e=>{
+   try{applyLiveStatus(JSON.parse(e.data));if(liveFallback){clearInterval(liveFallback);liveFallback=null}}
+   catch(_e){}
+  });
+  liveSource.onerror=()=>{beginLiveFallback()};
+ }catch(_e){beginLiveFallback()}
+}
+function beginLiveFallback(){
+ if(liveFallback)return;
+ refreshDashboardStatus();
+ liveFallback=setInterval(refreshDashboardStatus,1500);
+}
+async function refreshDashboardStatus(){
+ if(document.hidden||dashboardPollBusy||dashboardSessionExpired)return;
+ dashboardPollBusy=true;
+ try{
+  const res=await fetch('/api/dashboard/status',{cache:'no-store',credentials:'same-origin'});
+  if(res.status===401){dashboardSessionExpired=true;const banner=$('sessionExpiredNotice');if(banner)banner.classList.remove('hidden');return}
+  if(res.ok)applyLiveStatus(await res.json());
+ }catch(_e){}
+ finally{dashboardPollBusy=false}
+}
+connectLiveStatus();
 // Check quietly on startup so the nav can signal a verified available update.
 checkUpdate();
 setInterval(()=>{if(!document.hidden&&!updateRunning&&!updateSubmitting)checkUpdate()},30*60*1000);
-setInterval(refreshDashboardStatus,2500);
+// Live streaming is primary; polling starts only when unavailable.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDashboardStatus()});
 window.addEventListener('pageshow',event=>{if(event.persisted)refreshDashboardStatus();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePicker()});if(location.hash){let page=location.hash.slice(1);if($('view-'+page))navigate(page)}
