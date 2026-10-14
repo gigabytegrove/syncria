@@ -438,6 +438,13 @@ function setWizardStatus(message,bad=false){
 }
 function startWizard(){
  navigate('sync');$('syncWizard').reset();
+ $('editingSyncId').value='';
+ $('editingSyncType').value='';$('editingSyncType').disabled=true;
+ $('relationshipType').disabled=false;
+ $('editMappingWarning').classList.add('hidden');$('editResetMapping').checked=false;
+ $('wizardModeLabel').textContent='New sync';$('wizardHeading').textContent='Connect your files.';
+ $('createSyncButton').textContent='Save new sync (keep paused)';
+ $('cloudDirection').value='bidirectional';
  $('createSyncButton').disabled=false;$('wizard').classList.remove('hidden');
  $('remoteValue').value='root';$('selectedDriveLabel').textContent='Entire My Drive';
  $('nasSourceFolderValue').value='.';$('selectedNASSourceLabel').textContent='Share root';
@@ -452,12 +459,15 @@ function relationshipTypeChanged(){
  $('cloudSourceFields').classList.toggle('hidden',!cloud);
  $('nasSourceFields').classList.toggle('hidden',cloud);
  $('nasDirectionFields').classList.toggle('hidden',cloud);
+ $('nasDirection').disabled=cloud;
+ $('cloudDirectionFields').classList.toggle('hidden',!cloud);
+ $('cloudDirection').disabled=!cloud;
  $('cloudFirstRunFields').classList.toggle('hidden',!cloud);
  $('crossNASField').classList.toggle('hidden',!cloud);
  $('syncAccount').required=cloud&&$('sourceProvider').value==='google_drive';
  $('syncDropboxAccount').required=cloud&&$('sourceProvider').value==='dropbox';
  $('nasSourceId').required=!cloud;
- nasDirectionChanged();
+ nasDirectionChanged();cloudDirectionChanged();
  setWizardStatus(cloud?'Choose the account and folder where your files are now.':'Choose the first NAS box and the folder that already has your files.');
 }
 function sourceProviderChanged(){
@@ -497,6 +507,16 @@ function scheduleModeChanged(){
  const changed=$('scheduleMode').value==='changes';
  $('syncInterval').closest('.field').classList.toggle('hidden',changed);
  if(changed)$('syncInterval').value='5';
+}
+function cloudDirectionChanged(){
+ const cloud=$('relationshipType').value==='cloud';
+ const oneWay=cloud&&$('cloudDirection').value==='one_way';
+ const cross=$('crossNASField');
+ const checkbox=cross.querySelector('input[name="cross_nas_propagation"]');
+ if(oneWay){checkbox.checked=false}
+ checkbox.disabled=!cloud||oneWay;
+ cross.classList.toggle('hidden',!cloud||oneWay);
+ syncReviewed=false;
 }
 function nasDirectionChanged(){
  const nas=$('relationshipType').value==='nas',bi=$('nasDirection').value==='bidirectional';
@@ -567,7 +587,8 @@ function wizardFinalize(){
  $('reviewTarget').textContent=selectedNASDestinations().map(x=>x.label+' ('+x.folder+')').join(', ');
  $('reviewInterval').textContent=$('scheduleMode').value==='changes'?'When files change, plus checks every 5 minutes':$('syncInterval').selectedOptions[0]?.textContent||'';
  $('reviewDirection').textContent=nas?($('nasDirection').value==='one_way'?'One way: first NAS to the others':'Both ways · '+$('conflictPolicy').selectedOptions[0]?.textContent):
-  ('Cloud and NAS'+($('crossNASField').querySelector('input').checked?' · Copy changes between NAS boxes through cloud':' · No cross-NAS copying through cloud'));
+  ($('cloudDirection').value==='one_way'?'One way: cloud → NAS (cloud wins; NAS changes never upload)':'Both ways: cloud ↔ NAS')+
+  ($('cloudDirection').value!=='one_way'&&$('crossNASField').querySelector('input').checked?' · Cross-NAS propagation enabled':'');
  $('reviewDeletion').textContent=($('propagateDeletions').checked?'Delete matching copies too':'Keep other copies if I delete a file')+
   ($('recoveryEnabled').checked?' · 10-minute Undo on':' · No Undo window');
  showSyncStep(4);syncReviewed=true;
@@ -575,6 +596,55 @@ function wizardFinalize(){
 function submitSyncWizard(event){
  event.preventDefault();if(syncStep!==4||!syncReviewed)return false;
  syncReviewed=false;$('createSyncButton').disabled=true;$('syncWizard').submit();return false;
+}
+async function editSync(id){
+ try{
+  const response=await fetch('/api/sync/config?id='+encodeURIComponent(id),{credentials:'same-origin',cache:'no-store'});
+  if(!response.ok)throw Error((await response.text()).trim()||'Cannot load sync settings');
+  const job=await response.json();
+  startWizard();
+  $('editingSyncId').value=job.id;
+  $('editingSyncType').value=job.relationship_type;$('editingSyncType').disabled=false;
+  $('relationshipType').value=job.relationship_type;
+  $('relationshipType').disabled=true;
+  $('wizardModeLabel').textContent='Edit sync';
+  $('wizardHeading').textContent='Update '+job.name;
+  $('createSyncButton').textContent='Save changes (keep paused)';
+  $('editMappingWarning').classList.remove('hidden');
+  $('syncName').value=job.name;
+  $('sourceProvider').value=job.cloud_provider||'google_drive';
+  relationshipTypeChanged();sourceProviderChanged();
+  $('syncAccount').value=job.account_id||'';
+  $('syncDropboxAccount').value=job.dropbox_account_id||'';
+  $('remoteValue').value=job.remote_id||'root';
+  $('selectedDriveLabel').textContent=job.remote_id==='root'?'Entire My Drive':(job.remote_id||'Selected cloud folder');
+  $('nasSourceId').value=job.nas_source_id||'';
+  $('nasSourceFolderValue').value=job.nas_source_folder||'.';
+  $('selectedNASSourceLabel').textContent=job.nas_source_folder&&job.nas_source_folder!=='.'?job.nas_source_folder:'Share root';
+  const destinationList=Array.isArray(job.nas_destinations)?job.nas_destinations:[];
+  const choices=[...document.querySelectorAll('#nasTargets input[name="nas_ids"]')];
+  for(const box of choices){
+   const found=destinationList.find(d=>d.share_id===box.value||d.ShareID===box.value);
+   box.checked=!!found;
+   const folder=found?(found.folder??found.Folder??'.'):'.';
+   const input=$('nas-folder-'+box.value);
+   if(input)input.value=folder||'.';
+   const caption=$('nas-label-'+box.value);
+   if(caption)caption.textContent=!folder||folder==='.'?'Share root':folder;
+  }
+  $('cloudDirection').value=job.direction||'bidirectional';
+  $('nasDirection').value=job.direction||'bidirectional';
+  $('initialConflictPolicy').value=job.initial_conflict_policy||'newer';
+  $('conflictPolicy').value=job.conflict_policy||'manual';
+  $('scheduleMode').value=job.schedule_mode||'interval';
+  scheduleModeChanged();
+  $('syncInterval').value=String(job.interval||5);
+  $('propagateDeletions').checked=!!job.propagate_deletions;
+  $('recoveryEnabled').checked=!!job.recovery_enabled;
+  $('crossNASField').querySelector('input').checked=!!job.cross_nas_propagation;
+  cloudDirectionChanged();nasDirectionChanged();nasDestChanged();
+  setWizardStatus(job.enabled?'Pause this sync before saving edits; the current settings remain unchanged until then.':'Edit the settings, verify both locations, and save. Nothing will be copied.');
+ }catch(error){alert('Unable to edit this sync: '+(error?.message||'Unknown error'))}
 }
 function toggleDirectNAS(force){
  navigate('storage');
