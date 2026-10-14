@@ -2,6 +2,8 @@
 
 **Keep your files together, wherever you save them.**
 
+**New in v0.6:** A completely redesigned Syncria workspace with its own product identity. The dark navigation, new Overview, file-flow views and connection screens make everyday tasks easier to find while keeping every existing sync feature. The in-app updater remains the primary way to install new versions.
+
 Syncria helps you keep folders matched between Google Drive, Dropbox, and storage boxes on your home or work network. Those storage boxes are called **NAS devices**.
 
 For example, you can have family photos in Google Drive and keep a matching copy on your NAS. Or you can keep two NAS boxes matched without using the cloud at all.
@@ -60,7 +62,7 @@ The repository includes a [Docker Compose configuration](compose.yaml) and [Dock
 
 [Getting Started](docs/GETTING-STARTED.md) explains the everyday screens, common choices, and what to check when a connection fails.
 
-[Latest changes](docs/RELEASE-v0.5.3.md) explains what's different in the newest version without developer jargon.
+[Latest changes](docs/RELEASE-v0.6.0.md) explains what's different in the newest version without developer jargon.
 
 [Technical reference](docs/TECHNICAL.md) keeps advanced deployment, API, security, and release history details for administrators.
 
