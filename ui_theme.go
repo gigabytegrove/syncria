@@ -203,6 +203,8 @@ code{color:#1162bc;overflow-wrap:anywhere}
 /* Update idle is a clean screen. Details exist only while running or failed. */
 .update-workspace{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(290px,1fr);gap:18px;align-items:start}
 .update-workspace>.panel{margin-bottom:16px}
+.update-ready{background:#fff}
+#updateReadyPanel .panel-head{margin-bottom:16px}
 .update-workspace>div{min-width:0}
 .update-hero{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 19px;background:#f7faff;border:1px solid #e0ebf8;border-radius:12px;margin:0 0 18px}
 .update-hero strong{font-size:24px;color:#1b4069;letter-spacing:-.7px;display:block}
