@@ -2,7 +2,7 @@
 
 **Keep your files together, wherever you save them.**
 
-**New in v0.6:** A completely redesigned Syncria workspace with its own product identity. The dark navigation, new Overview, file-flow views and connection screens make everyday tasks easier to find while keeping every existing sync feature. The in-app updater remains the primary way to install new versions.
+**Interface:** Syncria uses a quieter, locally bundled Tailwind CSS design with straightforward navigation, forms, progress, and storage management. No browser CDN or external UI service is needed.
 
 Syncria helps you keep folders matched between Google Drive, Dropbox, and storage boxes on your home or work network. Those storage boxes are called **NAS devices**.
 

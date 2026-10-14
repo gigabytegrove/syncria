@@ -42,11 +42,11 @@ code{overflow-wrap:anywhere}
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">
 {{if and .Configured .Logged}}
 <aside class="sidebar" aria-label="Syncria navigation">
-  <div class="sidebar-brand"><div class="sidebar-logo"><img src="/assets/syncria-logo.svg" alt="Syncria" width="196" height="70"></div><div class="sidebar-edition"><span class="pulse-dot"></span> SYNC WORKSPACE <span class="sidebar-edition-line"></span></div></div>
+  <div class="sidebar-brand"><div class="sidebar-logo"><img src="/assets/syncria-logo.svg" alt="Syncria" width="196" height="70"></div><div class="sidebar-edition"><span class="pulse-dot"></span> Syncria <span class="sidebar-edition-line"></span></div></div>
   <div class="sidebar-navigation">
     <div class="nav-group"><p class="nav-section-label">WORKSPACE</p><nav class="nav" aria-label="Workspace">
       <button type="button" data-view="overview" class="active" aria-label="Overview"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg></span><span class="nav-copy"><strong>Overview</strong><small>Your files at a glance</small></span></button>
-      <button type="button" data-view="sync" class="" aria-label="My Syncs"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h15m0 0-4-4m4 4-4 4M20 17H5m0 0 4-4m-4 4 4 4"/></svg></span><span class="nav-copy"><strong>My Syncs</strong><small>Manage file flows</small></span></button>
+      <button type="button" data-view="sync" class="" aria-label="My Syncs"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h15m0 0-4-4m4 4-4 4M20 17H5m0 0 4-4m-4 4 4 4"/></svg></span><span class="nav-copy"><strong>My Syncs</strong><small>Manage syncs</small></span></button>
       <button type="button" data-view="activity" class="" aria-label="Activity"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17h4l3-10 4 13 3-7h4"/></svg></span><span class="nav-copy"><strong>Activity</strong><small>Transfers and results</small></span></button>
     </nav></div>
     <div class="nav-group"><p class="nav-section-label">CONNECTIONS</p><nav class="nav" aria-label="Connections">
@@ -69,23 +69,10 @@ code{overflow-wrap:anywhere}
 {{else}}
 <section class="view active" id="view-overview">
 <div class="command-hero">
-  <div class="hero-text"><div class="hero-overline"><span class="hero-overline-dot"></span> </div><h2>Keep your files in sync.</h2><p>Google Drive, Dropbox, NAS boxes. Syncria keeps the folders you choose together without keeping your files on this server.</p><div class="hero-actions"><button class="hero-cta" type="button" onclick="startWizard()">Create a sync <span aria-hidden="true">↗</span></button><button class="hero-text-link" type="button" onclick="navigate('sync')">Explore my syncs <span aria-hidden="true">→</span></button></div></div>
-  <div class="hero-illustration" aria-hidden="true">
-    <svg class="hero-flow-art" viewBox="0 0 420 255" fill="none" xmlns="http://www.w3.org/2000/svg">
-     <path class="hero-path" d="M75 128C140 128 140 70 210 70C280 70 279 128 345 128" stroke="currentColor" stroke-width="2" stroke-dasharray="5 9"/>
-     <path class="hero-path hero-path-low" d="M75 128C140 128 140 187 210 187C280 187 279 128 345 128" stroke="currentColor" stroke-width="2" stroke-dasharray="5 9"/>
-     <circle cx="75" cy="128" r="37" fill="#142f61" stroke="#55a2fb" stroke-width="1.5"/>
-     <path d="M55 133a17 17 0 0 1 2-23 18 18 0 0 1 34 6 13 13 0 0 1-2 26H60a12 12 0 0 1-5-9Z" stroke="#9dd8ff" stroke-width="3" stroke-linejoin="round"/>
-     <circle cx="210" cy="70" r="31" fill="#18d3d2"/><path d="m195 72 10 10 20-23" stroke="#0b2549" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-     <circle cx="210" cy="187" r="31" fill="#123d78" stroke="#6fa9ec" stroke-width="1.5"/>
-     <path d="M196 179h28v21h-28zM201 184h18M201 190h18M201 196h9" stroke="#a8dcff" stroke-width="2" stroke-linejoin="round"/>
-     <circle cx="345" cy="128" r="37" fill="#142f61" stroke="#55a2fb" stroke-width="1.5"/>
-     <rect x="324" y="113" width="42" height="12" rx="3" stroke="#b7e4ff" stroke-width="2.5"/><rect x="324" y="131" width="42" height="12" rx="3" stroke="#b7e4ff" stroke-width="2.5"/><circle cx="332" cy="119" r="2" fill="#18d3d2"/><circle cx="332" cy="137" r="2" fill="#18d3d2"/>
-     <text x="75" y="188" text-anchor="middle" fill="#cfe7ff" font-size="10" letter-spacing="1.5">CLOUD</text>
-     <text x="345" y="188" text-anchor="middle" fill="#cfe7ff" font-size="10" letter-spacing="1.5">NAS</text>
-     <text x="210" y="24" text-anchor="middle" fill="#cfe7ff" font-size="10" letter-spacing="1.5">IN SYNC</text>
-    </svg><div class="hero-flow-foot">CLOUD <span>↔</span> SYNCRIA <span>↔</span> YOUR STORAGE</div>
-  </div>
+ <div class="hero-text"><h2>Files and storage</h2>
+ <p>Manage your syncs between Google Drive, Dropbox, and your NAS devices.</p>
+ <div class="hero-actions"><button class="hero-cta" type="button" onclick="startWizard()">Create sync</button>
+ <button class="hero-text-link" type="button" onclick="navigate('sync')">View syncs</button></div></div>
 </div>
 <div class="overview-metrics" aria-label="Your current Syncria numbers">
  <div class="overview-metric"><span class="metric-symbol">↗</span><div><small>YOUR SYNCS</small><strong>{{len .Jobs}}</strong><span>configured connections</span></div></div>
@@ -98,7 +85,7 @@ code{overflow-wrap:anywhere}
 <div class="welcome-track-steps">
  <div><span class="track-index">01</span><strong>Connect your cloud</strong><p>Google Drive or Dropbox. Skip this if you're using two NAS boxes.</p><button type="button" onclick="startAccountWizard()">Cloud accounts →</button></div>
  <div><span class="track-index">02</span><strong>Add a NAS box</strong><p>Tell Syncria where your storage box lives.</p><button type="button" onclick="toggleDirectNAS(true)">Storage →</button></div>
- <div><span class="track-index">03</span><strong>Choose your folders</strong><p>Pick which folders should stay matched. New syncs start off.</p><button type="button" onclick="startWizard()">Set up sync →</button></div>
+ <div><span class="track-index">03</span><strong>Choose your folders</strong><p>Pick which folders should stay matched. New syncs start off.</p><button type="button" onclick="startWizard()">Set up sync</button></div>
 </div></div>
 {{else}}
 <details class="onboarding-disclosure"><summary>Need help setting up another sync? Open the step-by-step guide</summary><div class="quick-start"><div class="quick-start-heading"><h2>New here? Start with these three steps.</h2></div><div class="quick-start-grid">

@@ -25,7 +25,7 @@ func TestNewProductUIIsComplete(t *testing.T){
 }
 func TestNewProductUIHasItsOwnVisualIdentity(t *testing.T){
  for _,part:=range []string{
-  "command-hero","hero-flow-art","sidebar-navigation","sidebar-logo","sidebar-edition",
+  "command-hero","sidebar-navigation","sidebar-logo","sidebar-edition",
   "flow-card-main","flow-card-actions","connection-list","provider-grid",
   "activity-scoreboard","release-panel","sync-builder","pageBreadcrumb",
  }{
