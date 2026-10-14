@@ -139,6 +139,7 @@ code{overflow-wrap:anywhere}
   <div class="sync-preview-heading"><div><strong>Test this sync without changing files</strong><p>See which files would move, which side wins, and what needs a decision.</p></div><button class="secondary" type="button" onclick="previewSync('{{.ID}}')">Refresh preview</button></div>
   <div class="sync-preview-result" data-preview-result="{{.ID}}" role="status">Scanning both locations…</div>
  </section>
+ <details class="sync-run-events hidden" data-job-events="{{.ID}}"><summary>What actually changed in the last run</summary><div class="sync-run-event-list" data-job-events-list="{{.ID}}"></div></details>
  <div class="flow-card-actions">
  <button type="button" class="secondary" onclick="previewSync('{{.ID}}')">Test run · Preview changes</button>
  <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="run_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="primary">Sync now <span aria-hidden="true">→</span></button></form>
@@ -930,6 +931,22 @@ async function refreshDashboardStatus(){
         Number(liveProgress.uploads||0)+' uploaded, '+Number(liveProgress.downloads||0)+' downloaded · '+
         formatBytes(Number(liveProgress.upload_bytes||0)+Number(liveProgress.download_bytes||0))+
         (liveProgress.current?' · '+liveProgress.current:'')+(liveProgress.error?' · '+liveProgress.error:'');
+    }
+    const eventsBox=el('data-job-events'),eventsList=el('data-job-events-list');
+    if(eventsBox&&eventsList){
+      const events=Array.isArray(liveProgress.events)?liveProgress.events:[];
+      eventsBox.classList.toggle('hidden',events.length===0);
+      const signature=JSON.stringify(events);
+      if(eventsList.dataset.signature!==signature){
+        eventsList.dataset.signature=signature;eventsList.replaceChildren();
+        for(const item of events.slice().reverse()){
+          const row=document.createElement('div');row.className='sync-run-event';
+          const action=document.createElement('strong');action.textContent=item.action||'Changed';
+          const path=document.createElement('span');path.textContent=item.path||'';
+          const direction=document.createElement('small');direction.textContent=item.from&&item.to?item.from+' → '+item.to:'';
+          row.append(action,path,direction);eventsList.append(row);
+        }
+      }
     }
     const detail=el('data-job-detail');
     if(detail){
