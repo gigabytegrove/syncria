@@ -437,6 +437,7 @@ func localTree(root string) (map[string]Item, error) {
 			return e
 		}
 		rel = filepath.ToSlash(rel)
+		if !d.IsDir() && ignoredSyncPath(rel){return nil}
 		if d.Type()&os.ModeSymlink != 0 {
 			return fmt.Errorf("symlink unsupported: %s", rel)
 		}
