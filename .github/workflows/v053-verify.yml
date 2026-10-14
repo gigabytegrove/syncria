@@ -1,0 +1,26 @@
+name: Verify Syncria v0.5.3
+on:
+  push:
+    branches: [syncria-v0.5.3-ui-updater-cleanup]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+      - name: Test clean updater state and UI
+        run: |
+          set -euo pipefail
+          go mod tidy
+          go test -count=1 ./...
+          go test -race -count=1 ./...
+          go vet ./...
+          CGO_ENABLED=0 go build -trimpath -o /tmp/syncria-v053 .
+          /tmp/syncria-v053 -h >/dev/null
