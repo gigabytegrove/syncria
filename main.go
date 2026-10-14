@@ -376,15 +376,21 @@ func (a *App) remoteTreeProgress(ctx context.Context, acc, root string, onScan f
 		if err != nil {
 			return err
 		}
-		names := map[string]bool{}
+        counts:=map[string]int{}
+        for _,child:=range children{
+         if ignoredSyncMetadata(child.Name)&&child.MimeType!=folderMime{continue}
+         counts[strings.ToLower(portableDriveName(child.Name))]++
+        }
+        names:=map[string]bool{}
 		for _, f := range children {
 			if ignoredSyncMetadata(f.Name) && f.MimeType != folderMime {continue}
-			component:=portableDriveName(f.Name)
+            duplicate:=counts[strings.ToLower(portableDriveName(f.Name))]>1
+			component:=portableDriveObjectName(f.Name,f.ID,duplicate)
 			if !safeName(component) {
 				return fmt.Errorf("Google Drive filename %q cannot be mapped to a safe NAS name; no files changed", f.Name)
 			}
 			if names[strings.ToLower(component)] {
-				return fmt.Errorf("Google Drive files collide after NAS-safe filename mapping in folder %q: %q. Rename one at the source; neither copy was changed",p,f.Name)
+				return fmt.Errorf("Two Drive objects still map to the same NAS name in %q (%q); no files changed",p,f.Name)
 			}
 			names[strings.ToLower(component)] = true
 			path := component
