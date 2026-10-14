@@ -76,17 +76,25 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
    row.Action="copy";row.From="Primary";row.To="Secondary";row.Bytes=l.Size;row.Reason="Missing on secondary"
   case !tracked:
    row.FirstRun=true
-   // Metadata can propose a first-run winner without downloading all file
-   // contents during the dry run. Execution performs byte comparison first.
-   decision:=decideFirstRun(j,key,name,l,r,oneWay,policy)
-   if decision.Direction==""{
-    row.Action="review";if oneWay{row.Action="blocked"}
-    row.Reason=decision.Reason
+   if l.Modified.IsZero()||r.Modified.IsZero(){
+    row.Action="review";row.Reason="A modification timestamp is missing; no automatic replacement"
+   }else if l.Modified.Equal(r.Modified){
+    if l.Size==r.Size{
+     row.Action="unchanged";row.Reason="Modification times and sizes match; no file contents read"
+    }else{
+     row.Action="review";row.Reason="Modification times match but sizes differ; manual review required"
+    }
    }else{
-    row.Action="replace"
-    row.From="Primary";row.To="Secondary";row.Bytes=l.Size
-    if decision.Direction=="secondary"{row.From="Secondary";row.To="Primary";row.Bytes=r.Size}
-    row.Reason=decision.Reason
+    decision:=decideFirstRun(j,key,name,l,r,oneWay,policy)
+    if decision.Direction==""{
+     row.Action="review"
+     row.Reason=decision.Reason
+    }else{
+     row.Action="replace"
+     row.From="Primary";row.To="Secondary";row.Bytes=l.Size
+     if decision.Direction=="secondary"{row.From="Secondary";row.To="Primary";row.Bytes=r.Size}
+     row.Reason=decision.Reason
+    }
    }
   default:
    changeL:=old.MD5!=l.Fingerprint||(old.ID!=""&&l.ID!=""&&old.ID!=l.ID)
@@ -117,7 +125,7 @@ func (a *App) previewBridge(ctx context.Context,j *Job)(syncPreviewResult,error)
 func (a *App) previewBridgeProgress(ctx context.Context,j *Job,notify func(string,string,int64))(syncPreviewResult,error){
  result:=syncPreviewResult{Job:j.Name,ReadOnly:true,Generated:time.Now(),Rows:[]syncPreviewRow{},Counts:map[string]int{},Warnings:[]string{
   "This is a read-only scan, not an execution. Files can change after preview.",
-  "First-run matches are planned using modification times where available. The real sync compares file contents before replacing anything; timestamps alone do not prove which contents are correct.",
+  "First-run matches and transfer decisions use modification timestamps, not full-file checksums. Matching timestamps and sizes are skipped; missing or ambiguous metadata requires review.",
   "FreeFileSync database file sync.ffs_db is excluded on both sides; existing source copies remain untouched.",
  }}
  destinations:=append([]NASDestination(nil),j.NASDestinations...)
