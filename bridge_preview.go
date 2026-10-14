@@ -69,9 +69,18 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
   case !hasR:
    row.Action="copy";row.From="Primary";row.To="Secondary";row.Bytes=l.Size;row.Reason="Missing on secondary"
   case !tracked:
-   // Distinct fingerprints can be MD5, Dropbox SHA256 or NAS
-   // size/time, so a cross-provider mismatch is not proof of inequality.
-   row.Action="review";row.Reason="Both sides have an untracked file; content comparison is needed before deciding"
+   // Metadata can propose a first-run winner without downloading all file
+   // contents during the dry run. Execution performs byte comparison first.
+   decision:=decideFirstRun(j,key,name,l,r,oneWay,policy)
+   if decision.Direction==""{
+    row.Action="review";if oneWay{row.Action="blocked"}
+    row.Reason=decision.Reason
+   }else{
+    row.Action="replace"
+    row.From="Primary";row.To="Secondary";row.Bytes=l.Size
+    if decision.Direction=="secondary"{row.From="Secondary";row.To="Primary";row.Bytes=r.Size}
+    row.Reason=decision.Reason
+   }
   default:
    changeL:=old.MD5!=l.Fingerprint||(old.ID!=""&&l.ID!=""&&old.ID!=l.ID)
    changeR:=old.LocalMD5!=r.Fingerprint
@@ -99,7 +108,7 @@ func (a *App) previewBridge(ctx context.Context,j *Job)(syncPreviewResult,error)
 func (a *App) previewBridgeProgress(ctx context.Context,j *Job,notify func(string,string,int64))(syncPreviewResult,error){
  result:=syncPreviewResult{Job:j.Name,ReadOnly:true,Generated:time.Now(),Rows:[]syncPreviewRow{},Counts:map[string]int{},Warnings:[]string{
   "This is a read-only scan, not an execution. Files can change after preview.",
-  "Untracked files on both sides need byte comparison during a real sync; preview never guesses that they match.",
+  "First-run matches are planned using modification times where available. The real sync compares file contents before replacing anything; timestamps alone do not prove which contents are correct.",
   "FreeFileSync database file sync.ffs_db is excluded on both sides; existing source copies remain untouched.",
  }}
  destinations:=append([]NASDestination(nil),j.NASDestinations...)
