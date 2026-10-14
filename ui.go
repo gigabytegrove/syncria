@@ -307,18 +307,24 @@ function renderPreviewResult(output,result){
   summary.textContent=totals.length?totals.map(([action,count])=>count+' '+action).join(' · '):'No changes detected';
   output.append(summary);
   const note=document.createElement('p');note.className='preview-notice';note.textContent='Preview only · No changes made · Generated '+new Date(result.generated).toLocaleString();output.append(note);
+  const bootstrapInfo=document.createElement('p');bootstrapInfo.className='preview-notice';
+  bootstrapInfo.textContent='First run: Syncria proposes a newer copy using file modification times. The real sync verifies content before replacing a file. Ambiguous timestamps remain for manual review.';
+  output.append(bootstrapInfo);
   const table=document.createElement('div');table.className='preview-table-wrap';
   const grid=document.createElement('table');grid.className='preview-table';
   const head=document.createElement('thead');
   const header=document.createElement('tr');
-  for(const label of ['File or folder','Planned action','Direction / winner','Why']){
+  for(const label of ['File or folder','Planned action','Direction / winner','Last modified (source / destination)','Why']){
    const th=document.createElement('th');th.textContent=label;header.append(th);
   }
   head.append(header);grid.append(head);
   const body=document.createElement('tbody');
   for(const row of result.rows||[]){
    const tr=document.createElement('tr');tr.dataset.action=row.action||'';
-   for(const value of [row.path,row.action,(row.from&&row.to?row.from+' → '+row.to:row.from||''),row.reason]){
+   const localTime=value=>value?new Date(value).toLocaleString():'Unknown';
+   const modified=row.primary_modified||row.secondary_modified?
+     'Primary: '+localTime(row.primary_modified)+' / Secondary: '+localTime(row.secondary_modified):'Not available';
+   for(const value of [row.path,row.action,(row.from&&row.to?row.from+' → '+row.to:row.from||''),modified,row.reason]){
     const td=document.createElement('td');td.textContent=value||'—';tr.append(td);
    }
    body.append(tr);
