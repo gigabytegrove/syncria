@@ -42,6 +42,8 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
   l,hasL:=left[name];r,hasR:=right[name];old,tracked:=prev[name]
   row:=syncPreviewRow{Path:name}
   switch {
+  case (hasL&&l.Unsupported)||(hasR&&r.Unsupported):
+   row.Action="skip";row.Reason="Google-native item cannot be exported by this connector; preserved at source, no copies or deletions attempted"
   case !hasL&&!hasR:continue
   case hasL&&hasR&&l.Folder!=r.Folder:
    row.Action="blocked";row.Reason="File/folder mismatch; no overwrite is safe"
