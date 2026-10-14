@@ -30,4 +30,6 @@ Your saved accounts, NAS connections, files, sync settings, conflict choices, 10
 
 Open **App Updates → Check again → Download & install update** in your existing Syncria dashboard. There is no need to build Syncria yourself or replace the container.
 
+**One-time note:** The page that installs v0.5.3 is still running the older v0.5.2 interface in your browser. After the update, refresh the page once to see the new design and automatic success cleanup. Future updates will use the new behavior.
+
 [Getting Started](GETTING-STARTED.md) explains everyday setup. [Technical Reference](TECHNICAL.md) is available for advanced server and connection details.
