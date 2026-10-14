@@ -60,7 +60,7 @@ The repository includes a [Docker Compose configuration](compose.yaml) and [Dock
 
 [Getting Started](docs/GETTING-STARTED.md) explains the everyday screens, common choices, and what to check when a connection fails.
 
-[Latest changes](docs/RELEASE-v0.5.2.md) explains what's different in the newest version without developer jargon.
+[Latest changes](docs/RELEASE-v0.5.3.md) explains what's different in the newest version without developer jargon.
 
 [Technical reference](docs/TECHNICAL.md) keeps advanced deployment, API, security, and release history details for administrators.
 
