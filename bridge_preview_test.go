@@ -23,7 +23,7 @@ func TestPreviewPlansDirectionAndNeverMutatesState(t *testing.T){
  }
  right:=map[string]bridgeEntry{
  "back.txt":{Size:9,Fingerprint:"back"},
- "changed.txt":{Size:10,Fingerprint:"rightold"},
+ "changed.txt":{Size:10,Fingerprint:"rightnew"},
  "old.txt":{Size:3,Fingerprint:"same"},
  }
  j.PairStates["p"]["changed.txt"]=Item{MD5:"leftold",LocalMD5:"rightold"}
