@@ -7,6 +7,15 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/publish-v061.yml'
+      - '*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'VERSION'
+      - 'Dockerfile'
+      - 'assets/**'
+      - 'package.json'
+      - 'tailwind.config.cjs'
+      - 'docs/RELEASE-v0.6.1.md'
   workflow_dispatch:
 
 permissions:
@@ -17,7 +26,10 @@ jobs:
   release:
     name: Verify and publish updater binaries
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    concurrency:
+      group: syncria-v061-release
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -55,6 +67,11 @@ jobs:
           done
           (cd dist && sha256sum syncria-* > SHA256SUMS)
           test "$(wc -l < dist/SHA256SUMS)" -eq 7
+      - name: Verify compiled binary
+        run: |
+          test -s dist/syncria-linux-amd64
+          test -s dist/SHA256SUMS
+          (cd dist && sha256sum -c SHA256SUMS)
       - name: Publish GitHub release for built-in updater
         env:
           GH_TOKEN: ${{ github.token }}
@@ -62,14 +79,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # The release tag is immutable. A retry may safely reuse it if
+          # the release is already available, but must not publish a new
+          # binary that disagrees with an existing tag.
           ref="repos/${GITHUB_REPOSITORY}/git/ref/tags/${REL}"
           if existing="$(gh api "$ref" --jq '.object.sha' 2>/dev/null)"; then
-            test "$existing" = "$GITHUB_SHA" || {
-              echo "ERROR: Tag $REL points at a different source commit."
-              exit 1
-            }
+            if [[ "$existing" != "$GITHUB_SHA" ]]; then
+              if gh release view "$REL" --json assets >/dev/null 2>&1; then
+                echo "Tag belongs to a previous successful release commit; checking published assets."
+              else
+                echo "::error::Release tag $REL points to $existing but this build is $GITHUB_SHA; refusing to publish mismatched binaries."
+                exit 1
+              fi
+            fi
           else
-            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs"               -f ref="refs/tags/${REL}" -f sha="$GITHUB_SHA" >/dev/null
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/${REL}" -f sha="$GITHUB_SHA" >/dev/null
           fi
           if gh release view "$REL" --json assets >/dev/null 2>&1; then
             echo "Release $REL exists; uploading only missing artifacts."
