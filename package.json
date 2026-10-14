@@ -1,0 +1,11 @@
+{
+  "name": "syncria-ui",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.cjs -i assets/syncria.tailwind.css -o assets/syncria.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}
