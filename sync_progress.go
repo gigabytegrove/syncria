@@ -12,7 +12,15 @@ import (
 // SyncProgress represents the currently executing relationship. Unlike
 // historical statistics, it is memory-only and does not rewrite config.json
 // for every file. Completed runs are persisted via the existing Job counters.
+type SyncActionEvent struct {
+ At time.Time `json:"at"`
+ Action string `json:"action"`
+ Path string `json:"path"`
+ From string `json:"from,omitempty"`
+ To string `json:"to,omitempty"`
+}
 type SyncProgress struct {
+ Events []SyncActionEvent `json:"events,omitempty"`
  Phase string `json:"phase"`
  Current string `json:"current,omitempty"`
  Processed int64 `json:"processed"`
