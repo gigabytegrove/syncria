@@ -14,6 +14,7 @@ func (a *App) dashboardStatus(w http.ResponseWriter,r *http.Request) {
  if !a.authenticated(r) {http.Error(w,"Unauthorized",http.StatusUnauthorized);return}
  type jobState struct {
   ID string `json:"id"`
+  Name string `json:"name"`
   Enabled bool `json:"enabled"`
   LastRun string `json:"last_run"`
   Summary string `json:"summary"`
@@ -42,7 +43,7 @@ func (a *App) dashboardStatus(w http.ResponseWriter,r *http.Request) {
  for _,j:=range a.cfg.Jobs {
   last:="Never run"
   if !j.LastRun.IsZero(){last=j.LastRun.Format("Jan 2, 2006 15:04")}
-  jobs=append(jobs,jobState{ID:j.ID,Enabled:j.Enabled,Progress:a.syncProgress[j.ID],LastRun:last,Summary:j.LastSummary,Error:j.LastError,SuccessfulRuns:j.SuccessfulRuns,FailedRuns:j.FailedRuns,LastDurationMillis:j.LastDurationMillis,LastUploads:j.LastUploads,LastDownloads:j.LastDownloads,LastUploadBytes:j.LastUploadBytes,LastDownloadBytes:j.LastDownloadBytes,TotalUploads:j.TotalUploads,TotalDownloads:j.TotalDownloads,TotalUploadBytes:j.TotalUploadBytes,TotalDownloadBytes:j.TotalDownloadBytes})
+  jobs=append(jobs,jobState{ID:j.ID,Name:j.Name,Enabled:j.Enabled,Progress:a.syncProgress[j.ID],LastRun:last,Summary:j.LastSummary,Error:j.LastError,SuccessfulRuns:j.SuccessfulRuns,FailedRuns:j.FailedRuns,LastDurationMillis:j.LastDurationMillis,LastUploads:j.LastUploads,LastDownloads:j.LastDownloads,LastUploadBytes:j.LastUploadBytes,LastDownloadBytes:j.LastDownloadBytes,TotalUploads:j.TotalUploads,TotalDownloads:j.TotalDownloads,TotalUploadBytes:j.TotalUploadBytes,TotalDownloadBytes:j.TotalDownloadBytes})
  }
  shares:=append([]StorageShare(nil),a.cfg.Shares...)
  totals:=summarizeMetrics(a.cfg.Jobs)
