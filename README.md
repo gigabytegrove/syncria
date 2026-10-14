@@ -39,6 +39,15 @@ For examples and explanations of common choices, read [Getting Started](docs/GET
 
 **The app will not automatically overwrite a file it cannot safely handle.** Some cloud-native items, shared drives, shortcuts, and complicated moves need special care. If a file cannot be handled safely, you should see a problem instead of a false success.
 
+
+## Previewing and understanding a sync
+
+Open **My Syncs** and choose **Test run · Preview changes** on a sync. Syncria reads both locations without copying or deleting files. You can inspect the planned file-by-file actions, see the named source and destination of each transfer, and identify conflicts or deletions before a real run.
+
+The preview is an estimate based on the current scan. It does **not** promise that nothing will change before execution, and it will mark untracked files that exist on both sides for review rather than guessing whether their contents match. The view includes counts across the complete scan and up to 500 file rows. A live sync shows the current filename and a recent history of up to 100 **actual** operations.
+
+**FreeFileSync interoperability:** Syncria intentionally excludes the exact filename `sync.ffs_db` (case-insensitive) from replication. This file is FreeFileSync's private comparison database, and Google Drive can hold multiple copies with that name. Existing copies are left untouched in their original location. Other filenames, including other `.ffs_db` files, are not silently excluded. If Google Drive has other duplicate or case-colliding names in one folder, Syncria safely stops and asks you to rename a duplicate; it will not pick a winner and overwrite another file.
+
 ## Updating Syncria
 
 You normally update from **inside Syncria**:
