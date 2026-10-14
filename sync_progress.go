@@ -21,6 +21,9 @@ type SyncActionEvent struct {
 }
 type SyncProgress struct {
  Events []SyncActionEvent `json:"events,omitempty"`
+ Plan []syncPreviewRow `json:"plan,omitempty"`
+ PlanCounts map[string]int `json:"plan_counts,omitempty"`
+ PlanTruncated bool `json:"plan_truncated,omitempty"`
  Phase string `json:"phase"`
  Current string `json:"current,omitempty"`
  Processed int64 `json:"processed"`
