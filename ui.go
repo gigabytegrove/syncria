@@ -143,7 +143,7 @@ code{overflow-wrap:anywhere}
  <details class="sync-run-events hidden" data-job-events="{{.ID}}"><summary>What actually changed in the last run</summary><div class="sync-run-event-list" data-job-events-list="{{.ID}}"></div></details>
  <div class="flow-card-actions">
  <button type="button" class="secondary" onclick="previewSync('{{.ID}}')">Test run · Preview changes</button>
- <button type="button" class="secondary" onclick="editSync('{{.ID}}')">Edit sync</button>
+ {{if or (eq .Provider "bridge") (eq .Provider "nas_bridge")}}<button type="button" class="secondary" onclick="editSync('{{.ID}}')">Edit sync</button>{{end}}
  <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="run_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="primary">Sync now <span aria-hidden="true">→</span></button></form>
  <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="toggle_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="secondary">{{if .Enabled}}Pause automatic sync{{else}}Turn on automatic sync{{end}}</button></form>
  <form method="post" action="/action" class="inline flow-danger" onsubmit="return confirm('Remove this sync? Files stay on your cloud and NAS.')"><input type="hidden" name="action" value="delete_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="danger">Remove sync</button></form>
