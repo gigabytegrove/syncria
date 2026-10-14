@@ -7,6 +7,12 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/publish-v070.yml'
+      - '*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'VERSION'
+      - 'Dockerfile'
+      - 'docs/RELEASE-v0.7.0.md'
   workflow_dispatch:
 
 permissions:
