@@ -331,7 +331,8 @@ function renderPreviewResult(output,result){
    const localTime=value=>value?new Date(value).toLocaleString():'Unknown';
    const modified=row.primary_modified||row.secondary_modified?
      'Primary: '+localTime(row.primary_modified)+' / Secondary: '+localTime(row.secondary_modified):'Not available';
-   for(const value of [row.path,row.action,(row.from&&row.to?row.from+' → '+row.to:row.from||''),modified,row.reason]){
+   const displayAction=row.first_run&&row.action==='replace'?'Replace if contents differ':row.action;
+   for(const value of [row.path,displayAction,(row.from&&row.to?row.from+' → '+row.to:row.from||''),modified,row.reason]){
     const td=document.createElement('td');td.textContent=value||'—';tr.append(td);
    }
    body.append(tr);
