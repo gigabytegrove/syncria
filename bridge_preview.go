@@ -103,7 +103,7 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
     }else{row.Action="review";row.Reason="Both files changed; a conflict decision is required"}
    case changeL:row.Action="replace";row.From="Primary";row.To="Secondary";row.Bytes=l.Size;row.Reason="Primary changed since last sync"
    case changeR:
-    if oneWay{row.Action="blocked";row.Reason="Destination changed in a one-way relationship"
+    if oneWay{row.Action="replace";row.From="Primary";row.To="Secondary";row.Bytes=l.Size;row.Reason="One-way: restore the source copy to the destination"
     }else{row.Action="replace";row.From="Secondary";row.To="Primary";row.Bytes=r.Size;row.Reason="Secondary changed since last sync"}
    default:row.Action="unchanged";row.Reason="No recorded changes"
    }
