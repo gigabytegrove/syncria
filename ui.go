@@ -184,7 +184,7 @@ code{overflow-wrap:anywhere}
 <details class="simple-details"><summary>More choices about when to check</summary><label class="field">When should Syncria check? <span class="field-help">“When a file changes” asks your NAS to tell Syncria when it notices changes. Cloud changes are also checked every 5 minutes.</span><select id="scheduleMode" name="schedule_mode" onchange="scheduleModeChanged()"><option value="interval">Every few minutes (recommended)</option><option value="changes">When a NAS file changes, plus regular checks</option></select></label></details>
 <div id="cloudDirectionFields" class="panel"><label class="field">Which direction should files sync?
 <span class="field-help">One way copies from the cloud to your NAS. NAS edits will not be uploaded, and differing NAS files may be replaced by cloud copies. Both ways lets changes flow in either direction.</span>
-<select id="cloudDirection" name="direction" onchange="cloudDirectionChanged()">
+<select id="cloudDirection" name="cloud_direction" onchange="cloudDirectionChanged()">
 <option value="bidirectional">Both ways: cloud ↔ NAS</option>
 <option value="one_way">One way: cloud → NAS only</option>
 </select></label><p class="muted">Review the dry run before the first live sync. One-way means the cloud is authoritative; it does not mean that existing NAS files will never be changed.</p></div>
