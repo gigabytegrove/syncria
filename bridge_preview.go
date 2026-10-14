@@ -77,7 +77,17 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
   case !tracked:
    row.FirstRun=true
    if l.Modified.IsZero()||r.Modified.IsZero(){
-    row.Action="review";row.Reason="A modification timestamp is missing; no automatic replacement"
+    if oneWay && j.Provider=="bridge" {
+     // The source is explicitly authoritative in cloud-to-NAS one-way mode,
+     // even when a provider does not expose modification times.
+     decision:=decideFirstRun(j,key,name,l,r,oneWay,policy)
+     if decision.Direction=="primary"{
+      row.Action="replace";row.From="Primary";row.To="Secondary"
+      row.Bytes=l.Size;row.Reason="One-way cloud source is authoritative; timestamp unavailable"
+     }else{row.Action="review";row.Reason="A modification timestamp is missing; manual review required"}
+    }else{
+     row.Action="review";row.Reason="A modification timestamp is missing; no automatic replacement"
+    }
    }else if l.Modified.Equal(r.Modified){
     if l.Size==r.Size{
      row.Action="unchanged";row.Reason="Modification times and sizes match; no file contents read"
