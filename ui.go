@@ -135,7 +135,12 @@ code{overflow-wrap:anywhere}
  {{range .PendingDeletions}}<div class="decision-row"><div><strong>{{.Path}}</strong><small>Undo before {{.Expires.Format "Jan 2, 2006 · 15:04:05 MST"}}</small></div>
  <form method="post" action="/api/recovery/undo" class="inline"><input type="hidden" name="operation" value="undo"><input type="hidden" name="id" value="{{$job.ID}}"><input type="hidden" name="pair" value="{{.Pair}}"><input type="hidden" name="path" value="{{.Path}}"><button type="submit" class="secondary">Bring back file</button></form></div>{{end}}
  </section>{{end}}
+ <section class="sync-preview hidden" data-preview="{{.ID}}" aria-label="Read-only sync preview">
+  <div class="sync-preview-heading"><div><strong>Test this sync without changing files</strong><p>See which files would move, which side wins, and what needs a decision.</p></div><button class="secondary" type="button" onclick="previewSync('{{.ID}}')">Refresh preview</button></div>
+  <div class="sync-preview-result" data-preview-result="{{.ID}}" role="status">Scanning both locations…</div>
+ </section>
  <div class="flow-card-actions">
+ <button type="button" class="secondary" onclick="previewSync('{{.ID}}')">Test run · Preview changes</button>
  <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="run_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="primary">Sync now <span aria-hidden="true">→</span></button></form>
  <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="toggle_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="secondary">{{if .Enabled}}Pause automatic sync{{else}}Turn on automatic sync{{end}}</button></form>
  <form method="post" action="/action" class="inline flow-danger" onsubmit="return confirm('Remove this sync? Files stay on your cloud and NAS.')"><input type="hidden" name="action" value="delete_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="danger">Remove sync</button></form>
@@ -287,6 +292,44 @@ code{overflow-wrap:anywhere}
 <script>
 const $=id=>document.getElementById(id);
 let currentView='overview',pickerType='',folder='',parent='',folderName='',pickSeq=0;
+async function previewSync(id){
+ const panel=document.querySelector('[data-preview="'+id+'"]');
+ const output=document.querySelector('[data-preview-result="'+id+'"]');
+ if(!panel||!output)return;
+ panel.classList.remove('hidden');
+ output.textContent='Scanning both locations. No files will be changed…';
+ panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+ try{
+  const response=await fetch('/api/sync/preview?id='+encodeURIComponent(id),{cache:'no-store',credentials:'same-origin'});
+  const result=await response.json();
+  if(!response.ok){output.textContent='Preview could not finish: '+(result.error||'Unknown scan error');return;}
+  output.replaceChildren();
+  const summary=document.createElement('div');summary.className='preview-summary';
+  const totals=Object.entries(result.counts||{}).filter(([action,count])=>count>0).sort((a,b)=>b[1]-a[1]);
+  summary.textContent=totals.length?totals.map(([action,count])=>count+' '+action).join(' · '):'No changes detected';
+  output.append(summary);
+  const note=document.createElement('p');note.className='preview-notice';note.textContent='Preview only · No changes made · Generated '+new Date(result.generated).toLocaleString();output.append(note);
+  const table=document.createElement('div');table.className='preview-table-wrap';
+  const grid=document.createElement('table');grid.className='preview-table';
+  const head=document.createElement('thead');
+  const header=document.createElement('tr');
+  for(const label of ['File or folder','Planned action','Direction / winner','Why']){
+   const th=document.createElement('th');th.textContent=label;header.append(th);
+  }
+  head.append(header);grid.append(head);
+  const body=document.createElement('tbody');
+  for(const row of result.rows||[]){
+   const tr=document.createElement('tr');tr.dataset.action=row.action||'';
+   for(const value of [row.path,row.action,(row.from&&row.to?row.from+' → '+row.to:row.from||''),row.reason]){
+    const td=document.createElement('td');td.textContent=value||'—';tr.append(td);
+   }
+   body.append(tr);
+  }
+  grid.append(body);table.append(grid);output.append(table);
+  if(result.truncated){const p=document.createElement('p');p.className='preview-warning';p.textContent='Showing first 500 items. Counts include the complete scan.';output.append(p)}
+  for(const warning of result.warnings||[]){const p=document.createElement('p');p.className='preview-notice';p.textContent=warning;output.append(p)}
+ }catch(error){output.textContent='Preview failed: '+(error&&error.message?error.message:'Network error')}
+}
 function navigate(view){
  if(!$('view-'+view))return;
  const feedback=$('actionFeedback');if(feedback&&currentView!==view)feedback.remove();
