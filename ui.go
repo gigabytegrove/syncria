@@ -142,7 +142,7 @@ code{overflow-wrap:anywhere}
  </div>
 </article>
 {{else}}
-<div class="flow-library-empty"><span class="empty-symbol">⇄</span><span class="mini-overline">No syncs</span><h3>Your first sync starts here.</h3><p>Connect two folders, then decide whether and when Syncria should keep them matched.</p><button type="button" class="primary" onclick="startWizard()">Create my first sync →</button></div>
+<div class="flow-library-empty"><span class="empty-symbol" aria-hidden="true">⇄</span><h3>No syncs configured</h3><p>Connect two folders, then decide whether and when Syncria should keep them matched.</p><button type="button" class="primary" onclick="startWizard()">Create my first sync →</button></div>
 {{end}}
 </section>
 <details class="glossary-fold"><summary>Questions about one-way, both ways, or Undo?</summary><div class="glossary-layout"><span><strong>One way</strong> copies changes from the first NAS to the others.</span><span><strong>Both ways</strong> lets changes move between NAS boxes.</span><span><strong>Undo</strong> can bring back a recent deletion.</span></div></details>
@@ -212,7 +212,7 @@ code{overflow-wrap:anywhere}
 {{else}}<div class="flow-library-empty"><span class="empty-symbol">▤</span><span class="mini-overline">No NAS devices</span><h3>Your NAS boxes will appear here.</h3><p>Add one to get started. Files won't be copied until you set up a sync.</p><button type="button" class="primary" onclick="toggleDirectNAS(true)">Add a NAS →</button></div>{{end}}</section>
 </section>
 <section class="view" id="view-accounts">
-<div class="workspace-intro"><div><span class="mini-overline">Cloud accounts</span><h2>Cloud accounts</h2><p>Connect the accounts you want to use. Each account stays separate, and nothing syncs until you choose a folder.</p></div><button class="primary" type="button" onclick="startAccountWizard()">+ Connect account</button></div>
+<div class="workspace-intro"><div><p>Connect Google Drive or Dropbox accounts. Each account stays separate until you choose folders to sync.</p></div><button class="primary" type="button" onclick="startAccountWizard()">+ Connect account</button></div>
 <div class="provider-grid grid gap-4">
 <section class="provider-panel"><div class="provider-top"><span class="provider-icon google-icon">G</span><div><span class="mini-overline">GOOGLE</span><h3>Google Drive</h3><p>Use files from one or more Google accounts.</p></div><span class="provider-count">{{len .Accounts}} saved</span></div>
 <div class="provider-list">{{range .Accounts}}<div class="provider-account"><div><strong>{{.Email}}</strong><small>Connected to Syncria</small></div><div class="provider-buttons"><button class="secondary" type="button" onclick="verifyConnectedAccount('{{.ID}}',this)">Test</button><form method="post" action="/action" class="inline" onsubmit="return confirm('Disconnect this Google Drive account? Your files will stay on Google Drive.')"><input type="hidden" name="action" value="remove_account"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="danger">Remove</button></form></div></div>{{else}}<div class="provider-empty">No Google Drive accounts connected yet.</div>{{end}}</div>
