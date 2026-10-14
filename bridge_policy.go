@@ -100,6 +100,15 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
  right,err:=secondary.Scan(ctx);if err!=nil{return fmt.Errorf("Secondary scan: %w",err)}
  if j.PairStates==nil{j.PairStates=map[string]map[string]Item{}}
  prev:=j.PairStates[key];if prev==nil{prev=map[string]Item{}}
+ // Build the actual-run queue from the scans already performed; never re-read
+ // file contents or re-scan endpoints for the Activity view.
+ plan:=syncPreviewResult{Rows:[]syncPreviewRow{},Counts:map[string]int{},ChangesOnly:true,MaxRows:120}
+ planSyncPair(&plan,j,key,left,right,oneWay,policy)
+ a.setSyncProgress(j.ID,func(p *SyncProgress){
+  p.Phase="processing";p.Current="";p.Processed=0;p.Total=int64(len(left)+len(right))
+  p.Plan=plan.Rows;p.PlanCounts=plan.Counts;p.PlanTruncated=plan.Truncated
+ })
+
  next:=make(map[string]Item,len(prev));for k,v:=range prev{if !ignoredSyncPath(k){next[k]=v}}
  keys:=map[string]bool{}
  for k:=range left{keys[k]=true}
