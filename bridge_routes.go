@@ -45,6 +45,16 @@ func (a *App) openNAS(ctx context.Context,d NASDestination)(recoverableBridgeEnd
  conn,err:=a.dialSMB(ctx,share);if err!=nil{return nil,err}
  return &bridgeSMBEndpoint{client:conn,root:d.Folder},nil
 }
+func (a *App) labelSyncOperation(j *Job,source,secondary string) func(){
+ original:=j.operationHook
+ if original==nil{return func(){}}
+ j.operationHook=func(action,rel,from,to string){
+  if from=="Primary"||from=="primary"{from=source}else if from=="Secondary"||from=="secondary"{from=secondary}
+  if to=="Primary"||to=="primary"{to=source}else if to=="Secondary"||to=="secondary"{to=secondary}
+  original(action,rel,from,to)
+ }
+ return func(){j.operationHook=original}
+}
 func (a *App) syncBridge(ctx context.Context,j *Job) error {
  destinations:=append([]NASDestination(nil),j.NASDestinations...)
  if len(destinations)==0&&j.NASShareID!=""{
@@ -62,7 +72,14 @@ func (a *App) syncBridge(ctx context.Context,j *Job) error {
    primary,err:=a.openNAS(ctx,source);if err!=nil{return fmt.Errorf("Primary NAS: %w",err)}
    secondary,err:=a.openNAS(ctx,destination);if err!=nil{primary.Close();return fmt.Errorf("Destination NAS: %w",err)}
    key:=relationPairKey("nas:"+source.ShareID+":"+source.Folder,destination)
-   if err=a.executePolicyPair(ctx,j,primary,secondary,key,j.Direction=="one_way",policy);err!=nil{return err}
+   sourceLabel:=source.ShareID
+   if share,e:=a.directShare(source.ShareID);e==nil&&share.Label!=""{sourceLabel=share.Label}
+   destLabel:=destination.ShareID
+   if share,e:=a.directShare(destination.ShareID);e==nil&&share.Label!=""{destLabel=share.Label}
+   restore:=a.labelSyncOperation(j,sourceLabel,destLabel)
+   err=a.executePolicyPair(ctx,j,primary,secondary,key,j.Direction=="one_way",policy)
+   restore()
+   if err!=nil{return err}
   }
   return nil
  }
@@ -92,7 +109,14 @@ func (a *App) syncBridge(ctx context.Context,j *Job) error {
   // feed changes into the cloud unless explicitly configured as a separate
   // cloud relationship. This avoids accidental NAS-to-NAS propagation.
   oneWay:=i>0&&!j.CrossNASPropagation
-  if err=a.executePolicyPair(ctx,j,cloud,nas,key,oneWay,conflictManual);err!=nil{return err}
+  primaryLabel:="Google Drive"
+  if sourceName=="dropbox"{primaryLabel="Dropbox"}
+  destLabel:=d.ShareID
+  if share,e:=a.directShare(d.ShareID);e==nil&&share.Label!=""{destLabel=share.Label}
+  restore:=a.labelSyncOperation(j,primaryLabel,destLabel)
+  err=a.executePolicyPair(ctx,j,cloud,nas,key,oneWay,conflictManual)
+  restore()
+  if err!=nil{return err}
  }
  return nil
 }
