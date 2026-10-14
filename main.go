@@ -377,7 +377,7 @@ func (a *App) remoteTree(ctx context.Context, acc, root string) (map[string]driv
 				return fmt.Errorf("unsafe remote filename: %q", f.Name)
 			}
 			if names[strings.ToLower(f.Name)] {
-				return fmt.Errorf("duplicate/case-colliding remote name in %s: %s", p, f.Name)
+				return fmt.Errorf("Google Drive has two files named %q in folder %q (including possible case differences). Rename one in Google Drive, then retry; neither copy was changed", f.Name, p)
 			}
 			names[strings.ToLower(f.Name)] = true
 			path := f.Name
