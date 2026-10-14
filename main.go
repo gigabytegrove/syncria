@@ -371,6 +371,7 @@ func (a *App) remoteTree(ctx context.Context, acc, root string) (map[string]driv
 		}
 		names := map[string]bool{}
 		for _, f := range children {
+			if ignoredSyncMetadata(f.Name) && f.MimeType != folderMime {continue}
 			if !safeName(f.Name) {
 				return fmt.Errorf("unsafe remote filename: %q", f.Name)
 			}
