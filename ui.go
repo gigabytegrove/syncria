@@ -397,6 +397,24 @@ async function verifyConnectedAccount(id,button){
 let updatePollingBusy=false,updateSubmitting=false,updateRunning=false,updateInstallAvailable=false;
 let lastUpdatePhase='idle',lastUpdateLog='',lastConfirmedUpdateStatus='';
 let manualUploadInProgress=false;
+let completedUpdateTimer=null,hiddenCompletedUpdate='';
+function resetUpdateView(){
+ updateRunning=false;
+ lastUpdatePhase='idle';
+ lastUpdateLog='';
+ const flow=$('updateFlow'),history=$('updateHistoryPanel'),ready=$('updateReadyPanel');
+ if(flow)flow.classList.add('hidden');
+ if(history)history.classList.add('hidden');
+ if(ready)ready.classList.remove('hidden');
+ const banner=$('updateLiveBanner');if(banner)banner.classList.add('hidden');
+ const logState=$('updateLogState');if(logState)logState.textContent='Ready';
+ const timeline=$('updateEventTimeline');
+ if(timeline)timeline.replaceChildren();
+ const install=$('installUpdateButton'),rollback=$('rollbackUpdateButton');
+ if(install)install.disabled=updateSubmitting||!updateInstallAvailable;
+ if(rollback)rollback.disabled=updateSubmitting;
+}
+
 const updatePhaseTitles={
  checking:'Checking published release',manifest:'Reading release checksums',
  receiving:'Receiving manual update',downloading:'Downloading exact executable',
@@ -444,10 +462,27 @@ function setUpdateProgressBar(phase,current,total){
 }
 function renderUpdateProgress(p){
  if(!p||!p.phase)return;
- lastUpdatePhase=p.phase;
- updateRunning=!!p.active;
  const phase=p.phase;
- if(phase!=='idle')$('updateFlow')?.classList.remove('hidden');
+ if(phase==='idle'){resetUpdateView();return;}
+ const completionKey=phase==='complete'?((p.started_at||'')+'|'+(p.target||'')+'|'+(p.updated_at||'')):'';
+ if(phase==='complete'&&completionKey===hiddenCompletedUpdate){resetUpdateView();return;}
+ if(phase!=='complete'&&completedUpdateTimer){
+  clearTimeout(completedUpdateTimer);completedUpdateTimer=null;
+ }
+ lastUpdatePhase=phase;
+ updateRunning=!!p.active;
+ $('updateFlow')?.classList.remove('hidden');
+ $('updateHistoryPanel')?.classList.remove('hidden');
+ $('updateReadyPanel')?.classList.add('hidden');
+ if(phase==='complete'&&!completedUpdateTimer){
+  // A success is a short acknowledgement, not a permanent activity log.
+  completedUpdateTimer=setTimeout(()=>{
+   completedUpdateTimer=null;
+   hiddenCompletedUpdate=completionKey;
+   resetUpdateView();
+   checkUpdate();
+  },3500);
+ }
  const events=Array.isArray(p.events)?p.events:[];
  renderUpdateEvents(events,phase);
  const logState=$('updateLogState');
@@ -524,6 +559,8 @@ async function pollUpdateProgress(){
 }
 async function startUpdate(operation){
  if(updateSubmitting||updateRunning)return;
+ hiddenCompletedUpdate='';
+ if(completedUpdateTimer){clearTimeout(completedUpdateTimer);completedUpdateTimer=null;}
  if(!confirm(operation==='rollback'?'Restore Syncria\'s saved previous executable?':'Download, verify and install the latest published Syncria release?'))return;
  navigate('updates');
  $('updateFlow').classList.remove('hidden');
@@ -570,6 +607,8 @@ async function checkUpdate(force=false){
 }
 async function submitManualUpdate(event){
  event.preventDefault();
+ hiddenCompletedUpdate='';
+ if(completedUpdateTimer){clearTimeout(completedUpdateTimer);completedUpdateTimer=null;}
  if(updateSubmitting||updateRunning)return false;
  if(!confirm('Install the selected executable after verifying its SHA256SUMS?'))return false;
  navigate('updates');
