@@ -293,17 +293,14 @@ code{overflow-wrap:anywhere}
 <script>
 const $=id=>document.getElementById(id);
 let currentView='overview',pickerType='',folder='',parent='',folderName='',pickSeq=0;
-async function previewSync(id){
- const panel=document.querySelector('[data-preview="'+id+'"]');
+const activePreviews=new Map();
+function cancelPreview(id){
+ const connection=activePreviews.get(id);
+ if(connection){connection.close();activePreviews.delete(id)}
  const output=document.querySelector('[data-preview-result="'+id+'"]');
- if(!panel||!output)return;
- panel.classList.remove('hidden');
- output.textContent='Scanning both locations. No files will be changed…';
- panel.scrollIntoView({behavior:'smooth',block:'nearest'});
- try{
-  const response=await fetch('/api/sync/preview?id='+encodeURIComponent(id),{cache:'no-store',credentials:'same-origin'});
-  const result=await response.json();
-  if(!response.ok){output.textContent='Preview could not finish: '+(result.error||'Unknown scan error');return;}
+ if(output)output.textContent='Scan stopped. No files were changed.';
+}
+function renderPreviewResult(output,result){
   output.replaceChildren();
   const summary=document.createElement('div');summary.className='preview-summary';
   const totals=Object.entries(result.counts||{}).filter(([action,count])=>count>0).sort((a,b)=>b[1]-a[1]);
@@ -329,7 +326,56 @@ async function previewSync(id){
   grid.append(body);table.append(grid);output.append(table);
   if(result.truncated){const p=document.createElement('p');p.className='preview-warning';p.textContent='Showing first 500 items. Counts include the complete scan.';output.append(p)}
   for(const warning of result.warnings||[]){const p=document.createElement('p');p.className='preview-notice';p.textContent=warning;output.append(p)}
- }catch(error){output.textContent='Preview failed: '+(error&&error.message?error.message:'Network error')}
+
+}
+function previewSync(id){
+ const panel=document.querySelector('[data-preview="'+id+'"]');
+ const output=document.querySelector('[data-preview-result="'+id+'"]');
+ if(!panel||!output)return;
+ cancelPreview(id);
+ panel.classList.remove('hidden');
+ output.replaceChildren();
+ const status=document.createElement('div');status.className='preview-live-state';
+ const heading=document.createElement('strong');heading.textContent='Scanning locations…';
+ const description=document.createElement('div');description.textContent='Connecting to live scan. No files will be changed.';
+ const counts=document.createElement('div');counts.className='preview-live-counts';
+ const cancel=document.createElement('button');cancel.className='secondary';cancel.type='button';cancel.textContent='Stop scan';cancel.addEventListener('click',()=>cancelPreview(id));
+ status.append(heading,description,counts,cancel);output.append(status);
+ panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+ if(!('EventSource' in window)){
+  description.textContent='Your browser does not support live scan streaming.';
+  return;
+ }
+ const seen=new Map();
+ const connection=new EventSource('/api/sync/preview/live?id='+encodeURIComponent(id));
+ activePreviews.set(id,connection);
+ connection.addEventListener('scan',event=>{
+  if(activePreviews.get(id)!==connection)return;
+  try{
+   const scan=JSON.parse(event.data);
+   if(scan.endpoint!=='Planning changes')seen.set(scan.endpoint,Number(scan.items||0));
+   heading.textContent=scan.endpoint==='Planning changes'?'Comparing both locations…':'Scanning '+scan.endpoint;
+   description.textContent=scan.path||'Reading folder listings…';
+   counts.textContent=[...seen].map(([name,count])=>name+': '+count.toLocaleString()+' items discovered').join(' · ')||'Starting scan…';
+  }catch(_e){}
+ });
+ connection.addEventListener('complete',event=>{
+  if(activePreviews.get(id)!==connection)return;
+  connection.close();activePreviews.delete(id);
+  try{renderPreviewResult(output,JSON.parse(event.data))}
+  catch(error){output.textContent='Unable to show completed scan: '+error.message}
+ });
+ connection.addEventListener('failed',event=>{
+  if(activePreviews.get(id)!==connection)return;
+  connection.close();activePreviews.delete(id);
+  try{output.textContent='Preview could not finish: '+(JSON.parse(event.data).error||'Unknown scan error')}
+  catch(_e){output.textContent='Preview failed while reading scan results.'}
+ });
+ connection.onerror=()=>{
+  if(activePreviews.get(id)!==connection)return;
+  connection.close();activePreviews.delete(id);
+  output.textContent='Live scan connection interrupted. No files were changed. Try again or check your reverse proxy streaming settings.';
+ };
 }
 function navigate(view){
  if(!$('view-'+view))return;
