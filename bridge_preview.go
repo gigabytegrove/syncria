@@ -95,7 +95,8 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
   addPreviewRow(p,row)
  }
 }
-func (a *App) previewBridge(ctx context.Context,j *Job)(syncPreviewResult,error){
+func (a *App) previewBridge(ctx context.Context,j *Job)(syncPreviewResult,error){return a.previewBridgeProgress(ctx,j,nil)}
+func (a *App) previewBridgeProgress(ctx context.Context,j *Job,notify func(string,string,int64))(syncPreviewResult,error){
  result:=syncPreviewResult{Job:j.Name,ReadOnly:true,Generated:time.Now(),Rows:[]syncPreviewRow{},Counts:map[string]int{},Warnings:[]string{
   "This is a read-only scan, not an execution. Files can change after preview.",
   "Untracked files on both sides need byte comparison during a real sync; preview never guesses that they match.",
@@ -144,11 +145,26 @@ func (a *App) previewBridge(ctx context.Context,j *Job)(syncPreviewResult,error)
   if err!=nil{return result,fmt.Errorf("Primary connection: %w",err)}
   secondary,err:=a.openNAS(ctx,d)
   if err!=nil{primary.Close();return result,fmt.Errorf("Secondary connection: %w",err)}
+  primaryName:="Google Drive"
+  if j.Provider=="nas_bridge"{
+   primaryName=j.NASSourceID
+   if share,e:=a.directShare(j.NASSourceID);e==nil&&share.Label!=""{primaryName=share.Label}
+  }else if j.CloudProvider=="dropbox"{primaryName="Dropbox"}
+  secondaryName:=d.ShareID
+  if share,e:=a.directShare(d.ShareID);e==nil&&share.Label!=""{secondaryName=share.Label}
+  if notify!=nil{
+   if ep,ok:=primary.(*bridgeDriveEndpoint);ok{ep.scanHook=func(rel string,n int64){notify(primaryName,rel,n)}}
+   if ep,ok:=primary.(*bridgeSMBEndpoint);ok{ep.scanHook=func(rel string,n int64){notify(primaryName,rel,n)}}
+   if ep,ok:=secondary.(*bridgeSMBEndpoint);ok{ep.scanHook=func(rel string,n int64){notify(secondaryName,rel,n)}}
+   notify(primaryName,"Starting source scan",0)
+  }
   left,err:=primary.Scan(ctx)
   if err!=nil{secondary.Close();primary.Close();return result,fmt.Errorf("Primary scan: %w",err)}
+  if notify!=nil{notify(secondaryName,"Starting destination scan",0)}
   right,err:=secondary.Scan(ctx)
   secondary.Close();primary.Close()
   if err!=nil{return result,fmt.Errorf("Secondary scan: %w",err)}
+  if notify!=nil{notify("Planning changes","Comparing files",int64(len(left)+len(right)))}
   key:=relationPairKey(sourceKey,d)
   label:=d.ShareID
   if share,e:=a.directShare(d.ShareID);e==nil&&share.Label!=""{label=share.Label}
