@@ -79,14 +79,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The release tag is immutable. A retry may safely reuse it if
-          # the release is already available, but must not publish a new
-          # binary that disagrees with an existing tag.
+          test -s "docs/RELEASE-v0.6.2.md" || { echo "::error::Release notes missing"; exit 1; }
+          # Previous attempt left a tag after successfully compiling and
+          # hashing binaries, but before publishing a GitHub release.
+          # Allow recovery only when every application file matches the tag.
           ref="repos/${GITHUB_REPOSITORY}/git/ref/tags/${REL}"
           if existing="$(gh api "$ref" --jq '.object.sha' 2>/dev/null)"; then
             if [[ "$existing" != "$GITHUB_SHA" ]]; then
-              echo "::error::Release tag $REL points to $existing but this build is $GITHUB_SHA. Refusing to attach mismatched binaries."
-              exit 1
+              git fetch --no-tags --depth=1 origin "$existing"
+              if ! git diff --quiet "$existing" HEAD -- . ':(exclude)docs/RELEASE-v0.6.2.md' ':(exclude).github/workflows/publish-v062.yml'; then
+                echo "::error::Tagged source differs from the compiled application. Refusing mismatched binaries."
+                exit 1
+              fi
+              echo "Recovering interrupted publication: application source matches existing tag $existing."
             fi
           else
             gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/${REL}" -f sha="$GITHUB_SHA" >/dev/null
