@@ -97,6 +97,7 @@ func (a *App) previewBridge(ctx context.Context,j *Job)(syncPreviewResult,error)
  result:=syncPreviewResult{Job:j.Name,ReadOnly:true,Generated:time.Now(),Rows:[]syncPreviewRow{},Counts:map[string]int{},Warnings:[]string{
   "This is a read-only scan, not an execution. Files can change after preview.",
   "Untracked files on both sides need byte comparison during a real sync; preview never guesses that they match.",
+  "FreeFileSync database file sync.ffs_db is excluded on both sides; existing source copies remain untouched.",
  }}
  destinations:=append([]NASDestination(nil),j.NASDestinations...)
  if len(destinations)==0&&j.NASShareID!=""{destinations=[]NASDestination{{ShareID:j.NASShareID,Folder:j.NASFolder}}}
@@ -127,11 +128,24 @@ func (a *App) previewBridge(ctx context.Context,j *Job)(syncPreviewResult,error)
   secondary.Close();primary.Close()
   if err!=nil{return result,fmt.Errorf("Secondary scan: %w",err)}
   key:=relationPairKey(sourceKey,d)
-  label:=d.ShareID;if d.Folder!=""{label+="/"+d.Folder}
+  label:=d.ShareID
+  if share,e:=a.directShare(d.ShareID);e==nil&&share.Label!=""{label=share.Label}
+  if d.Folder!=""{label+="/"+d.Folder}
+  primaryName:="Google Drive"
+  if j.Provider=="nas_bridge"{
+    primaryName=j.NASSourceID
+    if share,e:=a.directShare(j.NASSourceID);e==nil&&share.Label!=""{primaryName=share.Label}
+    if j.NASSourceFolder!=""{primaryName+="/"+j.NASSourceFolder}
+  }else if j.CloudProvider=="dropbox"{primaryName="Dropbox"}
   start:=len(result.Rows)
   planSyncPair(&result,j,key,left,right,oneWay,policy)
-  for k:=start;k<len(result.Rows);k++{result.Rows[k].Reason=fmt.Sprintf("[%s] %s",label,result.Rows[k].Reason)}
-  if oneWay{result.Warnings=append(result.Warnings,fmt.Sprintf("%s: primary is the source; destination edits never win",label))}
+  for k:=start;k<len(result.Rows);k++{
+    row:=&result.Rows[k]
+    if row.From=="Primary"{row.From=primaryName}else if row.From=="Secondary"{row.From=label}
+    if row.To=="Primary"{row.To=primaryName}else if row.To=="Secondary"{row.To=label}
+    row.Reason=fmt.Sprintf("[%s] %s",label,row.Reason)
+  }
+  if oneWay{result.Warnings=append(result.Warnings,fmt.Sprintf("%s: source %s wins; destination-side edits never overwrite it",label,primaryName))}
  }
  return result,nil
 }
