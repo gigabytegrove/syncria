@@ -48,10 +48,14 @@ func TestFirstRunHonorsExplicitPolicyOneWayAndOverride(t *testing.T) {
  old:=time.Date(2026,1,1,0,0,0,0,time.UTC)
  newTime:=old.Add(time.Hour)
  l:=bridgeEntry{Modified:old};r:=bridgeEntry{Modified:newTime}
- job:=&Job{Provider:"bridge",ConflictPolicy:conflictManual}
+ job:=&Job{Provider:"bridge",ConflictPolicy:conflictManual,InitialConflictPolicy:conflictManual}
  d:=decideFirstRun(job,"p","f",l,r,false,conflictManual)
- if d.Direction!=""{t.Fatal("explicit manual selection must remain manual")}
- job.ConflictPolicy=""
+ if d.Direction!=""{t.Fatal("explicit initial manual selection must remain manual")}
+ job.InitialConflictPolicy=""
+ job.InitialConflictPolicy=""
+ job.ConflictPolicy=conflictManual
+ d=decideFirstRun(job,"p","f",l,r,false,conflictManual)
+ if d.Direction!="secondary"{t.Fatal("legacy cloud manual preference was implicit; initial run must choose newer")}
  job.ConflictOverrides=map[string]string{"p|f":"primary"}
  d=decideFirstRun(job,"p","f",l,r,false,conflictManual)
  if d.Direction!="primary"{t.Fatal("explicit file override must beat newest timestamp")}
