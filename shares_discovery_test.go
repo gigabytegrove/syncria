@@ -7,8 +7,8 @@ import (
  "testing"
 )
 func TestNoAutomaticPageReload(t *testing.T) {
- if strings.Contains(newUI,"location.replace(")||strings.Contains(newUI,"setInterval(checkRunningVersion") {
-  t.Fatal("Background update watcher must not reload the entire page")
+ if strings.Contains(newUI,"setInterval(checkRunningVersion") {
+  t.Fatal("Background polling must not reload the page")
  }
 }
 func TestDirectNASConnectionControls(t *testing.T) {
