@@ -222,7 +222,10 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    changedPrimary:=prior.MD5!=l.Fingerprint|| (prior.ID!=""&&l.ID!=""&&prior.ID!=l.ID)
    changedSecondary:=prior.LocalMD5!=r.Fingerprint
    if changedPrimary&&changedSecondary{
-    if oneWay{return fmt.Errorf("Both files changed at %s; one-way relationship will not overwrite them",rel)}
+    if oneWay{
+     if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,"primary",conflictPrimary,&l,&r);err!=nil{return err}
+     if j.operationHook!=nil{j.operationHook("one-way source wins",rel,"Primary","Secondary")}
+    }else{
     direction,method,resolveErr:=a.selectResolution(j,key,rel,policy,l,r)
     if resolveErr!=nil{_ =a.checkpointBridge(j);return fmt.Errorf("File conflict at %s: %w",rel,resolveErr)}
     if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,direction,method,&l,&r);err!=nil{return err}
