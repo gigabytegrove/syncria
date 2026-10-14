@@ -159,5 +159,5 @@ func TestFirstRunMetadataDoesNotReadThirtyGigabytes(t *testing.T){
  same,err=bridgeSameFirstRun(ctx,primary,secondary,"huge.mov",bridgeEntry{Size:huge,Modified:stamp.Add(time.Hour)},bridgeEntry{Size:huge,Modified:stamp})
  if err!=nil||same{t.Fatalf("Different timestamps should require sync decision: same=%v err=%v",same,err)}
  if _,err=bridgeSameFirstRun(ctx,primary,secondary,"huge.mov",bridgeEntry{Size:huge,Modified:stamp},bridgeEntry{Size:huge-1,Modified:stamp});err==nil{t.Fatal("Equal timestamp with different sizes must be reviewed")}
- if _,err=bridgeSameFirstRun(ctx,primary,secondary,"huge.mov",bridgeEntry{Size:huge},bridgeEntry{Size:huge});err==nil{t.Fatal("Missing timestamps must never be assumed identical")}
+ if same,err=bridgeSameFirstRun(ctx,primary,secondary,"huge.mov",bridgeEntry{Size:huge},bridgeEntry{Size:huge});err!=nil||same{t.Fatal("Missing timestamps must never be assumed identical")}
 }
