@@ -17,7 +17,7 @@ func TestNewProductUIIsComplete(t *testing.T){
   `id="recoveryEnabled"`,`name="cross_nas_propagation"`,
   `id="accountWizard"`,`id="directNASPanel"`,`id="picker"`,
   `id="manualUpdateForm"`,`id="updateProgressBar"`,`id="updateEventTimeline"`,
-  `id="updateHistoryPanel"`,`id="updateReadyPanel"`,
+  `id="updateHistoryPanel"`,`id="updateStatusCard"`,`id="updateStatusHeadline"`,`id="updateAvailableVersion"`,`id="updateReleaseNotes"`,
   `/api/update/progress`,`/api/browse/dropbox`,`/api/conflicts/resolve`,`/api/recovery/undo`,
  }{
   if !strings.Contains(newUI,control){t.Errorf("Existing feature lost: %s",control)}
