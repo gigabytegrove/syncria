@@ -263,50 +263,32 @@ code{color:#076bd3}
 </div><p class="activity-row-detail" data-job-detail="{{.ID}}">Loading most recent result…</p></div>{{else}}<div class="flow-library-empty"><strong>No activity yet</strong><p>Create a sync to see its results here.</p></div>{{end}}</section>
 </section>
 <section class="view" id="view-updates">
-<p class="lead">Update Syncria right here. You can watch each step: getting the new version, checking the file, installing it, and starting Syncria again. If something goes wrong, Syncria will explain what happened.</p>
+<div class="workspace-intro"><div><span class="mini-overline">SYSTEM / RELEASES</span><h2>Always moving forward.</h2><p>Syncria installs updates from inside the app. See real download progress, verification, and restart status when an update runs.</p></div></div>
 <div class="update-workspace">
 <div>
-<section class="panel"><div class="panel-head"><h2>Application updates</h2><span class="pill">In-app updater</span></div>
-<div class="update-hero"><div><span class="card-label">Newest available version</span><strong id="latestVersion">Checking releases…</strong><p id="updateMessage">Checking which version is ready to install.</p></div>
-<button class="secondary" type="button" onclick="checkUpdate(true)">Check again</button></div>
-<div class="update-revisions"><div><small>Version running right now</small><strong id="installedVersion">{{.Version}}</strong></div><div><small>Version you can install</small><strong id="updateAvailableVersion">Checking…</strong></div></div>
-<div class="row"><button id="installUpdateButton" class="primary" disabled type="button" onclick="startUpdate('install')">Download & install update</button><button id="rollbackUpdateButton" class="secondary" type="button" onclick="startUpdate('rollback')">Restore previous version</button></div>
-<p class="muted" style="margin-top:13px">Updates remain in this container using Syncria's existing launcher and persistent configuration. No image pull, replacement container, external updater, or manual compilation is required.</p>
+<section class="panel release-panel"><div class="release-panel-heading"><span class="mini-overline">RELEASE CHANNEL / STABLE</span><span class="pill">BUILT-IN UPDATER</span></div>
+<div class="release-well"><div><small>LATEST RELEASE</small><strong id="latestVersion">Checking GitHub Releases…</strong><p id="updateMessage">Looking for a newer version.</p></div><button class="secondary" type="button" onclick="checkUpdate(true)">Check again ↻</button></div>
+<div class="update-revisions"><div><small>VERSION YOU'RE RUNNING</small><strong id="installedVersion">{{.Version}}</strong></div><div><small>VERSION AVAILABLE</small><strong id="updateAvailableVersion">Checking…</strong></div></div>
+<div class="release-actions"><button id="installUpdateButton" class="primary" type="button" onclick="startUpdate('install')" disabled>Download & install update <span aria-hidden="true">→</span></button><button id="rollbackUpdateButton" class="secondary" type="button" onclick="startUpdate('rollback')">Restore previous version</button></div>
+<p class="release-note">Installed here, in this Syncria instance. No separate updater, Docker image pull, or manual compilation.</p>
 </section>
-<section id="updateFlow" class="panel hidden" aria-live="polite" aria-label="Exact update installation status">
-<div class="panel-head"><h2>Update execution</h2><span class="pill" id="updateProgressOperation">Install</span></div>
-<div class="update-progress-panel" style="margin-top:0">
-<div class="update-progress-meta"><strong id="updatePhaseTitle">No update has started</strong><strong id="updatePercent">—</strong></div>
-<p id="updateProgressMessage" role="status">Latest server status will appear here.</p>
-<progress class="update-meter" id="updateProgressBar" max="100" aria-label="Measured download or verification progress"></progress>
+<section class="panel hidden" id="updateFlow" aria-live="polite" aria-label="Measured update progress"><div class="panel-head"><h2>Installing your update</h2><span class="pill" id="updateProgressOperation">Install</span></div>
+<div class="update-progress-panel"><div class="update-progress-meta"><strong id="updatePhaseTitle">Preparing…</strong><strong id="updatePercent">—</strong></div>
+<p id="updateProgressMessage" role="status">Waiting for update status…</p>
+<progress id="updateProgressBar" class="update-meter" max="100" aria-label="Real download or verification progress"></progress>
 <div class="update-connection" id="updateConnectionStatus">Waiting to hear from Syncria about your update.</div>
-<div class="update-revisions"><div><small>From version</small><strong id="updateFromVersion">—</strong></div><div><small>To version</small><strong id="updateToVersion">—</strong></div></div>
-<div class="update-measures">
-<div><small>Executable</small><strong id="updateProgressAsset">—</strong></div>
-<div><small id="updateTransferLabel">Actual downloaded bytes</small><strong id="updateProgressBytes">—</strong></div>
-<div><small>Amount of download checked for errors</small><strong id="updateVerifiedBytes">—</strong></div>
-<div><small>Elapsed time</small><strong id="updateElapsed">—</strong></div>
-</div>
-<div class="row"><span id="updateProgressTarget" class="muted"></span></div>
-<ol class="update-steps" id="updateSteps"><li data-update-phase="checking">Check</li><li data-update-phase="manifest">Manifest</li><li data-update-phase="downloading">Download</li><li data-update-phase="verifying">SHA-256</li><li data-update-phase="staging">Install</li><li data-update-phase="restarting">Restart</li><li data-update-phase="complete">Complete</li></ol>
+<div class="update-revisions"><div><small>FROM</small><strong id="updateFromVersion">—</strong></div><div><small>TO</small><strong id="updateToVersion">—</strong></div></div>
+<div class="update-measures"><div><small>EXECUTABLE FILE</small><strong id="updateProgressAsset">—</strong></div><div><small id="updateTransferLabel">Actual downloaded bytes</small><strong id="updateProgressBytes">—</strong></div><div><small>BYTES VERIFIED</small><strong id="updateVerifiedBytes">—</strong></div><div><small>TIME TAKEN</small><strong id="updateElapsed">—</strong></div></div>
+<div id="updateProgressTarget" class="muted"></div>
+<ol class="update-steps" id="updateSteps"><li data-update-phase="checking">Check</li><li data-update-phase="manifest">Manifest</li><li data-update-phase="downloading">Download</li><li data-update-phase="verifying">Verify</li><li data-update-phase="staging">Install</li><li data-update-phase="restarting">Restart</li><li data-update-phase="complete">Ready</li></ol>
 <p id="updateError" class="update-alert hidden" role="alert"></p>
-<div class="row" style="margin-top:14px"><button id="updateReloadButton" class="primary hidden" type="button" onclick="window.location.assign('/?updated=1#updates')">Open updated interface</button></div>
-</div></section>
+<button id="updateReloadButton" type="button" class="primary hidden" onclick="window.location.assign('/?updated=1#updates')">Open updated Syncria →</button></div></section>
 </div>
 <div class="update-aside">
-<section class="panel" id="updateReadyPanel"><div class="panel-head"><h2>What happens during an update?</h2><span class="quiet-label">Only while updating</span></div><div class="update-explainer"><div><span>1</span><p><strong>Download</strong><small>Watch the real number of bytes arriving.</small></p></div><div><span>2</span><p><strong>Verify</strong><small>Check every byte against the published checksum.</small></p></div><div><span>3</span><p><strong>Install and restart</strong><small>Replace the app safely and confirm the new version started.</small></p></div></div></section>
-<section class="panel hidden" id="updateHistoryPanel"><div class="panel-head"><h2>What happened during the update?</h2><span class="status" id="updateLogState">No update in progress</span></div>
-<p class="muted">This list shows what Syncria actually did and when. The download bar counts real bytes, and Syncria only says the update worked once it starts again.</p>
-<ol class="update-timeline" id="updateEventTimeline" aria-live="polite"><li><strong>Ready</strong><small>Start an update to see its recorded steps.</small></li></ol>
-</section>
-<section class="panel"><details class="advanced-update"><summary>Install an update from a file (advanced)</summary><div class="advanced-update-body"><h2>Manual installation</h2><p class="muted">Most families won't need this. If Syncria cannot download an update, an administrator can provide the right app file and its checking file. Syncria still checks the file and keeps an older version to restore if needed.</p>
-<form id="manualUpdateForm" action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return submitManualUpdate(event)">
-<label class="field">Syncria executable<input type="file" name="binary" id="manualBinary" required></label>
-<label class="field">SHA256SUMS<input type="file" name="checksums" required></label>
-<button class="secondary" type="submit" id="manualUpdateButton">Verify and install supplied files</button></form></div></details>
-</section>
-</div>
-</div>
+<section class="panel update-ready" id="updateReadyPanel"><div class="panel-head"><h2>How it works</h2><span class="quiet-label">3 STEPS</span></div><div class="update-explainer"><div><span>01</span><p><strong>Download</strong><small>The exact file arrives. You'll see real bytes downloaded.</small></p></div><div><span>02</span><p><strong>Verify</strong><small>Every byte is checked against the release.</small></p></div><div><span>03</span><p><strong>Restart</strong><small>Syncria only says success after the new version starts.</small></p></div></div></section>
+<section class="panel hidden" id="updateHistoryPanel"><div class="panel-head"><h2>Live update log</h2><span class="status" id="updateLogState">Waiting</span></div><p class="muted">Real events recorded by Syncria, with timestamps.</p><ol class="update-timeline" id="updateEventTimeline" aria-live="polite"><li><strong>Ready</strong><small>Events appear here during an update.</small></li></ol></section>
+<section class="panel"><details class="advanced-update"><summary>Install from files (advanced)</summary><div class="advanced-update-body"><h2>Manual installation</h2><p class="muted">Use this only when automatic downloads are unavailable. Supply a matching app file and SHA256SUMS. Your previous version remains available for rollback.</p><form id="manualUpdateForm" action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return submitManualUpdate(event)"><label class="field">App executable<input type="file" name="binary" id="manualBinary" required></label><label class="field">SHA256SUMS<input type="file" name="checksums" required></label><button id="manualUpdateButton" class="secondary" type="submit">Verify & install files</button></form></div></details></section>
+</div></div>
 </section>
 <section class="view" id="view-settings"><p class="lead">These are the advanced settings that help Syncria connect securely to your accounts. Most people won’t need to change them once everything is connected.</p><section class="panel"><h2>Google sign-in settings (advanced)</h2><p>For an administrator: create a Google Cloud web sign-in app, enable the Google Drive API, and add the address shown below as its redirect URL:</p><div class="selected"><code>{{.Callback}}</code></div><form method="post" action="/action"><input type="hidden" name="action" value="oauth_settings"><label class="field">Google app ID (Client ID)<input name="client_id" value="{{.ClientID}}" required></label><label class="field">Google app secret<input name="client_secret" type="password" placeholder="Leave blank to keep existing secret"></label><label class="field">Your Syncria web address<input name="base_url" value="{{.BaseURL}}" required></label><button class="primary">Save Google sign-in settings</button></form></section><section class="panel"><h2>Dropbox sign-in settings (advanced)</h2>
 <p>For an administrator: add this return address to your Dropbox developer app:</p><div class="selected"><code>{{.DropboxCallback}}</code></div>
