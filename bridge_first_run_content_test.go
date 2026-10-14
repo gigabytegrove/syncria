@@ -2,11 +2,10 @@ package main
 
 import (
  "context"
- "crypto/md5"
- "encoding/hex"
  "io"
  "strings"
  "testing"
+ "time"
 )
 
 type firstRunMemoryEndpoint struct{
@@ -22,21 +21,28 @@ func (e *firstRunMemoryEndpoint) Open(_ context.Context,_ string)(io.ReadCloser,
 func (e *firstRunMemoryEndpoint) Put(context.Context,string,io.Reader,int64,string,func(int64))(bridgeEntry,error){return bridgeEntry{},nil}
 func (e *firstRunMemoryEndpoint) Close(){}
 
-func TestFirstRunChecksumAvoidsSecondCloudRead(t *testing.T){
- body:="the-same-content"
- digest:=md5.Sum([]byte(body))
- known:=hex.EncodeToString(digest[:])
- // A nil-content Drive endpoint intentionally has no working Open method:
- // the MD5 shortcut must only read the NAS side.
- cloud:=&bridgeDriveEndpoint{}
- nas:=&firstRunMemoryEndpoint{bytes:body}
- equal,err:=bridgeSameFirstRun(context.Background(),cloud,nas,"file.txt",bridgeEntry{
-  Size:int64(len(body)),Fingerprint:known,
- },bridgeEntry{Size:int64(len(body)),Fingerprint:"not-a-hash"})
- if err!=nil||!equal||nas.reads!=1{t.Fatalf("Expected one NAS read, no Drive read: equal=%v err=%v NAS=%d",equal,err,nas.reads)}
- nas.reads=0
- equal,err=bridgeSameFirstRun(context.Background(),cloud,nas,"file.txt",bridgeEntry{
-  Size:1000000,Fingerprint:known,
- },bridgeEntry{Size:int64(len(body))})
- if err!=nil||equal||nas.reads!=0{t.Fatal("Mismatched sizes should skip byte reads")}
+func TestFirstRunTimestampAvoidsAllFileReads(t *testing.T){
+ ctx:=context.Background()
+ stamp:=time.Date(2026,10,14,12,14,0,0,time.UTC)
+ huge:=int64(30)*1024*1024*1024
+ cloud:=&firstRunMemoryEndpoint{bytes:"source"}
+ nas:=&firstRunMemoryEndpoint{bytes:"destination"}
+
+ matched,err:=bridgeSameFirstRun(ctx,cloud,nas,"movie.mov",
+  bridgeEntry{Size:huge,Modified:stamp},
+  bridgeEntry{Size:huge,Modified:stamp})
+ if err!=nil||!matched{t.Fatalf("Matching timestamps and sizes must skip file bytes: equal=%v err=%v",matched,err)}
+ if cloud.reads!=0||nas.reads!=0{t.Fatal("Metadata check opened file contents")}
+
+ matched,err=bridgeSameFirstRun(ctx,cloud,nas,"movie.mov",
+  bridgeEntry{Size:huge,Modified:stamp.Add(time.Second)},
+  bridgeEntry{Size:huge,Modified:stamp})
+ if err!=nil||matched{t.Fatalf("Newer file must require transfer decision: equal=%v err=%v",matched,err)}
+ if cloud.reads!=0||nas.reads!=0{t.Fatal("Timestamp comparison opened file contents")}
+
+ matched,err=bridgeSameFirstRun(ctx,cloud,nas,"movie.mov",
+  bridgeEntry{Size:huge,Modified:stamp},
+  bridgeEntry{Size:huge-1,Modified:stamp})
+ if err==nil||matched{t.Fatal("Equal timestamps and different sizes must require review")}
+ if cloud.reads!=0||nas.reads!=0{t.Fatal("Size mismatch opened file contents")}
 }
