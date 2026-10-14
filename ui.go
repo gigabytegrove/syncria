@@ -256,13 +256,12 @@ code{overflow-wrap:anywhere}
 </section>
 <section class="view" id="view-updates">
 <div class="workspace-intro"><div><p>Install updates here. Download, verification, and restart progress appear when an update runs.</p></div></div>
-<div class="update-workspace">
-<div>
-<section class="panel release-panel"><div class="release-panel-heading"><span class="mini-overline">Stable releases</span><span class="pill">In-app updater</span></div>
-<div class="release-well"><div><small>LATEST RELEASE</small><strong id="latestVersion">Checking GitHub Releases…</strong><p id="updateMessage">Looking for a newer version.</p></div><button class="secondary" type="button" onclick="checkUpdate(true)">Check again ↻</button></div>
-<div class="update-revisions"><div><small>VERSION YOU'RE RUNNING</small><strong id="installedVersion">{{.Version}}</strong></div><div><small>VERSION AVAILABLE</small><strong id="updateAvailableVersion">Checking…</strong></div></div>
-<div class="release-actions"><button id="installUpdateButton" class="primary" type="button" onclick="startUpdate('install')" disabled>Download & install update <span aria-hidden="true">→</span></button><button id="rollbackUpdateButton" class="secondary" type="button" onclick="startUpdate('rollback')">Restore previous version</button></div>
-<p class="release-note">Installed here, in this Syncria instance. No separate updater, Docker image pull, or manual compilation.</p>
+<div class="update-console">
+<section class="panel update-primary" id="updateStatusCard" data-update-state="checking" aria-live="polite">
+ <div class="update-status-header"><span class="update-status-icon" id="updateStatusIcon" aria-hidden="true">↻</span><div class="update-status-text"><span class="mini-overline">Application status</span><h2 id="updateStatusHeadline">Checking for updates…</h2><p id="updateMessage">Checking the latest verified release for this device.</p></div><button class="secondary" type="button" onclick="checkUpdate(true)">Check for updates</button></div>
+ <div class="update-version-line"><div><small>INSTALLED VERSION</small><strong id="installedVersion">{{.Version}}</strong></div><span class="update-version-arrow" aria-hidden="true">→</span><div><small>LATEST RELEASE</small><strong id="updateAvailableVersion">Checking…</strong></div></div>
+ <div class="release-actions"><button id="installUpdateButton" class="primary" type="button" onclick="startUpdate('install')" disabled>Install update</button><button id="rollbackUpdateButton" class="secondary" type="button" onclick="startUpdate('rollback')">Restore previous version</button></div>
+ <span class="sr-only" id="latestVersion">Checking GitHub Releases…</span>
 </section>
 <section class="panel hidden" id="updateFlow" aria-live="polite" aria-label="Measured update progress"><div class="panel-head"><h2>Installing your update</h2><span class="pill" id="updateProgressOperation">Install</span></div>
 <div class="update-progress-panel"><div class="update-progress-meta"><strong id="updatePhaseTitle">Preparing…</strong><strong id="updatePercent">—</strong></div>
@@ -275,12 +274,10 @@ code{overflow-wrap:anywhere}
 <ol class="update-steps" id="updateSteps"><li data-update-phase="checking">Check</li><li data-update-phase="manifest">Manifest</li><li data-update-phase="downloading">Download</li><li data-update-phase="verifying">Verify</li><li data-update-phase="staging">Install</li><li data-update-phase="restarting">Restart</li><li data-update-phase="complete">Ready</li></ol>
 <p id="updateError" class="update-alert hidden" role="alert"></p>
 <button id="updateReloadButton" type="button" class="primary hidden" onclick="window.location.assign('/?updated=1#updates')">Open updated Syncria →</button></div></section>
-</div>
-<div class="update-aside">
-<section class="panel update-ready" id="updateReadyPanel"><div class="panel-head"><h2>How it works</h2><span class="quiet-label">3 STEPS</span></div><div class="update-explainer"><div><span>01</span><p><strong>Download</strong><small>The exact file arrives. You'll see real bytes downloaded.</small></p></div><div><span>02</span><p><strong>Verify</strong><small>Every byte is checked against the release.</small></p></div><div><span>03</span><p><strong>Restart</strong><small>Syncria only says success after the new version starts.</small></p></div></div></section>
+
 <section class="panel hidden" id="updateHistoryPanel"><div class="panel-head"><h2>Live update log</h2><span class="status" id="updateLogState">Waiting</span></div><p class="muted">Real events recorded by Syncria, with timestamps.</p><ol class="update-timeline" id="updateEventTimeline" aria-live="polite"><li><strong>Ready</strong><small>Events appear here during an update.</small></li></ol></section>
-<section class="panel"><details class="advanced-update"><summary>Install from files (advanced)</summary><div class="advanced-update-body"><h2>Manual installation</h2><p class="muted">Use this only when automatic downloads are unavailable. Supply a matching app file and SHA256SUMS. Your previous version remains available for rollback.</p><form id="manualUpdateForm" action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return submitManualUpdate(event)"><label class="field">App executable<input type="file" name="binary" id="manualBinary" required></label><label class="field">SHA256SUMS<input type="file" name="checksums" required></label><button id="manualUpdateButton" class="secondary" type="submit">Verify & install files</button></form></div></details></section>
-</div></div>
+<section class="update-advanced-section"><details class="advanced-update"><summary>Advanced options</summary><div class="advanced-update-body"><p class="muted">For troubleshooting or installations without access to automatic updates. Most people won't need these options.</p><h2>Manual installation</h2><p class="muted">Use this only when automatic downloads are unavailable. Supply a matching app file and SHA256SUMS. Your previous version remains available for rollback.</p><form id="manualUpdateForm" action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return submitManualUpdate(event)"><label class="field">App executable<input type="file" name="binary" id="manualBinary" required></label><label class="field">SHA256SUMS<input type="file" name="checksums" required></label><button id="manualUpdateButton" class="secondary" type="submit">Verify & install files</button></form></div></details></section>
+</div>
 </section>
 <section class="view" id="view-settings"><div class="workspace-intro"><div><p>Manage account credentials and connection settings. These usually only need to be configured once.</p></div></div><section class="panel"><h2>Google sign-in settings (advanced)</h2><p>For an administrator: create a Google Cloud web sign-in app, enable the Google Drive API, and add the address shown below as its redirect URL:</p><div class="selected"><code>{{.Callback}}</code></div><form method="post" action="/action"><input type="hidden" name="action" value="oauth_settings"><label class="field">Google app ID (Client ID)<input name="client_id" value="{{.ClientID}}" required></label><label class="field">Google app secret<input name="client_secret" type="password" placeholder="Leave blank to keep existing secret"></label><label class="field">Your Syncria web address<input name="base_url" value="{{.BaseURL}}" required></label><button class="primary">Save Google sign-in settings</button></form></section><section class="panel"><h2>Dropbox sign-in settings (advanced)</h2>
 <p>For an administrator: add this return address to your Dropbox developer app:</p><div class="selected"><code>{{.DropboxCallback}}</code></div>
@@ -724,6 +721,9 @@ async function startUpdate(operation){
 async function checkUpdate(force=false){
  if(!$('latestVersion'))return;
  $('latestVersion').textContent='Checking GitHub Releases…';
+ if($('updateStatusCard'))$('updateStatusCard').dataset.updateState='checking';
+ if($('updateStatusHeadline'))$('updateStatusHeadline').textContent='Checking for updates…';
+ if($('updateStatusIcon'))$('updateStatusIcon').textContent='↻';
  $('updateMessage').textContent='';updateInstallAvailable=false;
  $('installUpdateButton').disabled=true;
  try{
@@ -733,13 +733,22 @@ async function checkUpdate(force=false){
   if(result.error)throw Error(result.error);
   $('latestVersion').textContent=result.latest||'No published release';
   $('updateAvailableVersion').textContent=result.latest||'None';
-  $('updateMessage').textContent=result.pending?result.message||'Awaiting release binaries':result.available?'Verified release assets available for this platform':'Installed release is current';
+  const card=$('updateStatusCard'),headline=$('updateStatusHeadline'),icon=$('updateStatusIcon'),button=$('installUpdateButton');
+  const state=result.available?'available':result.pending?'pending':'current';
+  if(card)card.dataset.updateState=state;
+  if(headline)headline.textContent=state==='available'?'Update available':state==='pending'?'Update is being prepared':'Syncria is up to date';
+  if(icon)icon.textContent=state==='available'?'↓':state==='pending'?'…':'✓';
+  $('updateMessage').textContent=state==='available'?'Syncria '+(result.latest||'')+' is ready to install on this device.':state==='pending'?(result.message||'The release files are not ready yet.'):'You’re running the latest published release.';
+  if(button)button.textContent=state==='available'?'Download and install '+(result.latest||'update'):'No update available';
   updateInstallAvailable=!!result.available;
   $('installUpdateButton').disabled=updateRunning||updateSubmitting||!updateInstallAvailable;
  }catch(error){
   $('latestVersion').textContent='Release check failed';
   $('updateAvailableVersion').textContent='Unavailable';
   $('updateMessage').textContent=error.message;
+  if($('updateStatusCard'))$('updateStatusCard').dataset.updateState='error';
+  if($('updateStatusHeadline'))$('updateStatusHeadline').textContent='Unable to check for updates';
+  if($('updateStatusIcon'))$('updateStatusIcon').textContent='!';
  }
  await pollUpdateProgress();
 }
