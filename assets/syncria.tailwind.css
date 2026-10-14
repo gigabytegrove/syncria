@@ -281,3 +281,42 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{b
 .sidebar-edition{overflow:hidden;white-space:nowrap;font-size:0!important;max-width:100%}
 .sidebar-edition:after{font-size:10px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;min-width:0}
 @media(max-width:700px){.sync-run-event{grid-template-columns:1fr;gap:2px}}
+
+
+/* Update page: a status-first, single-column utility workflow. */
+.update-console{display:grid;grid-template-columns:minmax(0,1fr);gap:17px;max-width:1040px;margin:0 auto}
+.update-console .panel{margin:0}
+.update-primary{padding:30px 32px;border:1px solid #d9e5ed;border-radius:12px;background:#fff}
+.update-status-header{display:flex;align-items:flex-start;gap:19px}
+.update-status-icon{display:grid;place-items:center;flex:none;width:52px;height:52px;border-radius:14px;background:#edf4f9;color:#4c7b97;font-size:28px;font-weight:650}
+.update-status-text{flex:1;min-width:0}
+.update-status-text .mini-overline{color:#7590a2;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.update-status-text h2{font-size:25px;font-weight:730;letter-spacing:-.035em;line-height:1.2;margin:6px 0 6px;color:#183d56}
+.update-status-text p{font-size:13px;color:#667f90;line-height:1.55;margin:0}
+.update-status-header>.secondary{flex:none;align-self:center}
+.update-primary[data-update-state=available]{border-color:#badccc;background:linear-gradient(125deg,#f3fbf7,#fff 54%)}
+.update-primary[data-update-state=available] .update-status-icon{background:#def4e7;color:#21784b}
+.update-primary[data-update-state=available] .update-status-text h2{color:#19613d}
+.update-primary[data-update-state=current] .update-status-icon{background:#e6f5ed;color:#2b8b62}
+.update-primary[data-update-state=error]{border-color:#f0ccbb}
+.update-primary[data-update-state=error] .update-status-icon{background:#fff1eb;color:#b6582c}
+.update-primary[data-update-state=pending] .update-status-icon{background:#fff5dd;color:#8c6d22}
+.update-version-line{margin:24px 0 19px;background:#f8fbfd;border:1px solid #e0ebf2;border-radius:10px;padding:17px 21px;display:flex;align-items:center;gap:24px}
+.update-version-line>div{display:grid;gap:6px;min-width:0;flex:1}
+.update-version-line small{color:#71899b;font-size:10px;font-weight:700;letter-spacing:.055em}
+.update-version-line strong{color:#234d6a;font-size:17px;font-weight:720}
+.update-version-arrow{font-size:24px;color:#9eb3c0}
+.update-console .release-actions{justify-content:flex-start;gap:11px;align-items:center}
+.update-console .release-actions .primary{min-width:175px}
+.update-console .release-actions .primary:disabled{background:#e9eff4;border-color:#d9e3eb;color:#71879a;box-shadow:none;opacity:1}
+.update-console #updateFlow{padding:24px 27px}
+.update-console #updateFlow .panel-head h2{margin:0;color:#1e4a67;font-size:19px}
+.update-console .update-progress-panel{background:#f9fcfe;border-color:#dfebf2}
+.update-console .update-steps{display:none}
+.update-console #updateHistoryPanel{padding:22px 27px}
+.update-advanced-section{padding:0 2px}
+.update-advanced-section .advanced-update{background:#fff;border:1px solid #dfe8ee;border-radius:10px;padding:0;margin:0}
+.update-advanced-section summary{display:block;cursor:pointer;padding:17px 20px;font-size:13px;font-weight:650;color:#4c6980;list-style:revert}
+.update-advanced-section .advanced-update-body{border-top:1px solid #e5edf2;padding:21px 23px 24px}
+.update-advanced-section .advanced-update-body h2{font-size:16px;margin:10px 0 6px;color:#234963}
+@media(max-width:680px){.update-primary{padding:23px 20px}.update-status-header{flex-wrap:wrap;gap:12px}.update-status-header>.secondary{margin-left:0}.update-status-icon{width:45px;height:45px;font-size:24px}.update-status-text{flex-basis:calc(100% - 65px)}.update-status-text h2{font-size:21px}.update-version-line{padding:13px 15px;gap:10px}.update-version-line strong{font-size:14px}.update-console #updateFlow{padding:17px}.update-console .release-actions{flex-wrap:wrap}}
