@@ -52,6 +52,14 @@ Google Drive can have a single file or folder *name* containing a literal slash,
 
 **Do not manually rename these encoded NAS entries** if you expect a bidirectional relationship to continue matching the same Drive item. Google Drive siblings whose names still collide on a case-insensitive NAS stop safely rather than overwriting one another. The sidecar `sync.ffs_db` remains excluded from replication.
 
+## Editing a sync and choosing its direction
+
+On **My Syncs**, select **Edit sync** to change an existing cloud-to-NAS or NAS-to-NAS relationship. Syncria preloads the current account, source and destination folders, schedule, conflict settings, and deletion recovery preferences. Pause automatic syncing and wait for any active run to finish before saving changes.
+
+A change to name, schedule, sync direction, or conflict/deletion rules preserves the relationship identity, run history, and file comparison checkpoints. A change to an account, source, destination, folder, or the ordering of destination NAS boxes requires explicit confirmation of a new comparison baseline. This clears old file checkpoints rather than applying them to different locations, and saving **does not transfer, delete, or rename any user files**. Do not change endpoints while deletion recovery is pending.
+
+Cloud-to-NAS relationships support **Both ways: cloud ↔ NAS** (the legacy default) or **One way: cloud → NAS**. One way means the cloud wins if content differs: NAS edits will not go back to the cloud, and an existing NAS copy may be overwritten by the cloud copy. Confirm the preview before enabling it. NAS-to-NAS has its own direction and conflict controls; the existing one-way NAS conflict safeguards remain in place.
+
 ## Previewing and understanding a sync
 
 Open **My Syncs** and choose **Test run · Preview changes** on a sync. Syncria reads both locations without copying or deleting files. You can inspect the planned file-by-file actions, see the named source and destination of each transfer, and identify conflicts or deletions before a real run.
