@@ -159,7 +159,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    }else{
     if e:=surviving.Delete(ctx,rel);e!=nil{return e}
    }
-   if j.operationHook!=nil{j.operationHook("delete",rel,missingSide,"Other side")}
+   if j.operationHook!=nil{target:="Primary";if !hasL{target="Secondary"};j.operationHook("delete",rel,missingSide,target)}
    delete(next,rel)
    j.PairStates[key]=next
    // A NAS-origin deletion removes the cloud copy on the first relationship.
