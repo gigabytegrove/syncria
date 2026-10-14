@@ -112,7 +112,7 @@ code{overflow-wrap:anywhere}
 <article class="relationship-card">
  <div class="flow-card-main">
    <div class="flow-card-emblem">{{if eq .Provider "bridge"}}☁{{else}}⇄{{end}}</div>
-   <div class="flow-card-identity"><span class="mini-overline">{{if eq .Provider "bridge"}}CLOUD / NAS{{else if eq .Provider "nas_bridge"}}NAS / NAS{{else}}FOLDER / FOLDER{{end}}</span><h3>{{.Name}}</h3><p>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} and {{len .NASDestinations}} NAS destination(s){{else if eq .Provider "nas_bridge"}}{{if eq .Direction "one_way"}}Copy one way{{else}}Keep both ways matched{{end}} · {{len .NASDestinations}} NAS destination(s){{else}}Existing filesystem sync{{end}}</p></div>
+   <div class="flow-card-identity"><span class="mini-overline">{{if eq .Provider "bridge"}}CLOUD / NAS{{else if eq .Provider "nas_bridge"}}NAS / NAS{{else}}FOLDER / FOLDER{{end}}</span><h3>{{.Name}}</h3><p>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} · {{if eq .Direction "one_way"}}One way: cloud → NAS{{else}}Both ways: cloud ↔ NAS{{end}} · {{len .NASDestinations}} NAS destination(s){{else if eq .Provider "nas_bridge"}}{{if eq .Direction "one_way"}}Copy one way{{else}}Keep both ways matched{{end}} · {{len .NASDestinations}} NAS destination(s){{else}}Existing filesystem sync{{end}}</p></div>
    <div class="flow-card-health">{{if .Enabled}}<span class="flow-state is-on" data-job-enabled="{{.ID}}"><span></span> On</span>{{else}}<span class="flow-state is-off" data-job-enabled="{{.ID}}"><span></span> Paused</span>{{end}}</div>
  </div>
  <div class="flow-card-facts">
@@ -143,6 +143,7 @@ code{overflow-wrap:anywhere}
  <details class="sync-run-events hidden" data-job-events="{{.ID}}"><summary>What actually changed in the last run</summary><div class="sync-run-event-list" data-job-events-list="{{.ID}}"></div></details>
  <div class="flow-card-actions">
  <button type="button" class="secondary" onclick="previewSync('{{.ID}}')">Test run · Preview changes</button>
+ <button type="button" class="secondary" onclick="editSync('{{.ID}}')">Edit sync</button>
  <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="run_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="primary">Sync now <span aria-hidden="true">→</span></button></form>
  <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="toggle_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="secondary">{{if .Enabled}}Pause automatic sync{{else}}Turn on automatic sync{{end}}</button></form>
  <form method="post" action="/action" class="inline flow-danger" onsubmit="return confirm('Remove this sync? Files stay on your cloud and NAS.')"><input type="hidden" name="action" value="delete_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="danger">Remove sync</button></form>
@@ -153,9 +154,9 @@ code{overflow-wrap:anywhere}
 {{end}}
 </section>
 <details class="glossary-fold"><summary>Questions about one-way, both ways, or Undo?</summary><div class="glossary-layout"><span><strong>One way</strong> copies changes from the first NAS to the others.</span><span><strong>Both ways</strong> lets changes move between NAS boxes.</span><span><strong>Undo</strong> can bring back a recent deletion.</span></div></details>
-<section id="wizard" class="sync-builder hidden"><div class="builder-heading"><div><span class="mini-overline">New sync</span><h2>Connect your files.</h2><p>Four short steps. No files move until you're ready.</p></div><button type="button" class="secondary" onclick="closeSyncWizard()">Close ✕</button></div>
+<section id="wizard" class="sync-builder hidden"><div class="builder-heading"><div><span class="mini-overline" id="wizardModeLabel">New sync</span><h2 id="wizardHeading">Connect your files.</h2><p>Four short steps. No files move until you're ready.</p></div><button type="button" class="secondary" onclick="closeSyncWizard()">Close ✕</button></div>
 <div class="step-indicator"><span id="stepMarker1" class="active">1 · Files start here</span><span id="stepMarker2">2 · Copy them here</span><span id="stepMarker3">3 · Pick the rules</span><span id="stepMarker4">4 · Double-check</span></div>
-<form id="syncWizard" method="post" action="/action" onsubmit="return submitSyncWizard(event)" novalidate><input type="hidden" name="action" value="add_bridge">
+<form id="syncWizard" method="post" action="/action" onsubmit="return submitSyncWizard(event)" novalidate><input type="hidden" name="action" value="add_bridge"><input type="hidden" id="editingSyncId" name="edit_id" value=""><input type="hidden" id="editingSyncType" name="relationship_type" value="" disabled>
 <div id="wizard1" class="step active"><h2>Step 1: Where are your files now?</h2><p class="muted">Choose the place that already has your files. We won't move or delete anything while you set this up.</p>
 <label class="field">Give this sync a name <span class="field-help">Pick any name you will remember, like “Family Photos”.</span><input name="name" id="syncName" maxlength="128" placeholder="Family Photos" required></label>
 <label class="field">What do you want to keep in sync? <span class="field-help">A NAS is a file storage box connected to your home or work network.</span><select id="relationshipType" name="relationship_type" onchange="relationshipTypeChanged()"><option value="cloud">My cloud files and a NAS box</option><option value="nas">Two NAS boxes</option></select></label>
@@ -181,6 +182,12 @@ code{overflow-wrap:anywhere}
 <div id="wizard3" class="step"><h2>Step 3: How should this sync work?</h2><p class="muted">The usual choices are already picked for you. You can change them whenever you set up a new sync.</p>
 <label class="field">How often should Syncria check your files? <span class="field-help">Checking looks for files that are new, changed, or missing.</span><select id="syncInterval" name="interval"><option value="5">Every 5 minutes</option><option value="10">Every 10 minutes</option><option value="15">Every 15 minutes</option><option value="30">Every 30 minutes</option><option value="60">Every hour</option><option value="360">Every 6 hours</option><option value="1440">Daily</option></select></label>
 <details class="simple-details"><summary>More choices about when to check</summary><label class="field">When should Syncria check? <span class="field-help">“When a file changes” asks your NAS to tell Syncria when it notices changes. Cloud changes are also checked every 5 minutes.</span><select id="scheduleMode" name="schedule_mode" onchange="scheduleModeChanged()"><option value="interval">Every few minutes (recommended)</option><option value="changes">When a NAS file changes, plus regular checks</option></select></label></details>
+<div id="cloudDirectionFields" class="panel"><label class="field">Which direction should files sync?
+<span class="field-help">One way copies from the cloud to your NAS. NAS edits will not be uploaded, and differing NAS files may be replaced by cloud copies. Both ways lets changes flow in either direction.</span>
+<select id="cloudDirection" name="direction" onchange="cloudDirectionChanged()">
+<option value="bidirectional">Both ways: cloud ↔ NAS</option>
+<option value="one_way">One way: cloud → NAS only</option>
+</select></label><p class="muted">Review the dry run before the first live sync. One-way means the cloud is authoritative; it does not mean that existing NAS files will never be changed.</p></div>
 <div id="cloudFirstRunFields" class="panel"><label class="field">If the same file is already on both sides when this sync starts
 <span class="field-help">Syncria compares actual file contents before replacing anything. When the contents differ, decide how to choose the first copy.</span>
 <select id="initialConflictPolicy" name="initial_conflict_policy">
@@ -204,8 +211,10 @@ code{overflow-wrap:anywhere}
 <div><span class="card-label">When Syncria checks</span><strong id="reviewInterval"></strong></div>
 <div><span class="card-label">How files are matched</span><strong id="reviewDirection"></strong></div>
 <div><span class="card-label">Deleting and bringing back files</span><strong id="reviewDeletion"></strong></div></div>
-<p class="wizard-status good" id="reviewStatus">Your new sync starts turned off. Files will not be copied until you click Turn on sync or Sync now.</p>
-<div class="row"><button type="button" class="secondary" onclick="showSyncStep(3)">← Back</button><button type="submit" class="primary" id="createSyncButton">Save my sync (keep it off)</button></div></div></form></section></section>
+<p class="wizard-status good" id="reviewStatus">Your sync starts paused. No files move when you save these settings.</p>
+<div id="editMappingWarning" class="panel hidden"><h3>Changing connected folders?</h3><p class="muted">Changing the source, NAS destination, or folder requires Syncria to establish a fresh comparison baseline. Old sync checkpoints cannot safely be applied to different folders. This does not delete files; preview the new mapping before syncing.</p>
+<label><input id="editResetMapping" type="checkbox" name="reset_mapping" value="1"> I understand: reset the file comparison baseline if I changed a source or destination</label></div>
+<div class="row"><button type="button" class="secondary" onclick="showSyncStep(3)">← Back</button><button type="submit" class="primary" id="createSyncButton">Save sync settings (keep paused)</button></div></div></form></section></section>
 <section class="view" id="view-storage">
 <div class="workspace-intro"><div><p>Connect and manage the network storage used by your syncs. Adding a NAS does not transfer files.</p></div><button class="primary" type="button" onclick="toggleDirectNAS()">+ Add NAS</button></div>
 <section id="directNASPanel" class="connection-drawer hidden" aria-label="Add a NAS connection"><div class="drawer-heading"><div><span class="mini-overline">New NAS</span><h3>Connect a NAS box</h3><p>You'll need the address, shared folder, and sign-in details from your NAS.</p></div><button type="button" class="secondary" onclick="toggleDirectNAS(false)">Close ✕</button></div>
