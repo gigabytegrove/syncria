@@ -355,7 +355,11 @@ func (a *App) folderChildren(ctx context.Context, acc, parent string) ([]driveFi
 func safeName(n string) bool {
 	return n != "" && n != "." && n != ".." && !strings.ContainsAny(n, "/\\\x00") && n != ".sync-agent-trash" && !strings.HasPrefix(n,".syncria-") && n != ".DS_Store"
 }
-func (a *App) remoteTree(ctx context.Context, acc, root string) (map[string]driveFile, error) {
+func (a *App) remoteTree(ctx context.Context,acc,root string)(map[string]driveFile,error){
+ return a.remoteTreeProgress(ctx,acc,root,nil)
+}
+func (a *App) remoteTreeProgress(ctx context.Context, acc, root string, onScan func(string,int64)) (map[string]driveFile, error) {
+ scanned:=int64(0)
 	res := map[string]driveFile{}
 	seen := map[string]bool{}
 	var walk func(string, string, int) error
@@ -390,6 +394,8 @@ func (a *App) remoteTree(ctx context.Context, acc, root string) (map[string]driv
 				return fmt.Errorf("Google-native document %q requires export; sync paused to protect data", path)
 			}
 			res[path] = f
+            scanned++
+            if onScan!=nil{onScan(path,scanned)}
 			if f.MimeType == folderMime {
 				if err := walk(f.ID, path, depth+1); err != nil {
 					return err
