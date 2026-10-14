@@ -676,7 +676,7 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     job.itemHook=func(done,total int64,current string){
       a.setSyncProgress(jobID,func(p *SyncProgress){p.Phase="processing";p.Processed=done;p.Total=total;p.Current=current})
     }
-	ctx, cancel := context.WithTimeout(ctx, 45*time.Minute)
+	ctx, cancel := context.WithCancel(ctx)
     defer cancel()
     started := time.Now()
     job.LastUploads, job.LastDownloads = 0, 0
@@ -1517,7 +1517,18 @@ func main() {
 		log.Fatal(e)
 	}
 	file := filepath.Join(dir, "state.json")
-	a := &App{file: file, client: &http.Client{Timeout: 45 * time.Minute}, oauth: map[string]time.Time{}}
+	// Large media transfers can legitimately take hours. Bound connection and
+ // response-header setup, not the total duration of a streaming transfer.
+ transport := &http.Transport{
+  Proxy: http.ProxyFromEnvironment,
+  DialContext: (&net.Dialer{Timeout:15*time.Second,KeepAlive:30*time.Second}).DialContext,
+  MaxIdleConns:100,
+  IdleConnTimeout:90*time.Second,
+  TLSHandshakeTimeout:15*time.Second,
+  ResponseHeaderTimeout:2*time.Minute,
+  ExpectContinueTimeout:1*time.Second,
+ }
+ a := &App{file:file,client:&http.Client{Transport:transport},oauth:map[string]time.Time{}}
 	if b, e := os.ReadFile(file); e == nil {
 		if e = json.Unmarshal(b, &a.cfg); e != nil {
 			log.Fatal(e)
