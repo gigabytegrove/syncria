@@ -40,6 +40,18 @@ For examples and explanations of common choices, read [Getting Started](docs/GET
 **The app will not automatically overwrite a file it cannot safely handle.** Some cloud-native items, shared drives, shortcuts, and complicated moves need special care. If a file cannot be handled safely, you should see a problem instead of a false success.
 
 
+## Live synchronization
+
+Syncria shows one shared live status across Overview, My Syncs, and Activity. The interface uses an authenticated, same-origin event stream to report folder scanning, filenames discovered, transfer direction, operations completed, and failures as they happen. If a reverse proxy does not support streaming, Syncria falls back to frequently refreshed status snapshots. All data comes from the current sync process, not estimates or demonstration values.
+
+**Activity** shows actual file operations across all relationships; the latest 100 operations per sync are saved when a run ends, so they remain visible after a restart. You can still use **Test run · Preview changes** if you want a read-only safety check before executing. A preview is not required to see live sync data.
+
+### Names that contain slashes
+
+Google Drive can have a single file or folder *name* containing a literal slash, such as `Bland, Mike - Security Camera/P2P Setup`. An SMB/NAS cannot represent that slash within one filename. Syncria now maps that individual Drive name into a unique, reversible NAS-safe component with a reserved `~syncria~` prefix and URL-safe encoding, while retaining its original Drive ID and name. Normal names are unchanged. When creating a file or folder back on Drive, Syncria restores the original name.
+
+**Do not manually rename these encoded NAS entries** if you expect a bidirectional relationship to continue matching the same Drive item. Google Drive siblings whose names still collide on a case-insensitive NAS stop safely rather than overwriting one another. The sidecar `sync.ffs_db` remains excluded from replication.
+
 ## Previewing and understanding a sync
 
 Open **My Syncs** and choose **Test run · Preview changes** on a sync. Syncria reads both locations without copying or deleting files. You can inspect the planned file-by-file actions, see the named source and destination of each transfer, and identify conflicts or deletions before a real run.
