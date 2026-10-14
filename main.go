@@ -1531,6 +1531,7 @@ func main() {
     mux.HandleFunc("/api/browse/nas/create", a.createNASFolder)
     mux.HandleFunc("/api/nas/action", a.directNASAction)
 	mux.HandleFunc("/api/dashboard/status", a.dashboardStatus)
+    mux.HandleFunc("/api/live", a.liveStatus)
     mux.HandleFunc("/api/sync/preview", a.previewSyncAPI)
 	mux.HandleFunc("/api/wizard/verify", a.verifyWizard)
 	mux.HandleFunc("/action", a.action)
