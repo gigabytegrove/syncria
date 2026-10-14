@@ -115,7 +115,7 @@ func (a *App) syncBridge(ctx context.Context,j *Job) error {
   // Remaining NAS destinations are mirrors of the cloud only; they do not
   // feed changes into the cloud unless explicitly configured as a separate
   // cloud relationship. This avoids accidental NAS-to-NAS propagation.
-  oneWay:=i>0&&!j.CrossNASPropagation
+  oneWay:=j.Direction=="one_way"||(i>0&&!j.CrossNASPropagation)
   primaryLabel:="Google Drive"
   if sourceName=="dropbox"{primaryLabel="Dropbox"}
   destLabel:=d.ShareID
