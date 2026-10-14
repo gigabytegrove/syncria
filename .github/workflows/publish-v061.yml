@@ -27,6 +27,7 @@ jobs:
         with:
           go-version: '1.25'
           cache: false
+      # Tailwind is a build dependency only; no CSS CDN is used at runtime.
       - name: Compile offline Tailwind CSS
         run: |
           npm install --no-audit --no-fund
