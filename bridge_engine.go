@@ -26,6 +26,7 @@ type bridgeEntry struct {
  Size int64
  Modified time.Time
  Folder bool
+ Unsupported bool
 }
 type bridgeEndpoint interface {
  Scan(context.Context)(map[string]bridgeEntry,error)
@@ -78,6 +79,10 @@ func (b *bridgeDriveEndpoint) Scan(ctx context.Context)(map[string]bridgeEntry,e
  for rel,f:=range files{
   size,_:=strconv.ParseInt(f.Size,10,64)
   if f.MimeType==folderMime{b.folders[rel]=f.ID;out[rel]=bridgeEntry{ID:f.ID,Folder:true};continue}
+  if strings.HasPrefix(f.MimeType,"application/vnd.google-apps.") {
+   out[rel]=bridgeEntry{ID:f.ID,Unsupported:true}
+   continue
+  }
   if f.MD5Checksum==""{return nil,fmt.Errorf("Google Drive file %q lacks a checksum; sync safely stopped",rel)}
   modified,_:=time.Parse(time.RFC3339Nano,f.ModifiedTime)
   out[rel]=bridgeEntry{ID:f.ID,Fingerprint:f.MD5Checksum,Size:size,Modified:modified}
