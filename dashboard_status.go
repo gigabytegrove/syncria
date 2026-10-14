@@ -43,7 +43,9 @@ func (a *App) dashboardStatus(w http.ResponseWriter,r *http.Request) {
  for _,j:=range a.cfg.Jobs {
   last:="Never run"
   if !j.LastRun.IsZero(){last=j.LastRun.Format("Jan 2, 2006 15:04")}
-  jobs=append(jobs,jobState{ID:j.ID,Name:j.Name,Enabled:j.Enabled,Progress:a.syncProgress[j.ID],LastRun:last,Summary:j.LastSummary,Error:j.LastError,SuccessfulRuns:j.SuccessfulRuns,FailedRuns:j.FailedRuns,LastDurationMillis:j.LastDurationMillis,LastUploads:j.LastUploads,LastDownloads:j.LastDownloads,LastUploadBytes:j.LastUploadBytes,LastDownloadBytes:j.LastDownloadBytes,TotalUploads:j.TotalUploads,TotalDownloads:j.TotalDownloads,TotalUploadBytes:j.TotalUploadBytes,TotalDownloadBytes:j.TotalDownloadBytes})
+  progress:=a.syncProgress[j.ID]
+  if !progress.Running && len(progress.Events)==0 && len(j.RecentEvents)>0{progress.Events=append([]SyncActionEvent(nil),j.RecentEvents...)}
+  jobs=append(jobs,jobState{ID:j.ID,Name:j.Name,Enabled:j.Enabled,Progress:progress,LastRun:last,Summary:j.LastSummary,Error:j.LastError,SuccessfulRuns:j.SuccessfulRuns,FailedRuns:j.FailedRuns,LastDurationMillis:j.LastDurationMillis,LastUploads:j.LastUploads,LastDownloads:j.LastDownloads,LastUploadBytes:j.LastUploadBytes,LastDownloadBytes:j.LastDownloadBytes,TotalUploads:j.TotalUploads,TotalDownloads:j.TotalDownloads,TotalUploadBytes:j.TotalUploadBytes,TotalDownloadBytes:j.TotalDownloadBytes})
  }
  shares:=append([]StorageShare(nil),a.cfg.Shares...)
  totals:=summarizeMetrics(a.cfg.Jobs)
