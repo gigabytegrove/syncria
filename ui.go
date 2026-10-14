@@ -260,6 +260,7 @@ code{overflow-wrap:anywhere}
 <section class="panel update-primary" id="updateStatusCard" data-update-state="checking" aria-live="polite">
  <div class="update-status-header"><span class="update-status-icon" id="updateStatusIcon" aria-hidden="true">↻</span><div class="update-status-text"><span class="mini-overline">Application status</span><h2 id="updateStatusHeadline">Checking for updates…</h2><p id="updateMessage">Checking the latest verified release for this device.</p></div><button class="secondary" type="button" onclick="checkUpdate(true)">Check for updates</button></div>
  <div class="update-version-line"><div><small>INSTALLED VERSION</small><strong id="installedVersion">{{.Version}}</strong></div><span class="update-version-arrow" aria-hidden="true">→</span><div><small>LATEST RELEASE</small><strong id="updateAvailableVersion">Checking…</strong></div></div>
+ <p class="update-release-link"><a id="updateReleaseNotes" href="https://github.com/gigabytegrove/syncria/releases" target="_blank" rel="noopener noreferrer">See release notes ↗</a></p>
  <div class="release-actions"><button id="installUpdateButton" class="primary" type="button" onclick="startUpdate('install')" disabled>Install update</button><button id="rollbackUpdateButton" class="secondary" type="button" onclick="startUpdate('rollback')">Restore previous version</button></div>
  <span class="sr-only" id="latestVersion">Checking GitHub Releases…</span>
 </section>
@@ -733,6 +734,12 @@ async function checkUpdate(force=false){
   if(result.error)throw Error(result.error);
   $('latestVersion').textContent=result.latest||'No published release';
   $('updateAvailableVersion').textContent=result.latest||'None';
+  const notes=$('updateReleaseNotes');
+  if(notes){
+   const valid=/^v?[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/.test(result.latest||'');
+   notes.href=valid?'https://github.com/gigabytegrove/syncria/releases/tag/'+encodeURIComponent(result.latest):'https://github.com/gigabytegrove/syncria/releases';
+   notes.textContent=valid?'See what changed in '+result.latest+' ↗':'View published releases ↗';
+  }
   const card=$('updateStatusCard'),headline=$('updateStatusHeadline'),icon=$('updateStatusIcon'),button=$('installUpdateButton');
   const state=result.available?'available':result.pending?'pending':'current';
   if(card)card.dataset.updateState=state;
@@ -746,6 +753,7 @@ async function checkUpdate(force=false){
   $('latestVersion').textContent='Release check failed';
   $('updateAvailableVersion').textContent='Unavailable';
   $('updateMessage').textContent=error.message;
+  if($('installUpdateButton'))$('installUpdateButton').textContent='Update check unavailable';
   if($('updateStatusCard'))$('updateStatusCard').dataset.updateState='error';
   if($('updateStatusHeadline'))$('updateStatusHeadline').textContent='Unable to check for updates';
   if($('updateStatusIcon'))$('updateStatusIcon').textContent='!';
