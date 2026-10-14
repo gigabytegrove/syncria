@@ -122,6 +122,7 @@ func (b *bridgeDropboxEndpoint) Scan(ctx context.Context)(map[string]bridgeEntry
   }
   actual=strings.TrimPrefix(actual,"/")
   if actual==""{continue}
+  if f.Tag=="file" && ignoredSyncPath(actual){continue}
   rel,err:=safeRemotePath(actual);if err!=nil{return nil,fmt.Errorf("Dropbox entry %q: %w",actual,err)}
   if rel==".syncria-recovery"||strings.HasPrefix(rel,".syncria-recovery/"){continue}
   lower:=strings.ToLower(rel)
