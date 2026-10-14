@@ -18,6 +18,9 @@ type syncPreviewRow struct {
  From string `json:"from,omitempty"`
  To string `json:"to,omitempty"`
  Reason string `json:"reason"`
+ PrimaryModified string `json:"primary_modified,omitempty"`
+ SecondaryModified string `json:"secondary_modified,omitempty"`
+ FirstRun bool `json:"first_run,omitempty"`
  Bytes int64 `json:"bytes,omitempty"`
 }
 type syncPreviewResult struct {
@@ -41,6 +44,8 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
  for _,name:=range names{
   l,hasL:=left[name];r,hasR:=right[name];old,tracked:=prev[name]
   row:=syncPreviewRow{Path:name}
+  if hasL&&!l.Modified.IsZero(){row.PrimaryModified=l.Modified.UTC().Format(time.RFC3339)}
+  if hasR&&!r.Modified.IsZero(){row.SecondaryModified=r.Modified.UTC().Format(time.RFC3339)}
   switch {
   case (hasL&&l.Unsupported)||(hasR&&r.Unsupported):
    row.Action="skip";row.Reason="Google-native item cannot be exported by this connector; preserved at source, no copies or deletions attempted"
@@ -69,6 +74,7 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
   case !hasR:
    row.Action="copy";row.From="Primary";row.To="Secondary";row.Bytes=l.Size;row.Reason="Missing on secondary"
   case !tracked:
+   row.FirstRun=true
    // Metadata can propose a first-run winner without downloading all file
    // contents during the dry run. Execution performs byte comparison first.
    decision:=decideFirstRun(j,key,name,l,r,oneWay,policy)
