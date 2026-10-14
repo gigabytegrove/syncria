@@ -32,6 +32,9 @@ func fileModifiedText(t time.Time) string {
 }
 
 func decideFirstRun(j *Job,key,rel string,l,r bridgeEntry,oneWay bool,ongoingPolicy string) firstRunDecision {
+ if oneWay && j.Provider=="nas_bridge" {
+  return firstRunDecision{Reason:"One-way NAS relationship: existing different destination files require review; source-side changes do not upload backward."}
+ }
  if oneWay {
   return firstRunDecision{Direction:"primary",Method:conflictPrimary,Reason:"One-way relationship: source wins; content is checked first, and NAS changes are never uploaded to the source."}
  }
