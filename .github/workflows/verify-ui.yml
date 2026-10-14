@@ -3,6 +3,7 @@ on:
   push:
     branches: [main]
     paths:
+      - '*.go'
       - 'ui.go'
       - 'ui_theme.go'
       - 'ui_product_test.go'
