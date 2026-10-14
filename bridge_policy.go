@@ -197,7 +197,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    if err!=nil{return err}
    recordTransfer(j,true,bytes);countForward++;if j.operationHook!=nil{j.operationHook("copy",rel,"Primary","Secondary")}
   }else if !tracked{
-   same,err:=bridgeSameStreams(ctx,primary,secondary,rel)
+   same,err:=bridgeSameFirstRun(ctx,primary,secondary,rel,l,r)
    if err!=nil{return err}
    if !same{
     decision:=decideFirstRun(j,key,rel,l,r,oneWay,policy)
@@ -265,6 +265,21 @@ func pickConflict(policy string,l,r bridgeEntry)(string,error){
  default:return "",fmt.Errorf("Unrecognized conflict policy %q",policy)
  }
 }
+// Compare a first-run pair before overwriting. Google Drive publishes a
+// content MD5 for ordinary files, so only the NAS file needs to be read.
+// Dropbox's content_hash is NOT a normal SHA256 and must not be treated as one.
+func bridgeSameFirstRun(ctx context.Context,primary,secondary bridgeEndpoint,rel string,l,r bridgeEntry)(bool,error){
+ if l.Size!=r.Size{return false,nil}
+ if _,drive:=primary.(*bridgeDriveEndpoint);drive&&len(l.Fingerprint)==32 {
+  valid:=true
+  for _,c:=range l.Fingerprint{
+   if !((c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F')){valid=false;break}
+  }
+  if valid{return bridgeSameContent(ctx,secondary,rel,l.Fingerprint)}
+ }
+ return bridgeSameStreams(ctx,primary,secondary,rel)
+}
+
 func bridgeSameStreams(ctx context.Context,a,b bridgeEndpoint,rel string)(bool,error){
  ar,as,err:=a.Open(ctx,rel);if err!=nil{return false,err};defer ar.Close()
  br,bs,err:=b.Open(ctx,rel);if err!=nil{return false,err};defer br.Close()
