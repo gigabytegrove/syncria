@@ -156,7 +156,7 @@ func (a *App) previewBridgeProgress(ctx context.Context,j *Job,notify func(strin
    prov:=j.CloudProvider;if prov==""{prov="google_drive"}
    account:=j.AccountID;if prov=="dropbox"{account=j.DropboxAccountID}
    sourceKey=prov+":"+account+":"+j.RemoteID
-   oneWay=i>0&&!j.CrossNASPropagation
+   oneWay=j.Direction=="one_way"||(i>0&&!j.CrossNASPropagation)
   }
   if err!=nil{return result,fmt.Errorf("Primary connection: %w",err)}
   secondary,err:=a.openNAS(ctx,d)
