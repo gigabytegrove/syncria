@@ -56,17 +56,17 @@ Google Drive can have a single file or folder *name* containing a literal slash,
 
 Open **My Syncs** and choose **Test run · Preview changes** on a sync. Syncria reads both locations without copying or deleting files. You can inspect the planned file-by-file actions, see the named source and destination of each transfer, and identify conflicts or deletions before a real run.
 
-The preview is an estimate based on the current scan. It does **not** promise that nothing will change before execution, and it will mark untracked files that exist on both sides for review rather than guessing whether their contents match. The view includes counts across the complete scan and up to 500 file rows. A live sync shows the current filename and a recent history of up to 100 **actual** operations.
+The preview is a read-only estimate based on the current scan. During a first cloud-to-NAS sync, if both locations contain the same file path, Syncria proposes the copy with the newer modification timestamp, shows both timestamps, and labels the proposed replacement **Replace if contents differ**. The real sync checks file contents first; equal or unreliable timestamps require manual review. The first-run preference can be changed to manual in the cloud sync wizard. Be aware that moving a file between NAS devices can reset its timestamp, so newer does not always mean better. The view includes counts across the complete scan and up to 500 file rows. A live sync shows the current filename and a recent history of up to 100 **actual** operations.
 
-**FreeFileSync interoperability:** Syncria intentionally excludes the exact filename `sync.ffs_db` (case-insensitive) from replication. This file is FreeFileSync's private comparison database, and Google Drive can hold multiple copies with that name. Existing copies are left untouched in their original location. Other filenames, including other `.ffs_db` files, are not silently excluded. If Google Drive has other duplicate or case-colliding names in one folder, Syncria safely stops and asks you to rename a duplicate; it will not pick a winner and overwrite another file.
+**FreeFileSync interoperability:** Syncria intentionally excludes the exact filename `sync.ffs_db` (case-insensitive) from replication. This file is FreeFileSync's private comparison database, and Google Drive can hold multiple copies with that name. Existing copies are left untouched in their original location. Other filenames, including other `.ffs_db` files, are not silently excluded. Drive sibling files with the same name are represented on NAS using distinct, stable names derived from their Drive IDs. Existing Drive files are not renamed.
 
 ## Updating Syncria
 
 You normally update from **inside Syncria**:
 
 1. Open **App Updates**.
-2. Click **Check again**.
-3. Click **Download & install update**.
+2. Click **Check for updates**.
+3. Click **Download and install** when a verified update is available.
 4. Watch the real download and checking progress. Syncria will restart and confirm the new version.
 
 Your saved accounts, NAS boxes, and sync choices remain in place. You do **not** need to build an app, download a replacement image, or add an extra updater container each time.
