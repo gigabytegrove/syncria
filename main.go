@@ -97,6 +97,7 @@ type Job struct {
     ScheduleMode string `json:"schedule_mode,omitempty"`
     progressHook func(up,down,upBytes,downBytes int64) `json:"-"`
     itemHook func(processed,total int64,current string) `json:"-"`
+    operationHook func(action,rel,from,to string) `json:"-"`
 	Provider    string `json:"provider,omitempty"`
 	ID          string          `json:"id"`
 	Name        string          `json:"name"`
@@ -645,6 +646,12 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
       a.setSyncProgress(jobID,func(p *SyncProgress){
         p.Phase="transferring"
         p.Uploads=up;p.Downloads=down;p.UploadBytes=upBytes;p.DownloadBytes=downBytes
+      })
+    }
+    job.operationHook=func(action,rel,from,to string){
+      a.setSyncProgress(jobID,func(p *SyncProgress){
+        p.Events=append(p.Events,SyncActionEvent{At:time.Now(),Action:action,Path:rel,From:from,To:to})
+        if len(p.Events)>100{p.Events=p.Events[len(p.Events)-100:]}
       })
     }
     job.itemHook=func(done,total int64,current string){
