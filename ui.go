@@ -122,7 +122,7 @@ code{overflow-wrap:anywhere}
  </div>
  <p class="flow-card-description" data-job-summary="{{.ID}}">{{if .LastSummary}}{{.LastSummary}}{{else}}This sync hasn't run yet.{{end}}</p>
  <p class="flow-card-stats" data-job-statline="{{.ID}}">Sent: {{.TotalUploads}} files · Received: {{.TotalDownloads}} files · Successful runs: {{.SuccessfulRuns}} · Errors: {{.FailedRuns}}</p>
- <p class="flow-card-error" data-job-error="{{.ID}}" role="alert" {{if not .LastError}}hidden{{end}}>{{.LastError}}</p>
+ <p class="flow-card-error" data-job-error="{{.ID}}" role="status" {{if not .LastError}}hidden{{end}}>{{if .LastError}}Last sync failed{{if not .LastRun.IsZero}} on {{.LastRun.Format "Jan 2, 2006 15:04"}}{{end}}: {{.LastError}}{{end}}</p>
  <div class="sync-live-progress hidden" data-job-progress="{{.ID}}">
   <div class="progress-topline"><strong data-job-phase="{{.ID}}">Syncing…</strong><small>Live transfer progress</small></div>
   <progress data-job-bar="{{.ID}}" max="100"></progress><p data-job-progress-detail="{{.ID}}"></p>
@@ -1036,7 +1036,7 @@ function applyLiveStatus(data){
    const summary=document.querySelector('[data-job-summary="'+CSS.escape(job.id)+'"]');
    if(summary)summary.textContent=job.summary||'';
    const error=document.querySelector('[data-job-error="'+CSS.escape(job.id)+'"]');
-   if(error){error.hidden=!job.error;error.textContent=job.error?'Error: '+job.error:'';}
+   if(error){error.hidden=!job.error||job.running;error.textContent=job.error?'Last sync failed ('+(job.last_run||'unknown date')+'): '+job.error:'';}
     const el=(attr)=>document.querySelector('['+attr+'="'+CSS.escape(job.id)+'"]');
     const bytes=Number(job.total_upload_bytes||0)+Number(job.total_download_bytes||0);
     const files=Number(job.total_uploads||0)+Number(job.total_downloads||0);
