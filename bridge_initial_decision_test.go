@@ -60,7 +60,7 @@ func TestFirstRunHonorsExplicitPolicyOneWayAndOverride(t *testing.T) {
  d=decideFirstRun(job,"p","f",l,r,false,conflictManual)
  if d.Direction!="primary"{t.Fatal("explicit file override must beat newest timestamp")}
  d=decideFirstRun(job,"p","f",l,r,true,conflictManual)
- if d.Direction!=""{t.Fatal("one-way destination must not be automatically overwritten")}
+ if d.Direction!="primary"{t.Fatal("one-way cloud must choose source instead of uploading NAS changes")}
  nas:=&Job{Provider:"nas_bridge",ConflictPolicy:conflictManual}
  d=decideFirstRun(nas,"p","f",l,r,false,conflictManual)
  if d.Direction!=""{t.Fatal("manual NAS policy must not be overridden")}
