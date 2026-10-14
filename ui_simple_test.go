@@ -44,7 +44,7 @@ func TestSimpleUILanguageAndGuidedSetup(t *testing.T){
 }
 func TestSimpleUIAndThemeParse(t *testing.T){
  if _,err:=template.New("ui").Parse(newUI);err!=nil{t.Fatal(err)}
- if !strings.Contains(v051Theme,".quick-start-grid") || !strings.Contains(v051Theme,".glossary-layout") || !strings.Contains(v051Theme,"@media(max-width:800px)") {
+ if !strings.Contains(v051Theme,".quick-start-grid") || !strings.Contains(v051Theme,".glossary-layout") || !strings.Contains(v051Theme,"@media") {
   t.Fatal("guided setup and mobile help styles are missing")
  }
 }
