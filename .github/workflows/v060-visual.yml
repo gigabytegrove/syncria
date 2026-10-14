@@ -55,7 +55,7 @@ jobs:
           python3 - <<'PY'
           import os,base64,pathlib
           root=pathlib.Path(os.environ['RUNNER_TEMP'])
-          for name in ('overview','mobile'):
+          for name in ('overview','sync','accounts','updates','mobile'):
               image=root/(name+'.png')
               print('SYNCRIA_IMAGE_START:'+name)
               print(base64.b64encode(image.read_bytes()).decode('ascii'))
