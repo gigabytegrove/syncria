@@ -1,0 +1,63 @@
+name: Browser Preview — Syncria UI
+on:
+  push:
+    branches: [syncria-v0.6.0-new-interface]
+    paths:
+      - 'ui.go'
+      - 'ui_theme.go'
+      - 'ui_visual_preview_test.go'
+      - '.github/workflows/v060-visual.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+      - name: Render a synthetic local dashboard
+        env:
+          SYNCRIA_VISUAL_PREVIEW: '1'
+        run: |
+          go mod tidy
+          go test -run TestProduceUIBrowserPreview -count=1 -v .
+      - name: Capture real Chromium screenshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          chrome="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$chrome"
+          "$chrome" --version
+          for screen in overview sync accounts updates; do
+            "$chrome" --headless --disable-gpu --no-sandbox --no-first-run --hide-scrollbars --virtual-time-budget=800 --window-size=1440,920 --screenshot="$RUNNER_TEMP/${screen}.png" "file://$RUNNER_TEMP/syncria-preview.html#${screen}" >/dev/null 2>&1
+            test -s "$RUNNER_TEMP/${screen}.png"
+          done
+          "$chrome" --headless --disable-gpu --no-sandbox --no-first-run --hide-scrollbars --virtual-time-budget=800 --window-size=390,844 --screenshot="$RUNNER_TEMP/mobile.png" "file://$RUNNER_TEMP/syncria-preview.html#overview" >/dev/null 2>&1
+          test -s "$RUNNER_TEMP/mobile.png"
+          ls -lh "$RUNNER_TEMP"/*.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: syncria-v060-visual-review
+          path: |
+            ${{ runner.temp }}/overview.png
+            ${{ runner.temp }}/sync.png
+            ${{ runner.temp }}/accounts.png
+            ${{ runner.temp }}/updates.png
+            ${{ runner.temp }}/mobile.png
+          retention-days: 7
+      - name: Emit two preview images for visual inspection
+        run: |
+          python3 - <<'PY'
+          import os,base64,pathlib
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])
+          for name in ('overview','sync','accounts','updates','mobile'):
+              image=root/(name+'.png')
+              print('SYNCRIA_IMAGE_START:'+name)
+              print(base64.b64encode(image.read_bytes()).decode('ascii'))
+              print('SYNCRIA_IMAGE_END:'+name)
+          PY
