@@ -200,11 +200,21 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    same,err:=bridgeSameStreams(ctx,primary,secondary,rel)
    if err!=nil{return err}
    if !same{
-    if oneWay{return fmt.Errorf("Existing different files at %s: choose a safe resolution",rel)}
-    direction,method,resolveErr:=a.selectResolution(j,key,rel,policy,l,r)
-    if resolveErr!=nil{_ =a.checkpointBridge(j);return fmt.Errorf("Initial file conflict at %s: %w",rel,resolveErr)}
-    if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,direction,method,&l,&r);err!=nil{return err}
-    if j.operationHook!=nil{j.operationHook("resolve conflict",rel,direction,func()string{if direction=="primary"{return "Secondary"};return "Primary"}())}
+    decision:=decideFirstRun(j,key,rel,l,r,oneWay,policy)
+    if decision.Direction==""{
+     if !oneWay{
+      // Preserve the existing manual resolution controls when timestamps
+      // cannot identify a safe winner. Do not invent a default overwrite.
+      _,_,_ =a.manualConflict(j,key,rel,l,r)
+      _=a.checkpointBridge(j)
+     }
+     return fmt.Errorf("Initial file conflict at %s: %s",rel,decision.Reason)
+    }
+    if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,decision.Direction,decision.Method,&l,&r);err!=nil{return err}
+    if j.operationHook!=nil{
+     target:="Secondary";if decision.Direction=="secondary"{target="Primary"}
+     j.operationHook("resolve first-run conflict",rel,decision.Direction,target)
+    }
     a.clearConflict(j,key,rel)
    }
   }else{
