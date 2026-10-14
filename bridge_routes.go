@@ -249,7 +249,7 @@ func (a *App) addBridge(w http.ResponseWriter,r *http.Request){
    if !exists{redirect(w,r,"Dropbox account not connected");return}
   default:redirect(w,r,"Select Google Drive or Dropbox");return
   }
-  j.Direction=r.FormValue("direction")
+  j.Direction=r.FormValue("cloud_direction")
   if j.Direction==""{j.Direction="bidirectional"} // Legacy cloud form default.
   if j.Direction!="one_way"&&j.Direction!="bidirectional"{redirect(w,r,"Choose one-way cloud → NAS or bidirectional cloud ↔ NAS");return}
   j.CrossNASPropagation=r.FormValue("cross_nas_propagation")=="1"
