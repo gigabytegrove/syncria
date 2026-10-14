@@ -1,0 +1,40 @@
+name: Verify Syncria New Interface
+on:
+  push:
+    branches: [syncria-v0.6.0-new-interface]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+      - name: Verify source and existing sync tests
+        run: |
+          set -euo pipefail
+          go mod tidy
+          go test -count=1 ./...
+          go test -race -count=1 ./...
+          go vet ./...
+          CGO_ENABLED=0 go build -trimpath -o /tmp/syncria-ui .
+          /tmp/syncria-ui -h >/dev/null
+      - name: Verify embedded browser JavaScript parses
+        run: |
+          node <<'JS'
+          const fs=require('node:fs'),vm=require('node:vm');
+          const src=fs.readFileSync('ui.go','utf8');
+          const start=src.indexOf('<script>')+8,end=src.indexOf('</script>',start);
+          if(start<8||end<start)throw Error('No embedded script');
+          new vm.Script(src.slice(start,end),{filename:'syncria-ui.js'});
+          const ids=new Set([...src.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]));
+          const references=[...src.matchAll(/\$\('([A-Za-z0-9_-]+)'\)/g)].map(x=>x[1]);
+          const missing=[...new Set(references.filter(x=>!ids.has(x)))];
+          if(missing.length)throw Error('UI element references missing: '+missing.join(', '));
+          console.log('PASS: JavaScript syntax and '+references.length+' element references');
+          JS
