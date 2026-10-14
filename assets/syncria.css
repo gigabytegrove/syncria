@@ -337,3 +337,11 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{b
 .live-activity-item span{overflow-wrap:anywhere}
 .live-activity-item small{color:#6c8598;overflow-wrap:anywhere}
 @media(max-width:700px){.live-activity-item{grid-template-columns:1fr;gap:3px}.live-system-bar{flex-wrap:wrap}.live-system-bar button{margin-left:auto}}
+
+
+.preview-live-state{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px 18px;align-items:center;padding:17px 19px;border:1px solid #cbdfea;border-radius:10px;background:#f6fbfe}
+.preview-live-state strong{font-size:15px;color:#1d587d}
+.preview-live-state>div:not(.preview-live-counts){grid-column:1 / -1;overflow-wrap:anywhere;color:#40667e;font-size:12px}
+.preview-live-counts{grid-column:1;display:flex;gap:12px;flex-wrap:wrap;color:#26769a;font-size:12px;font-weight:650}
+.preview-live-state button{grid-column:2;grid-row:1;justify-self:end}
+@media(max-width:520px){.preview-live-state{grid-template-columns:1fr}.preview-live-state button{grid-row:auto;grid-column:1;justify-self:start}}
