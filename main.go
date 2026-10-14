@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-var appVersion = "v0.6.9"
+var appVersion = "v0.6.10"
 const folderMime = "application/vnd.google-apps.folder"
 const scope = "https://www.googleapis.com/auth/drive"
 
