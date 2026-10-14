@@ -288,7 +288,7 @@ func pickConflict(policy string,l,r bridgeEntry)(string,error){
 func bridgeSameFirstRun(ctx context.Context,primary,secondary bridgeEndpoint,rel string,l,r bridgeEntry)(bool,error){
  if err:=ctx.Err();err!=nil{return false,err}
  if l.Modified.IsZero()||r.Modified.IsZero(){
-  return false,fmt.Errorf("Cannot compare %s: a file modification timestamp is missing; manual review required",rel)
+  return false,nil // no metadata match: defer to the configured first-run conflict policy
  }
  if l.Modified.Equal(r.Modified) {
   if l.Size!=r.Size{
