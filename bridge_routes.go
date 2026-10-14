@@ -55,6 +55,11 @@ func (a *App) labelSyncOperation(j *Job,source,secondary string) func(){
  }
  return func(){j.operationHook=original}
 }
+func wireNASScan(j *Job,endpoint recoverableBridgeEndpoint,label string){
+ if smb,ok:=endpoint.(*bridgeSMBEndpoint);ok&&j.scanHook!=nil{
+  smb.scanHook=func(rel string,count int64){j.scanHook(label,rel,count)}
+ }
+}
 func (a *App) syncBridge(ctx context.Context,j *Job) error {
  destinations:=append([]NASDestination(nil),j.NASDestinations...)
  if len(destinations)==0&&j.NASShareID!=""{
@@ -76,6 +81,8 @@ func (a *App) syncBridge(ctx context.Context,j *Job) error {
    if share,e:=a.directShare(source.ShareID);e==nil&&share.Label!=""{sourceLabel=share.Label}
    destLabel:=destination.ShareID
    if share,e:=a.directShare(destination.ShareID);e==nil&&share.Label!=""{destLabel=share.Label}
+   wireNASScan(j,primary,sourceLabel)
+   wireNASScan(j,secondary,destLabel)
    restore:=a.labelSyncOperation(j,sourceLabel,destLabel)
    err=a.executePolicyPair(ctx,j,primary,secondary,key,j.Direction=="one_way",policy)
    restore()
@@ -113,6 +120,7 @@ func (a *App) syncBridge(ctx context.Context,j *Job) error {
   if sourceName=="dropbox"{primaryLabel="Dropbox"}
   destLabel:=d.ShareID
   if share,e:=a.directShare(d.ShareID);e==nil&&share.Label!=""{destLabel=share.Label}
+  wireNASScan(j,nas,destLabel)
   restore:=a.labelSyncOperation(j,primaryLabel,destLabel)
   err=a.executePolicyPair(ctx,j,cloud,nas,key,oneWay,conflictManual)
   restore()
