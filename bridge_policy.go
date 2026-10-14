@@ -240,6 +240,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     if err!=nil{return err}
     recordTransfer(j,true,bytes);countForward++;if j.operationHook!=nil{j.operationHook("copy",rel,"Primary","Secondary")}
    }else if changedSecondary{
+    if oneWay&&j.Provider=="nas_bridge"{return fmt.Errorf("One-way NAS destination was modified at %s; no overwrite attempted",rel)}
     if oneWay{
      checksum:="";if len(l.Fingerprint)==32||len(l.Fingerprint)==64{checksum=l.Fingerprint}
      r,err=bridgeCopy(ctx,primary,secondary,rel,checksum,func(n int64){if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
