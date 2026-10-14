@@ -114,6 +114,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
  })
  var countForward,countBack int64
  for i,rel:=range ordered{
+  if ignoredSyncPath(rel){continue}
   if err:=ctx.Err();err!=nil{return err}
   if isPending(j,key,rel){continue}
   if j.itemHook!=nil{j.itemHook(int64(i),int64(len(ordered)),rel)}
