@@ -373,16 +373,17 @@ func (a *App) remoteTree(ctx context.Context, acc, root string) (map[string]driv
 		names := map[string]bool{}
 		for _, f := range children {
 			if ignoredSyncMetadata(f.Name) && f.MimeType != folderMime {continue}
-			if !safeName(f.Name) {
-				return fmt.Errorf("unsafe remote filename: %q", f.Name)
+			component:=portableDriveName(f.Name)
+			if !safeName(component) {
+				return fmt.Errorf("Google Drive filename %q cannot be mapped to a safe NAS name; no files changed", f.Name)
 			}
-			if names[strings.ToLower(f.Name)] {
-				return fmt.Errorf("Google Drive has two files named %q in folder %q (including possible case differences). Rename one in Google Drive, then retry; neither copy was changed", f.Name, p)
+			if names[strings.ToLower(component)] {
+				return fmt.Errorf("Google Drive files collide after NAS-safe filename mapping in folder %q: %q. Rename one at the source; neither copy was changed",p,f.Name)
 			}
-			names[strings.ToLower(f.Name)] = true
-			path := f.Name
+			names[strings.ToLower(component)] = true
+			path := component
 			if p != "" {
-				path = p + "/" + f.Name
+				path = p + "/" + component
 			}
 			if f.MimeType != folderMime && strings.HasPrefix(f.MimeType, "application/vnd.google-apps.") {
 				return fmt.Errorf("Google-native document %q requires export; sync paused to protect data", path)
