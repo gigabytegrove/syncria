@@ -31,7 +31,7 @@ func (a *App) cloudEndpoint(j *Job)(recoverableBridgeEndpoint,error){
   if j.AccountID==""{return nil,errors.New("Google Drive account not selected")}
   a.mu.Lock();exists:=a.account(j.AccountID)!=nil;a.mu.Unlock()
   if !exists{return nil,errors.New("Google Drive account unavailable")}
-  return &bridgeDriveEndpoint{app:a,account:j.AccountID,root:j.RemoteID},nil
+  return &bridgeDriveEndpoint{app:a,account:j.AccountID,root:j.RemoteID,scanHook:func(rel string,count int64){if j.scanHook!=nil{j.scanHook("Google Drive",rel,count)}}},nil
  case "dropbox":
   if j.DropboxAccountID==""{return nil,errors.New("Dropbox account not selected")}
   a.mu.Lock();exists:=a.dropboxAccount(j.DropboxAccountID)!=nil;a.mu.Unlock()
