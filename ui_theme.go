@@ -462,4 +462,54 @@ overflow:hidden;box-shadow:0 5px 23px #1439690b
  .hero-actions{gap:12px}
 }
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+
+/* Product-specific sync builder: its own composition, not a generic modal card */
+.sync-builder{
+ background:#fff;border:1px solid #d6e4f4;border-top:5px solid #16ccd0;
+ border-radius:16px;margin:27px 0 30px;padding:0;overflow:hidden;
+ box-shadow:0 15px 43px #103b6d17
+}
+.builder-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;background:#102e59;color:#fff;padding:27px 31px}
+.builder-heading .mini-overline{color:#4cdeea}
+.builder-heading h2{font-size:27px;letter-spacing:-.8px;color:#fff;font-weight:840;margin:5px 0}
+.builder-heading p{font-size:12px;color:#b3cee9;margin:5px 0 0}
+.builder-heading .secondary{background:#1c487d;border:1px solid #3e6799;color:#e3f2ff}
+.builder-heading .secondary:hover{background:#285a96}
+.sync-builder>.step-indicator{background:#f1f7ff;padding:16px 28px;margin:0;border-bottom:1px solid #dfeaf7;gap:10px}
+.sync-builder>.step-indicator span{background:transparent;border:0;border-radius:0;padding:8px 12px;color:#7b93ad;font-size:11px;font-weight:750}
+.sync-builder>.step-indicator span.active{color:#0e66cb;background:#fff;border-radius:8px;box-shadow:0 3px 9px #1954a211}
+.sync-builder>form{padding:29px 31px 33px;max-width:930px}
+.sync-builder .step>h2{font-size:23px;color:#1b3c61;letter-spacing:-.6px;font-weight:830;margin:0 0 5px}
+.sync-builder .step>p.muted{color:#7189a0;margin:0 0 22px;line-height:1.6;font-size:12px}
+.sync-builder .step .field{max-width:790px}
+.sync-builder .wizard-status{margin:20px 0}
+.sync-builder .selected{background:#f6fbff}
+.sync-builder .row{margin-top:13px}
+.sync-builder .row .primary{min-height:43px}
+.sync-builder #nasTargets{border:1px solid #e3ebf5;border-radius:13px;padding:13px;background:#f9fcff}
+.sync-builder .review-grid{margin:13px 0 18px}
+.sync-builder .step-indicator{margin:0 0 24px}
+.release-panel{border-top:4px solid #12cad4}
+.release-panel-heading{display:flex;align-items:center;justify-content:space-between;gap:13px;margin-bottom:18px}
+.release-well{padding:24px;border-radius:13px;background:#0f305e;color:#fff;display:flex;justify-content:space-between;align-items:center;gap:15px;margin:0 0 15px}
+.release-well>div{min-width:0}
+.release-well small{font-size:10px;letter-spacing:1.2px;font-weight:840;color:#81bdec;display:block}
+.release-well strong{font-size:32px;letter-spacing:-.7px;color:#fff;font-weight:850;display:block;margin:3px 0}
+.release-well p{color:#aacdeb;font-size:12px;margin:0}
+.release-well .secondary{border-color:#36669a;background:#1e4c81;color:#fff;white-space:nowrap}
+.release-well .secondary:hover{background:#2467aa}
+.release-actions{display:flex;align-items:center;flex-wrap:wrap;gap:11px}
+.release-note{font-size:11px;color:#8797ab;margin:17px 0 2px;line-height:1.6}
+.update-progress-panel{margin-top:0}
+#view-settings .panel{max-width:1020px}
+#view-settings .panel:first-of-type{border-top:4px solid #16ccd0}
+@media(max-width:680px){
+ .sync-builder>.step-indicator{padding:12px}
+ .sync-builder>.step-indicator span{font-size:10px;padding:6px 8px}
+ .sync-builder>form{padding:18px}
+ .builder-heading{padding:22px 18px;flex-wrap:wrap}
+ .builder-heading h2{font-size:23px}
+ .release-well{flex-direction:column;align-items:flex-start}
+ .release-well strong{font-size:26px}
+}
 `
