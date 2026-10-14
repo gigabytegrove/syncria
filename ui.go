@@ -1,7 +1,7 @@
 package main
 
 // newUI is a complete replacement for the original single-page dashboard.
-const newUI = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Syncria — Your files, in sync</title>
+var newUI = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Syncria — Your files, in sync</title>
 <style>
 /* Functional layout primitives. Product styling is centralized in ui_theme.go. */
 *{box-sizing:border-box}
