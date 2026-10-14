@@ -93,7 +93,8 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
    changeR:=old.LocalMD5!=r.Fingerprint
    switch {
    case changeL&&changeR:
-    if oneWay {row.Action="replace";row.From="Primary";row.To="Secondary";row.Bytes=l.Size;row.Reason="One-way: source wins when both changed; NAS changes are not uploaded"
+    if oneWay&&j.Provider=="nas_bridge"{row.Action="blocked";row.Reason="Both files changed in one-way NAS relationship"
+    }else if oneWay {row.Action="replace";row.From="Primary";row.To="Secondary";row.Bytes=l.Size;row.Reason="One-way: source wins when both changed; NAS changes are not uploaded"
     }else if policy==conflictPrimary||policy==conflictSecondary{
      row.Action="replace";row.From="Primary";row.To="Secondary";if policy==conflictSecondary{row.From="Secondary";row.To="Primary"}
      row.Reason="Both changed; configured conflict preference determines winner"
