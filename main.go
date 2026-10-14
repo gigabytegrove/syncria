@@ -111,6 +111,7 @@ type Job struct {
 	LastRun     time.Time       `json:"last_run"`
 	LastError   string          `json:"last_error"`
 	LastSummary string          `json:"last_summary"`
+    RecentEvents []SyncActionEvent `json:"recent_events,omitempty"`
     SuccessfulRuns int64 `json:"successful_runs"`
     FailedRuns int64 `json:"failed_runs"`
     LastDurationMillis int64 `json:"last_duration_ms"`
@@ -688,8 +689,10 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     default:
       err=fmt.Errorf("Unsupported sync provider: %s",job.Provider)
     }
+    recent:=a.getSyncProgress(jobID).Events
 	a.mu.Lock()
 	if actual := a.job(jobID); actual != nil {
+        actual.RecentEvents=append([]SyncActionEvent(nil),recent...)
 		actual.LastRun = time.Now()
         actual.LastDurationMillis = time.Since(started).Milliseconds()
         if err != nil {actual.FailedRuns++} else {actual.SuccessfulRuns++}
