@@ -163,6 +163,14 @@ func (a *App) verifyNASFolder(ctx context.Context,d NASDestination)error{
  return err
 }
 func (a *App) addBridge(w http.ResponseWriter,r *http.Request){
+ editID:=strings.TrimSpace(r.FormValue("edit_id"))
+ if editID!="" {
+  a.mu.Lock();existing:=a.job(editID)
+  if existing==nil{a.mu.Unlock();redirect(w,r,"Existing sync not found");return}
+  if existing.Enabled{a.mu.Unlock();redirect(w,r,errSyncMustBePaused.Error());return}
+  if _,running:=a.runs.Load(editID);running{a.mu.Unlock();redirect(w,r,"Wait until the current sync finishes before editing");return}
+  a.mu.Unlock()
+ }
  name:=strings.TrimSpace(r.FormValue("name"))
  if name==""||len(name)>128{redirect(w,r,"Relationship name must be 1–128 characters");return}
  relationship:=r.FormValue("relationship_type")
@@ -241,7 +249,11 @@ func (a *App) addBridge(w http.ResponseWriter,r *http.Request){
    if !exists{redirect(w,r,"Dropbox account not connected");return}
   default:redirect(w,r,"Select Google Drive or Dropbox");return
   }
+  j.Direction=r.FormValue("direction")
+  if j.Direction==""{j.Direction="bidirectional"} // Legacy cloud form default.
+  if j.Direction!="one_way"&&j.Direction!="bidirectional"{redirect(w,r,"Choose one-way cloud → NAS or bidirectional cloud ↔ NAS");return}
   j.CrossNASPropagation=r.FormValue("cross_nas_propagation")=="1"
+  if j.Direction=="one_way"&&j.CrossNASPropagation {redirect(w,r,"One-way sync cannot share NAS-side changes back through the cloud");return}
  }
  // Make sure the selected endpoint folders actually exist and are
  // accessible, without mounting or copying anything into Syncria.
@@ -271,6 +283,7 @@ func (a *App) addBridge(w http.ResponseWriter,r *http.Request){
  allNew:=append([]NASDestination(nil),selected...)
  if j.Provider=="nas_bridge" {allNew=append(allNew,NASDestination{ShareID:j.NASSourceID,Folder:j.NASSourceFolder})}
  for _,existing:=range a.cfg.Jobs{
+  if existing.ID==editID{continue}
   if existing.Provider!="bridge"&&existing.Provider!="nas_bridge"{continue}
   previous:=append([]NASDestination(nil),existing.NASDestinations...)
   if len(previous)==0&&existing.NASShareID!=""{previous=append(previous,NASDestination{ShareID:existing.NASShareID,Folder:existing.NASFolder})}
@@ -285,10 +298,23 @@ func (a *App) addBridge(w http.ResponseWriter,r *http.Request){
    }
   }
  }
- a.cfg.Jobs=append(a.cfg.Jobs,j)
+ if editID!=""{
+  index:=-1
+  for i:=range a.cfg.Jobs{if a.cfg.Jobs[i].ID==editID{index=i;break}}
+  if index<0{a.mu.Unlock();redirect(w,r,"Existing sync was removed before saving");return}
+  if _,running:=a.runs.Load(editID);running{a.mu.Unlock();redirect(w,r,"Wait for the sync to finish before editing");return}
+  if err:=carryEditedSync(&j,a.cfg.Jobs[index],r.FormValue("reset_mapping")=="1");err!=nil{
+   a.mu.Unlock();redirect(w,r,err.Error());return
+  }
+  a.cfg.Jobs[index]=j
+ }else{
+  a.cfg.Jobs=append(a.cfg.Jobs,j)
+ }
  err=a.save();a.mu.Unlock()
  if err!=nil{http.Error(w,"Could not save relationship",500);return}
- http.Redirect(w,r,"/?msg="+url.QueryEscape("Synchronization relationship created and paused. No files were copied.")+"#sync",http.StatusSeeOther)
+ message:="Sync created and paused. No files were copied."
+ if editID!=""{message="Sync settings saved. The relationship remains paused; run a fresh dry run before enabling it."}
+ http.Redirect(w,r,"/?msg="+url.QueryEscape(message)+"#sync",http.StatusSeeOther)
 }
 func boolPtr(value bool)*bool{return &value}
 
