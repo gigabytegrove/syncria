@@ -118,6 +118,10 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
   if isPending(j,key,rel){continue}
   if j.itemHook!=nil{j.itemHook(int64(i),int64(len(ordered)),rel)}
   l,hasL:=left[rel];r,hasR:=right[rel];prior,tracked:=prev[rel]
+  if (hasL&&l.Unsupported)||(hasR&&r.Unsupported){
+   if j.operationHook!=nil{j.operationHook("unsupported Google document — kept on Drive",rel,"Google Drive","No NAS copy")}
+   continue
+  }
   if suppressCrossNASTransfer(j,key,rel,l,hasL,oneWay){continue}
   if !hasL&&!hasR{delete(next,rel);continue}
   if hasL&&hasR&&l.Folder!=r.Folder{return fmt.Errorf("Folder/file type conflict: %s",rel)}
