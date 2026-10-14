@@ -1,0 +1,153 @@
+name: Publish Syncria v0.7.1 for in-app updater
+
+# The release is built and published by GitHub Actions, not on an end user's NAS.
+# The updater binaries and checksums publish first. GHCR is optional.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-v071.yml'
+      - '*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'VERSION'
+      - 'Dockerfile'
+      - 'docs/RELEASE-v0.7.1.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    name: Verify and publish updater binaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: syncria-v071-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+      # Compile the finalized interface and bundle it inside every updater binary.
+      - name: Compile offline Tailwind CSS
+        run: |
+          npm install --no-audit --no-fund
+          npm run build:css
+          test -s assets/syncria.css
+      - name: Verify application and tests
+        run: |
+          set -euo pipefail
+          test "$(cat VERSION)" = "v0.7.1"
+          go mod tidy
+          go test -count=1 ./...
+          go test -race -count=1 ./...
+          go vet ./...
+      - name: Cross-compile updater assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 linux/arm windows/amd64 windows/arm64 darwin/amd64 darwin/arm64; do
+            os="${target%/*}"
+            arch="${target#*/}"
+            suffix=""
+            if [[ "$os" == windows ]]; then suffix=".exe"; fi
+            GOOS="$os" GOARCH="$arch" CGO_ENABLED=0               go build -trimpath -ldflags="-s -w -X main.appVersion=v0.7.1"               -o "dist/syncria-${os}-${arch}${suffix}" .
+          done
+          (cd dist && sha256sum syncria-* > SHA256SUMS)
+          test "$(wc -l < dist/SHA256SUMS)" -eq 7
+      - name: Verify compiled binary
+        run: |
+          test -s dist/syncria-linux-amd64
+          test -s dist/SHA256SUMS
+          (cd dist && sha256sum -c SHA256SUMS)
+      - name: Publish GitHub release for built-in updater
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REL: v0.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "docs/RELEASE-v0.7.1.md" || { echo "::error::Release notes missing"; exit 1; }
+          # Previous attempt left a tag after successfully compiling and
+          # hashing binaries, but before publishing a GitHub release.
+          # Allow recovery only when every application file matches the tag.
+          ref="repos/${GITHUB_REPOSITORY}/git/ref/tags/${REL}"
+          if existing="$(gh api "$ref" --jq '.object.sha' 2>/dev/null)"; then
+            if [[ "$existing" != "$GITHUB_SHA" ]]; then
+              git fetch --no-tags --depth=1 origin "$existing"
+              if ! git diff --quiet "$existing" HEAD -- . ':(exclude)docs/RELEASE-v0.7.1.md' ':(exclude).github/workflows/publish-v071.yml'; then
+                echo "::error::Tagged source differs from the compiled application. Refusing mismatched binaries."
+                exit 1
+              fi
+              echo "Recovering interrupted publication: application source matches existing tag $existing."
+            fi
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/${REL}" -f sha="$GITHUB_SHA" >/dev/null
+          fi
+          if gh release view "$REL" --json assets >/dev/null 2>&1; then
+            echo "Release $REL exists; uploading only missing artifacts."
+            for file in dist/*; do
+              name="${file##*/}"
+              if ! gh release view "$REL" --json assets --jq '.assets[].name' | grep -Fqx "$name"; then
+                gh release upload "$REL" "$file"
+              fi
+            done
+          else
+            gh release create "$REL" dist/* --verify-tag --title "Syncria v0.7.1" --notes-file docs/RELEASE-v0.7.1.md
+          fi
+          gh release view "$REL" --json assets --jq '.assets[].name'
+      - name: Verify public updater manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          sleep 3
+          python3 - <<'PY'
+          import json, urllib.request
+          url = "https://api.github.com/repos/gigabytegrove/syncria/releases/tags/v0.7.1"
+          with urllib.request.urlopen(urllib.request.Request(url, headers={"Accept":"application/vnd.github+json", "User-Agent":"Syncria-release-check"}), timeout=30) as resp:
+              obj = json.load(resp)
+          required = {"SHA256SUMS", "syncria-linux-amd64", "syncria-linux-arm64", "syncria-linux-arm",
+            "syncria-windows-amd64.exe", "syncria-windows-arm64.exe",
+            "syncria-darwin-amd64", "syncria-darwin-arm64"}
+          names = {x["name"] for x in obj.get("assets",[]) if x.get("state")=="uploaded" and x.get("size",0)>0}
+          if obj.get("draft") or not required.issubset(names):
+              raise SystemExit("Updater release assets missing: "+str(required-names))
+          print("PASS: Public release manifest contains every versioned binary and SHA256SUMS.")
+          PY
+
+  ghcr:
+    name: Publish optional GHCR images
+    # GHCR package ACLs may reject a push; the already-published in-app
+    # updater binaries must remain the successful primary release.
+    continue-on-error: true
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: APP_VERSION=v0.7.1
+          tags: |
+            ghcr.io/gigabytegrove/syncria:0.7.1
+            ghcr.io/gigabytegrove/syncria:v0.7.1
+            ghcr.io/gigabytegrove/syncria:latest
