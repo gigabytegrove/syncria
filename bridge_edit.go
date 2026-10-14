@@ -59,7 +59,8 @@ func (a *App) syncEditorConfig(w http.ResponseWriter,r *http.Request){
 }
 
 func sameSyncEndpoints(x,y Job)bool{
- if x.Provider!=y.Provider||x.CloudProvider!=y.CloudProvider||x.AccountID!=y.AccountID||
+ cloud:=func(j Job)string{if j.Provider=="bridge" && j.CloudProvider==""{return "google_drive"};return j.CloudProvider}
+ if x.Provider!=y.Provider||cloud(x)!=cloud(y)||x.AccountID!=y.AccountID||
  x.DropboxAccountID!=y.DropboxAccountID||x.RemoteID!=y.RemoteID||x.NASSourceID!=y.NASSourceID||x.NASSourceFolder!=y.NASSourceFolder{return false}
  xd:=x.NASDestinations;yd:=y.NASDestinations
  if len(xd)==0&&x.NASShareID!=""{xd=[]NASDestination{{ShareID:x.NASShareID,Folder:x.NASFolder}}}
