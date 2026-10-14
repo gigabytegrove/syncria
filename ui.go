@@ -54,7 +54,7 @@ code{overflow-wrap:anywhere}
       <button type="button" data-view="accounts" class="" aria-label="Cloud Accounts"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16.5a4 4 0 0 1 1-7.7 7.5 7.5 0 0 1 14.4 1.2A4.5 4.5 0 0 1 18 19H6.5"/><path d="M8 16h8m-4-4v8"/></svg></span><span class="nav-copy"><strong>Cloud Accounts</strong><small>Google & Dropbox</small></span></button>
     </nav></div>
     <div class="nav-group"><p class="nav-section-label">SYSTEM</p><nav class="nav" aria-label="System">
-      <button type="button" data-view="updates" class="" aria-label="App Updates"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.8 9a7.5 7.5 0 0 1 13.4-3L21 9m0-6v6h-6M19.2 15A7.5 7.5 0 0 1 5.8 18L3 15m0 6v-6h6"/></svg></span><span class="nav-copy"><strong>App Updates</strong><small>Versions and installs</small></span></button>
+      <button type="button" data-view="updates" class="" aria-label="App Updates"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.8 9a7.5 7.5 0 0 1 13.4-3L21 9m0-6v6h-6M19.2 15A7.5 7.5 0 0 1 5.8 18L3 15m0 6v-6h6"/></svg></span><span class="nav-copy"><strong>App Updates</strong><small>Versions and installs</small></span><span id="updateNavIndicator" class="update-nav-indicator hidden" aria-label="Update available">New</span></button>
       <button type="button" data-view="settings" class="" aria-label="Settings"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 14 5l3-1 1 3 3 2-2 3 2 3-3 2-1 3-3-1-2 2-2-2-3 1-1-3-3-2 2-3-2-3 3-2 1-3 3 1z"/><circle cx="12" cy="12" r="3"/></svg></span><span class="nav-copy"><strong>Settings</strong><small>Advanced configuration</small></span></button>
     </nav></div>
   </div>
@@ -748,6 +748,7 @@ async function checkUpdate(force=false){
   $('updateMessage').textContent=state==='available'?'Syncria '+(result.latest||'')+' is ready to install on this device.':state==='pending'?(result.message||'The release files are not ready yet.'):'You’re running the latest published release.';
   if(button)button.textContent=state==='available'?'Download and install '+(result.latest||'update'):'No update available';
   updateInstallAvailable=!!result.available;
+  if($('updateNavIndicator'))$('updateNavIndicator').classList.toggle('hidden',!result.available);
   $('installUpdateButton').disabled=updateRunning||updateSubmitting||!updateInstallAvailable;
  }catch(error){
   $('latestVersion').textContent='Release check failed';
