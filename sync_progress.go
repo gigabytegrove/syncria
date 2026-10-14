@@ -50,6 +50,18 @@ func (a *App) getSyncProgress(id string) SyncProgress {
  return a.syncProgress[id]
 }
 
+// stopRunningJob cancels only the current run; it never changes the saved
+// Enabled flag or touches already committed cloud/NAS file data.
+func (a *App) stopRunningJob(id string) bool {
+ if _,running:=a.runs.Load(id);!running{return false}
+ value,exists:=a.runCancels.Load(id)
+ if !exists{return false}
+ a.stopRequests.Store(id,true)
+ a.setSyncProgress(id,func(p *SyncProgress){p.Phase="stopping"})
+ value.(context.CancelFunc)()
+ return true
+}
+
 func (a *App) watchChangedJob(ctx context.Context,id string) {
  defer a.watchers.Delete(id)
  a.mu.Lock()
