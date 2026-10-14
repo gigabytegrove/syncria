@@ -231,6 +231,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,direction,method,&l,&r);err!=nil{return err}
     if j.operationHook!=nil{j.operationHook("resolve conflict",rel,direction,func()string{if direction=="primary"{return "Secondary"};return "Primary"}())}
     a.clearConflict(j,key,rel)
+    }
    }else if changedPrimary{
     var bytes int64
     checksum:="";if len(l.Fingerprint)==32||len(l.Fingerprint)==64{checksum=l.Fingerprint}
