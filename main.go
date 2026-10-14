@@ -98,6 +98,7 @@ type Job struct {
     progressHook func(up,down,upBytes,downBytes int64) `json:"-"`
     itemHook func(processed,total int64,current string) `json:"-"`
     operationHook func(action,rel,from,to string) `json:"-"`
+    scanHook func(endpoint,rel string,count int64) `json:"-"`
 	Provider    string `json:"provider,omitempty"`
 	ID          string          `json:"id"`
 	Name        string          `json:"name"`
@@ -647,6 +648,11 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
       a.setSyncProgress(jobID,func(p *SyncProgress){
         p.Phase="transferring"
         p.Uploads=up;p.Downloads=down;p.UploadBytes=upBytes;p.DownloadBytes=downBytes
+      })
+    }
+    job.scanHook=func(endpoint,rel string,count int64){
+      a.setSyncProgress(jobID,func(p *SyncProgress){
+        p.Phase="scanning";p.Current=endpoint+": "+rel;p.Processed=count;p.Total=0
       })
     }
     job.operationHook=func(action,rel,from,to string){
