@@ -14,14 +14,14 @@ type firstRunDecision struct {
  Reason string
 }
 
-// Cloud-to-NAS relationships previously forced "manual" even at bootstrap,
-// so an existing mirrored collection showed thousands of undifferentiated
-// review rows. Cloud bootstrap defaults to newer-timestamp only when no
-// explicit policy was configured; regular later conflicts remain manual.
+// Cloud-to-NAS relationships have historically persisted ConflictPolicy:
+// "manual" even though the user did not select it. First-run decisions use
+// a SEPARATE optional preference, defaulting to "newer" for existing jobs.
+// This does not change the ongoing manual conflict rule.
 func firstRunPolicy(j *Job, ongoingPolicy string) string {
  if j.Provider=="bridge" {
-  if j.ConflictPolicy=="" {return conflictNewer}
-  if validNASPolicy(j.ConflictPolicy){return j.ConflictPolicy}
+  if validNASPolicy(j.InitialConflictPolicy){return j.InitialConflictPolicy}
+  return conflictNewer
  }
  return ongoingPolicy
 }
