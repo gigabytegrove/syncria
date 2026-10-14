@@ -160,7 +160,7 @@ code{color:#076bd3}
 {{end}}
 </section>
 <details class="glossary-fold"><summary>Questions about one-way, both ways, or Undo?</summary><div class="glossary-layout"><span><strong>One way</strong> copies changes from the first NAS to the others.</span><span><strong>Both ways</strong> lets changes move between NAS boxes.</span><span><strong>Undo</strong> can bring back a recent deletion.</span></div></details>
-<section id="wizard" class="panel hidden"><div class="panel-head"><h2>Let's set up a file sync</h2><button type="button" class="secondary" onclick="closeSyncWizard()">Close</button></div>
+<section id="wizard" class="sync-builder hidden"><div class="builder-heading"><div><span class="mini-overline">SYNC BUILDER / NEW FLOW</span><h2>Connect your files.</h2><p>Four short steps. No files move until you're ready.</p></div><button type="button" class="secondary" onclick="closeSyncWizard()">Close ✕</button></div>
 <div class="step-indicator"><span id="stepMarker1" class="active">1 · Files start here</span><span id="stepMarker2">2 · Copy them here</span><span id="stepMarker3">3 · Pick the rules</span><span id="stepMarker4">4 · Double-check</span></div>
 <form id="syncWizard" method="post" action="/action" onsubmit="return submitSyncWizard(event)" novalidate><input type="hidden" name="action" value="add_bridge">
 <div id="wizard1" class="step active"><h2>Step 1: Where are your files now?</h2><p class="muted">Choose the place that already has your files. We won't move or delete anything while you set this up.</p>
@@ -290,7 +290,7 @@ code{color:#076bd3}
 <section class="panel"><details class="advanced-update"><summary>Install from files (advanced)</summary><div class="advanced-update-body"><h2>Manual installation</h2><p class="muted">Use this only when automatic downloads are unavailable. Supply a matching app file and SHA256SUMS. Your previous version remains available for rollback.</p><form id="manualUpdateForm" action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return submitManualUpdate(event)"><label class="field">App executable<input type="file" name="binary" id="manualBinary" required></label><label class="field">SHA256SUMS<input type="file" name="checksums" required></label><button id="manualUpdateButton" class="secondary" type="submit">Verify & install files</button></form></div></details></section>
 </div></div>
 </section>
-<section class="view" id="view-settings"><p class="lead">These are the advanced settings that help Syncria connect securely to your accounts. Most people won’t need to change them once everything is connected.</p><section class="panel"><h2>Google sign-in settings (advanced)</h2><p>For an administrator: create a Google Cloud web sign-in app, enable the Google Drive API, and add the address shown below as its redirect URL:</p><div class="selected"><code>{{.Callback}}</code></div><form method="post" action="/action"><input type="hidden" name="action" value="oauth_settings"><label class="field">Google app ID (Client ID)<input name="client_id" value="{{.ClientID}}" required></label><label class="field">Google app secret<input name="client_secret" type="password" placeholder="Leave blank to keep existing secret"></label><label class="field">Your Syncria web address<input name="base_url" value="{{.BaseURL}}" required></label><button class="primary">Save Google sign-in settings</button></form></section><section class="panel"><h2>Dropbox sign-in settings (advanced)</h2>
+<section class="view" id="view-settings"><div class="workspace-intro"><div><span class="mini-overline">SYSTEM / CONNECTION SETTINGS</span><h2>Fine-tune Syncria.</h2><p>Advanced connection settings live here, away from everyday syncing. You usually only set these once.</p></div></div><section class="panel"><h2>Google sign-in settings (advanced)</h2><p>For an administrator: create a Google Cloud web sign-in app, enable the Google Drive API, and add the address shown below as its redirect URL:</p><div class="selected"><code>{{.Callback}}</code></div><form method="post" action="/action"><input type="hidden" name="action" value="oauth_settings"><label class="field">Google app ID (Client ID)<input name="client_id" value="{{.ClientID}}" required></label><label class="field">Google app secret<input name="client_secret" type="password" placeholder="Leave blank to keep existing secret"></label><label class="field">Your Syncria web address<input name="base_url" value="{{.BaseURL}}" required></label><button class="primary">Save Google sign-in settings</button></form></section><section class="panel"><h2>Dropbox sign-in settings (advanced)</h2>
 <p>For an administrator: add this return address to your Dropbox developer app:</p><div class="selected"><code>{{.DropboxCallback}}</code></div>
 <form method="post" action="/action"><input type="hidden" name="action" value="dropbox_oauth_settings">
 <label class="field">Dropbox app key<input name="client_id" value="{{.DropboxClientID}}" required></label>
@@ -301,7 +301,30 @@ code{color:#076bd3}
 <script>
 const $=id=>document.getElementById(id);
 let currentView='overview',pickerType='',folder='',parent='',folderName='',pickSeq=0;
-function navigate(view){if(!$('view-'+view))return;currentView=view;document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+view));document.querySelectorAll('.nav button').forEach(el=>el.classList.toggle('active',el.dataset.view===view));$('pageTitle').textContent=({'overview':'Home','sync':'My Syncs','storage':'My NAS Boxes','accounts':'Cloud Accounts','activity':'What Happened?','updates':'App Updates','settings':'Settings'})[view]||view;history.replaceState(null,'','#'+view);if(view==='updates')checkUpdate();}
+function navigate(view){
+ if(!$('view-'+view))return;
+ currentView=view;
+ document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+view));
+ document.querySelectorAll('.nav button').forEach(el=>{
+  const active=el.dataset.view===view;
+  el.classList.toggle('active',active);
+  if(active)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');
+ });
+ const pages={
+  overview:['Your overview','OVERVIEW'],
+  sync:['Your syncs','MY SYNCS'],
+  storage:['Storage devices','MY NAS BOXES'],
+  accounts:['Cloud connections','CLOUD ACCOUNTS'],
+  activity:['Transfer activity','ACTIVITY'],
+  updates:['App updates','UPDATES'],
+  settings:['Settings','PREFERENCES']
+ };
+ const page=pages[view]||[view,view.toUpperCase()];
+ $('pageTitle').textContent=page[0];
+ const breadcrumb=$('pageBreadcrumb');if(breadcrumb)breadcrumb.textContent=page[1];
+ history.replaceState(null,'','#'+view);
+ if(view==='updates')checkUpdate();
+}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.view)));
 let syncReviewed=false,syncStep=1,selectedNASTargetID='';
 function showSyncStep(step){
