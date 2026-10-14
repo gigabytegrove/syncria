@@ -116,7 +116,7 @@ code{color:#076bd3}
  {{range .Shares}}<div class="place-summary"><div class="place-summary-icon">▤</div><div><strong>{{.Label}}</strong><small>{{.Protocol}} · {{.Server}}</small></div>{{if not .Local}}<span class="place-indicator" data-share-mounted="{{.ID}}">NAS connection saved</span>{{else if .Mounted}}<span class="place-indicator" data-share-mounted="{{.ID}}">Mounted</span>{{else}}<span class="place-indicator" data-share-mounted="{{.ID}}">Not mounted</span>{{end}}</div>{{else}}<div class="overview-empty overview-empty-compact"><strong>No NAS boxes connected</strong><p>Add a NAS from Storage to use it in a sync.</p></div>{{end}}
  </section>
 </div>
-<details class="glossary-fold"><summary>New to syncing? A few words explained.</summary><div class="glossary-layout"><span><strong>NAS</strong> — A storage box on your network.</span><span><strong>Cloud</strong> — Online files, like Google Drive.</span><span><strong>Sync</strong> — Keeping folders matched.</span><span><strong>Undo</strong> — Bringing back a recently deleted file.</span></div></details>
+<details class="glossary-fold"><summary>New to syncing? A few words explained.</summary><div class="glossary-layout"><span><strong>NAS</strong> — A NAS is a storage box on your network.</span><span><strong>Cloud</strong> — Online files, like Google Drive.</span><span><strong>Sync</strong> — Keeping folders matched.</span><span><strong>Undo</strong> — Bringing back a recently deleted file.</span></div></details>
 </section>
 <section class="view" id="view-sync">
 <div class="workspace-intro"><div><span class="mini-overline">FLOWS / YOUR CONNECTIONS</span><h2>Every sync, one place.</h2><p>Manage where files travel and when they move. Nothing happens automatically until you turn a sync on.</p></div><button class="primary" type="button" onclick="startWizard()">+ Create sync</button></div>
@@ -860,8 +860,14 @@ async function refreshDashboardStatus(){
   for(const job of data.jobs||[]){
    for(const el of document.querySelectorAll('[data-job-enabled]')){
     if(el.dataset.jobEnabled!==job.id)continue;
-    el.textContent=job.running?'Running':job.enabled?'Enabled':'Paused';
-    el.classList.toggle('off',!job.enabled&&!job.running);
+    const on=!!(job.enabled||job.running);
+    el.classList.toggle('is-on',on);
+    el.classList.toggle('is-off',!on);
+    let dot=el.querySelector('span');
+    if(!dot){dot=document.createElement('span');el.replaceChildren(dot);}
+    const label=job.running?' Syncing':job.enabled?' On':' Paused';
+    if(el.lastChild?.nodeType===Node.TEXT_NODE){el.lastChild.textContent=label;}
+    else{el.appendChild(document.createTextNode(label));}
    }
    const run=document.querySelector('[data-job-run="'+CSS.escape(job.id)+'"]');
    if(run)run.textContent=job.last_run==='Never run'?'Never run':'Last run '+job.last_run;
