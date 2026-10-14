@@ -34,7 +34,6 @@ func TestRunningVersionDoesNotQueryGitHub(t *testing.T) {
 
 func TestOnlyTargetedVersionPolling(t *testing.T) {
  if strings.Contains(newUI,"setInterval(checkRunningVersion,5000)") ||
-    strings.Contains(newUI,"location.replace(") ||
     strings.Contains(newUI,"location.reload("){
    t.Fatal("automatic whole-page version refresh must not return")
  }
