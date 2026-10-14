@@ -102,6 +102,26 @@ func (a *App) previewBridge(ctx context.Context,j *Job)(syncPreviewResult,error)
  destinations:=append([]NASDestination(nil),j.NASDestinations...)
  if len(destinations)==0&&j.NASShareID!=""{destinations=[]NASDestination{{ShareID:j.NASShareID,Folder:j.NASFolder}}}
  if len(destinations)==0{return result,errors.New("No NAS destination selected")}
+ // Mirror live syncBridge routing: when an enabled NAS-to-NAS job manages
+ // the downstream devices, the cloud relationship only targets its first NAS.
+ if j.Provider=="bridge"&&len(destinations)>1{
+  a.mu.Lock()
+  related:=false
+  for _,other:=range a.cfg.Jobs{
+   if other.ID==j.ID||other.Provider!="nas_bridge"||!other.Enabled{continue}
+   for _,d:=range destinations{
+    if d.ShareID==other.NASSourceID{related=true;break}
+    for _,child:=range other.NASDestinations{if d.ShareID==child.ShareID{related=true;break}}
+    if related{break}
+   }
+   if related{break}
+  }
+  a.mu.Unlock()
+  if related{
+   destinations=destinations[:1]
+   result.Warnings=append(result.Warnings,"Only the designated first NAS is part of this cloud relationship; a separate NAS-to-NAS relationship handles downstream copies.")
+  }
+ }
  for i,d:=range destinations{
   var primary recoverableBridgeEndpoint
   var err error
