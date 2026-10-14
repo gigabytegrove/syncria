@@ -85,12 +85,8 @@ jobs:
           ref="repos/${GITHUB_REPOSITORY}/git/ref/tags/${REL}"
           if existing="$(gh api "$ref" --jq '.object.sha' 2>/dev/null)"; then
             if [[ "$existing" != "$GITHUB_SHA" ]]; then
-              if gh release view "$REL" --json assets >/dev/null 2>&1; then
-                echo "Tag belongs to a previous successful release commit; checking published assets."
-              else
-                echo "::error::Release tag $REL points to $existing but this build is $GITHUB_SHA; refusing to publish mismatched binaries."
-                exit 1
-              fi
+              echo "::error::Release tag $REL points to $existing but this build is $GITHUB_SHA. Refusing to attach mismatched binaries."
+              exit 1
             fi
           else
             gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/${REL}" -f sha="$GITHUB_SHA" >/dev/null
