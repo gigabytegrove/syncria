@@ -87,6 +87,10 @@ type smbObject struct {
  Modified time.Time
 }
 func (s *directSMB) scan(ctx context.Context,root string)(map[string]smbObject,error){
+ return s.scanWithProgress(ctx,root,nil)
+}
+func (s *directSMB) scanWithProgress(ctx context.Context,root string,onScan func(string,int64))(map[string]smbObject,error){
+ count:=int64(0)
  root,err:=safeRemotePath(root);if err!=nil{return nil,err}
  found:=map[string]smbObject{}
  var walk func(dir,rel string,depth int)error
@@ -110,6 +114,8 @@ func (s *directSMB) scan(ctx context.Context,root string)(map[string]smbObject,e
    child,err:=joinRemotePath(root,childRel);if err!=nil{return err}
    if len(found)>100000{return errors.New("NAS listing exceeds 100,000 objects")}
    found[childRel]=smbObject{File:!info.IsDir(),Size:info.Size(),Fingerprint:fmt.Sprintf("%d:%d",info.Size(),info.ModTime().UnixNano()),Modified:info.ModTime()}
+   count++
+   if onScan!=nil{onScan(childRel,count)}
    if info.IsDir(){if err:=walk(child,childRel,depth+1);err!=nil{return err}}
   }
   return nil
