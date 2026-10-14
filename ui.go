@@ -71,10 +71,10 @@ code{overflow-wrap:anywhere}
 <div class="command-hero">
  <div class="hero-text"><h2>Files and storage</h2>
  <p>Manage your syncs between Google Drive, Dropbox, and your NAS devices.</p>
- <div class="hero-actions"><button class="hero-cta" type="button" onclick="startWizard()">Create sync</button>
+ <div class="hero-actions flex flex-wrap gap-3"><button class="hero-cta" type="button" onclick="startWizard()">Create sync</button>
  <button class="hero-text-link" type="button" onclick="navigate('sync')">View syncs</button></div></div>
 </div>
-<div class="overview-metrics" aria-label="Your current Syncria numbers">
+<div class="overview-metrics grid gap-3" aria-label="Your current Syncria numbers">
  <div class="overview-metric"><span class="metric-symbol">↗</span><div><small>YOUR SYNCS</small><strong>{{len .Jobs}}</strong><span>configured connections</span></div></div>
  <div class="overview-metric"><span class="metric-symbol">▦</span><div><small>FILES TRACKED</small><strong id="metricFiles">{{.Metrics.TrackedFiles}}</strong><span>across your syncs</span></div></div>
  <div class="overview-metric"><span class="metric-symbol">⇅</span><div><small>DATA MOVED</small><strong id="metricBandwidth">—</strong><span>total transferred</span></div></div>
@@ -94,10 +94,10 @@ code{overflow-wrap:anywhere}
 <div class="quick-step"><span class="step-number">3</span><h3>Choose where files go</h3><p>Choose the folders to match.</p><button class="primary" type="button" onclick="startWizard()">Set up a sync</button></div>
 </div></div></details>
 {{end}}
-<div class="overview-columns">
+<div class="overview-columns grid gap-4">
 <section class="overview-list-panel">
  <div class="section-heading"><div><span class="mini-overline">01 / YOUR FLOWS</span><h2>My Syncs</h2><p>Each sync is a connection between places you've chosen.</p></div><button class="text-action" type="button" onclick="navigate('sync')">View all →</button></div>
- <div class="flow-list">
+ <div class="flow-list grid">
  {{range .Jobs}}<div class="flow-row"><span class="flow-row-icon">{{if eq .Provider "bridge"}}☁{{else}}⇄{{end}}</span><div class="flow-row-content"><strong>{{.Name}}</strong><small>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} → NAS{{else if eq .Provider "nas_bridge"}}NAS ↔ NAS{{else}}Existing folder sync{{end}}</small></div>{{if .Enabled}}<span class="flow-state is-on"><span></span> On</span>{{else}}<span class="flow-state is-off"><span></span> Paused</span>{{end}}<button class="flow-row-open" type="button" onclick="navigate('sync')" aria-label="Open {{.Name}}">↗</button></div>{{else}}<div class="overview-empty"><span>⇄</span><strong>No syncs yet</strong><p>Make your first one to start keeping folders together.</p><button class="secondary" type="button" onclick="startWizard()">Create a sync</button></div>{{end}}
  </div>
 </section>
@@ -218,7 +218,7 @@ code{overflow-wrap:anywhere}
 </section>
 <section class="view" id="view-accounts">
 <div class="workspace-intro"><div><span class="mini-overline">CONNECTIONS / CLOUD</span><h2>One home for all your clouds.</h2><p>Connect the accounts you want to use. Each account stays separate, and nothing syncs until you choose a folder.</p></div><button class="primary" type="button" onclick="startAccountWizard()">+ Connect account</button></div>
-<div class="provider-grid">
+<div class="provider-grid grid gap-4">
 <section class="provider-panel"><div class="provider-top"><span class="provider-icon google-icon">G</span><div><span class="mini-overline">GOOGLE</span><h3>Google Drive</h3><p>Use files from one or more Google accounts.</p></div><span class="provider-count">{{len .Accounts}} saved</span></div>
 <div class="provider-list">{{range .Accounts}}<div class="provider-account"><div><strong>{{.Email}}</strong><small>Connected to Syncria</small></div><div class="provider-buttons"><button class="secondary" type="button" onclick="verifyConnectedAccount('{{.ID}}',this)">Test</button><form method="post" action="/action" class="inline" onsubmit="return confirm('Disconnect this Google Drive account? Your files will stay on Google Drive.')"><input type="hidden" name="action" value="remove_account"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="danger">Remove</button></form></div></div>{{else}}<div class="provider-empty">No Google Drive accounts connected yet.</div>{{end}}</div>
 <button type="button" class="provider-add" onclick="startAccountWizard('google_drive')">+ Add Google Drive account <span aria-hidden="true">↗</span></button></section>
@@ -236,7 +236,7 @@ code{overflow-wrap:anywhere}
 </section>
 <section class="view" id="view-activity">
 <div class="workspace-intro"><div><span class="mini-overline">THE LOG / REAL ACTIVITY</span><h2>See what's moving.</h2><p>Actual transfer counts and results from your syncs, updated as they run.</p></div><button class="secondary" type="button" onclick="refreshDashboardStatus()">Refresh activity ↻</button></div>
-<div class="activity-scoreboard">
+<div class="activity-scoreboard grid gap-3">
  <div class="activity-score activity-score-highlight"><small>CHECKS THAT WORKED</small><strong id="activitySuccessful">{{.Metrics.Runs}}</strong><span>completed checks</span></div>
  <div class="activity-score"><small>CHECKS WITH ERRORS</small><strong id="activityFailed">{{.Metrics.Failures}}</strong><span>need attention</span></div>
  <div class="activity-score"><small>FILES COPIED</small><strong id="activityFiles">—</strong><span>across all syncs</span></div>
