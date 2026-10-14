@@ -1,6 +1,7 @@
 package main
 
 import (
+ "context"
  "strings"
  "testing"
 )
@@ -81,4 +82,21 @@ func TestSyncEditorUIControlsPresent(t *testing.T){
  }{
   if !strings.Contains(newUI,expect){t.Errorf("Missing editor control %s",expect)}
  }
+}
+
+
+func TestCloudOneWayActualSyncOnlyCopiesSourceToNAS(t *testing.T){
+ job:=editorExample()
+ job.PairStates=map[string]map[string]Item{}
+ job.CloudOriginHashes=map[string]string{}
+ app:=policyTestApp(t,job)
+ cloud:=newRecoveryFake(map[string]string{"shared.txt":"cloud newer", "source.txt":"from-cloud"})
+ nas:=newRecoveryFake(map[string]string{"shared.txt":"nas older","nas-only.txt":"keep me"})
+ if err:=app.executePolicyPair(context.Background(),&job,cloud,nas,"pair",true,conflictManual);err!=nil{t.Fatal(err)}
+ if nas.files["shared.txt"]!="cloud newer"||nas.files["source.txt"]!="from-cloud"{t.Fatal("Source did not win one-way bootstrap")}
+ if cloud.files["nas-only.txt"]!=""||nas.files["nas-only.txt"]!="keep me"{t.Fatal("One-way copied NAS-only file backward or deleted it")}
+ nas.files["shared.txt"]="unauthorized nas-side edit"
+ if err:=app.executePolicyPair(context.Background(),&job,cloud,nas,"pair",true,conflictManual);err!=nil{t.Fatal(err)}
+ if nas.files["shared.txt"]!="cloud newer"{t.Fatal("Subsequent one-way run failed to restore the source copy")}
+ if cloud.files["shared.txt"]!="cloud newer"{t.Fatal("NAS edit uploaded to source")}
 }
