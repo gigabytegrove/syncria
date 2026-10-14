@@ -21,6 +21,9 @@ type SyncActionEvent struct {
 }
 type SyncProgress struct {
  Events []SyncActionEvent `json:"events,omitempty"`
+ Plan []syncPreviewRow `json:"plan,omitempty"`
+ PlanCounts map[string]int `json:"plan_counts,omitempty"`
+ PlanTruncated bool `json:"plan_truncated,omitempty"`
  Phase string `json:"phase"`
  Current string `json:"current,omitempty"`
  Processed int64 `json:"processed"`
@@ -45,6 +48,18 @@ func (a *App) setSyncProgress(id string,update func(*SyncProgress)) {
 func (a *App) getSyncProgress(id string) SyncProgress {
  a.mu.Lock();defer a.mu.Unlock()
  return a.syncProgress[id]
+}
+
+// stopRunningJob cancels only the current run; it never changes the saved
+// Enabled flag or touches already committed cloud/NAS file data.
+func (a *App) stopRunningJob(id string) bool {
+ if _,running:=a.runs.Load(id);!running{return false}
+ value,exists:=a.runCancels.Load(id)
+ if !exists{return false}
+ a.stopRequests.Store(id,true)
+ a.setSyncProgress(id,func(p *SyncProgress){p.Phase="stopping"})
+ value.(context.CancelFunc)()
+ return true
 }
 
 func (a *App) watchChangedJob(ctx context.Context,id string) {

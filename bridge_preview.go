@@ -31,10 +31,15 @@ type syncPreviewResult struct {
  Rows []syncPreviewRow `json:"rows"`
  Counts map[string]int `json:"counts"`
  Warnings []string `json:"warnings"`
+ ChangesOnly bool `json:"-"`
+ MaxRows int `json:"-"`
 }
 func addPreviewRow(p *syncPreviewResult,row syncPreviewRow) {
  p.Counts[row.Action]++
- if len(p.Rows)<500 {p.Rows=append(p.Rows,row)}else{p.Truncated=true}
+ if p.ChangesOnly && (row.Action=="unchanged" || row.Action=="skip"){return}
+ limit:=p.MaxRows
+ if limit<=0{limit=500}
+ if len(p.Rows)<limit {p.Rows=append(p.Rows,row)}else{p.Truncated=true}
 }
 func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]bridgeEntry,oneWay bool,policy string){
  prev:=j.PairStates[key]
