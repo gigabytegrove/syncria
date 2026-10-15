@@ -68,6 +68,22 @@ func loadSyncIndex(path string)(*syncIndex,error) {
 }
 func (idx *syncIndex) Close()error{return idx.db.Close()}
 
+// After migration the settings file contains only a schema marker and job
+// definitions, not individual records. An empty/newly recreated database is
+// NOT a new sync baseline: fail closed rather than treating every file as
+// unsynchronized and triggering destructive first-run reconciliation.
+func (idx *syncIndex) requireIndexedJobs(jobs []Job)error{
+ idx.mu.Lock()
+ defer idx.mu.Unlock()
+ for _,job:=range jobs {
+  if _,ok:=idx.last[job.ID];!ok{
+   return fmt.Errorf("Syncria indexed relationship %q is missing from the database; restore the original database or pre-migration backup",job.Name)
+  }
+ }
+ return nil
+}
+
+
 func sameIndexRecords(left,right map[string]map[string]Item)bool {
  if len(left)!=len(right){return false}
  for key,files:=range left{
