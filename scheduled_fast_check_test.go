@@ -77,3 +77,12 @@ func TestSingleFlightLaunchReservationAcrossManyTriggers(t *testing.T){
  a.runs.Store("another",true)
  if a.reserveScheduledRun("another"){t.Fatal("Already executing run must not be queued again")}
 }
+
+func TestFiveMinuteSchedulerUsesLastQuickCheckNotOldFullRun(t *testing.T){
+ now:=time.Date(2026,10,15,2,0,0,0,time.UTC)
+ j:=Job{Enabled:true,ScheduleMode:"changes",Interval:1,LastRun:now.Add(-time.Hour),LastChecked:now.Add(-2*time.Minute)}
+ if syncCheckDue(j,now){t.Fatal("Successful fast check should suppress redundant 30-second rescheduling")}
+ if !syncCheckDue(j,now.Add(4*time.Minute)){t.Fatal("Five-minute cadence should permit later fast check")}
+ j.Enabled=false
+ if syncCheckDue(j,now.Add(time.Hour)){t.Fatal("Paused job must never auto-start")}
+}
