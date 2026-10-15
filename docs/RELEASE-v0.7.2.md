@@ -15,3 +15,8 @@ Syncria still inventories metadata on both endpoints during a reconciliation; di
 A context deadline during a **genuinely necessary** transfer can still occur because of network outages, remote service timeouts, or SMB behavior. This release reduces unnecessary transfer attempts and retries safe transient NAS-bound errors, but does not yet provide byte-offset continuation for interrupted 30 GB uploads or a guarantee that network I/O can never fail.
 
 No user sync configuration or stored checkpoints are reset by this release.
+
+## Metadata exclusions and baseline clarity
+- `Thumbs.db`, `ehthumbs.db`, and `ehthumbs_vista.db` are ignored case-insensitively at every folder depth across supported connectors. Files already present are not removed or interpreted as deleted when an old checkpoint contains them.
+- The live UI indicates when a sync is establishing its initial baseline so longer first-time inventories are expected.
+- **Index limitation:** v0.7.2 retains the existing `PairStates` checkpoint metadata in `config.json`; it does **not** introduce a new SQLite or key-value index file or incremental Google Drive change-feed tracking. A dedicated persistent index and fast delta scanning are being developed separately because they require safe migration and remote deletion handling.
