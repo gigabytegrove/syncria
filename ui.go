@@ -1805,6 +1805,8 @@ if(location.hash){
   const id=decodeURIComponent(parts[1]);
   if(document.querySelector('[data-sync-card="'+CSS.escape(id)+'"]'))openSyncDetails(id,parts[2]||'overview');
   else navigate('sync');
+ }else if(parts[0]==='accounts'&&parts[1]==='connect'){
+  startAccountWizard(parts[2]==='dropbox'?'dropbox':'google_drive');
  }else if($('view-'+parts[0])&&parts[0]!=='sync-detail')navigate(parts[0]);
 }
 </script></body></html>`
