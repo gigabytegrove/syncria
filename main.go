@@ -1586,26 +1586,8 @@ func main() {
   a.cfg.Secret = b64rand()
   if e := a.save(); e != nil {log.Fatal(e)}
  }
- // One-time backup of the legacy JSON checkpoint before moving that state
- // into the local transactional database. Never overwrite an old backup.
- oldData,readErr:=os.ReadFile(file)
- if readErr==nil {
-  backup:=file+".pre-index-v0.8.0"
-  if _,err:=os.Stat(backup);os.IsNotExist(err){
-   if err=os.WriteFile(backup,oldData,0600);err!=nil{log.Fatal("Index migration backup failed: ",err)}
-  }
- }
- indexPath:=filepath.Join(dir,"syncria-index.db")
- if a.cfg.FileIndexVersion>=1 {
-  if _,err:=os.Stat(indexPath);err!=nil {log.Fatal("Indexed state exists but its database is missing or inaccessible; refusing to rebaseline: ",err)}
- }
- indexed,err:=loadSyncIndex(indexPath)
- if err!=nil{log.Fatal("File index unavailable, refusing to start sync: ",err)}
- defer indexed.Close()
- if a.cfg.FileIndexVersion>=1 {if err=indexed.requireIndexedJobs(a.cfg.Jobs);err!=nil{log.Fatal("Previously indexed data is missing; sync prevented: ",err)}}
- if err=indexed.hydratePairs(a.cfg.Jobs);err!=nil{log.Fatal("File index migration failed: ",err)}
- a.index=indexed
- if err=a.save();err!=nil{log.Fatal("Saving migrated index state failed: ",err)}
+ if err:=a.initializeFileIndex(dir);err!=nil{log.Fatal("File index startup failed: ",err)}
+ defer a.index.Close()
  a.reconcileUpdateOnStartup()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
