@@ -156,6 +156,7 @@ type App struct {
     updateProgress UpdateProgress
     syncProgress map[string]SyncProgress
     index *syncIndex
+    indexBroken bool
     watchers sync.Map
     runCancels sync.Map // job ID -> context.CancelFunc
     stopRequests sync.Map // job ID -> explicit user-requested stop
@@ -223,7 +224,7 @@ func (a *App) save() error {
  // Update the durable indexed records BEFORE writing lightweight config.
  // A failed DB transaction aborts this save and never advances the index.
  if a.index!=nil{
-  if err:=a.index.commitJobs(a.cfg.Jobs);err!=nil{return err}
+  if err:=a.index.commitJobs(a.cfg.Jobs);err!=nil{a.indexBroken=true;return err}
  }
  cfg:=a.cfg
  if a.index!=nil {
@@ -655,6 +656,7 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     defer func(){runCancel();a.runCancels.Delete(jobID);a.stopRequests.Delete(jobID);a.runs.Delete(jobID)}()
     ctx=runCtx
 	a.mu.Lock()
+    if a.indexBroken {a.mu.Unlock();return errors.New("Syncria file index failed previously; syncs paused for safety until the index is repaired and Syncria restarted")}
 	j := a.job(jobID)
 	if j == nil {
 		a.mu.Unlock()
@@ -743,7 +745,16 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
         actual.Conflicts=job.Conflicts
         actual.ConflictOverrides=job.ConflictOverrides
         actual.CloudOriginHashes=job.CloudOriginHashes
-		_ = a.save()
+        if saveErr:=a.save();saveErr!=nil {
+         if err==nil{
+          if _,stopped:=a.stopRequests.Load(jobID);!stopped{
+           if actual.SuccessfulRuns>0{actual.SuccessfulRuns--}
+           actual.FailedRuns++
+          }
+         }
+         err=fmt.Errorf("File-index commit failed, current run not safely recorded: %w",saveErr)
+         actual.LastError=err.Error()
+        }
 	}
     a.mu.Unlock()
     a.setSyncProgress(jobID,func(p *SyncProgress){
