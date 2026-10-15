@@ -68,6 +68,8 @@ code{overflow-wrap:anywhere}
 .active-sync-file-reason{font-size:11px;color:#57738c;white-space:normal;overflow-wrap:anywhere}
 .active-sync-file-main{align-items:flex-start}
 .active-sync-file-state{align-self:center}
+.flow-card-dismiss{margin:0 0 12px auto;display:block;width:max-content;max-width:100%;font-size:12px}
+.flow-card-dismiss[hidden]{display:none}
 ` + v051Theme + `</style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">
 {{if and .Configured .Logged}}
@@ -153,6 +155,7 @@ code{overflow-wrap:anywhere}
  <p class="flow-card-description" data-job-summary="{{.ID}}">{{if .LastSummary}}{{.LastSummary}}{{else}}This sync hasn't run yet.{{end}}</p>
  <p class="flow-card-stats" data-job-statline="{{.ID}}">Sent: {{.TotalUploads}} files · Received: {{.TotalDownloads}} files · Successful runs: {{.SuccessfulRuns}} · Errors: {{.FailedRuns}}</p>
  <p class="flow-card-error" data-job-error="{{.ID}}" role="status" {{if not .LastError}}hidden{{end}}>{{if .LastError}}Last sync failed{{if not .LastRun.IsZero}} on {{.LastRun.Format "Jan 2, 2006 15:04"}}{{end}}: {{.LastError}}{{end}}</p>
+  <button type="button" class="secondary flow-card-dismiss" data-job-dismiss="{{.ID}}" {{if not .LastError}}hidden{{end}} onclick="dismissSyncFailure('{{.ID}}',this)">Dismiss old failure</button>
  <div class="sync-live-progress hidden" data-job-progress="{{.ID}}">
   <div class="progress-topline"><strong data-job-phase="{{.ID}}">Syncing…</strong><small>Live transfer progress</small></div>
   <progress data-job-bar="{{.ID}}" max="100"></progress><p data-job-progress-detail="{{.ID}}"></p>
@@ -1084,6 +1087,21 @@ function formatBytes(value){
   return n.toFixed(n<10?1:0)+' '+units[i];
 }
 
+async function dismissSyncFailure(id,button){
+ if(button){button.disabled=true;button.textContent='Dismissing…'}
+ try{
+  const response=await fetch('/action',{method:'POST',
+   headers:{'Content-Type':'application/x-www-form-urlencoded'},
+   body:new URLSearchParams({action:'dismiss_job_error',id}),
+   credentials:'same-origin',cache:'no-store',redirect:'follow'});
+  if(!response.ok)throw Error('Unable to dismiss the failure (HTTP '+response.status+').');
+  await refreshDashboardStatus();
+ }catch(error){
+  alert(error.message);
+ }finally{
+  if(button){button.disabled=false;button.textContent='Dismiss old failure'}
+ }
+}
 async function requestStopSync(id,button){
  if(!confirm('Stop this sync run? Files already copied will stay in place. Automatic checks will remain enabled unless you pause them separately.'))return;
  if(button){button.disabled=true;button.textContent='Stopping…'}
@@ -1251,6 +1269,8 @@ function applyLiveStatus(data){
    if(summary)summary.textContent=job.summary||'';
    const error=document.querySelector('[data-job-error="'+CSS.escape(job.id)+'"]');
    if(error){error.hidden=!job.error||job.running;error.textContent=job.error?'Last sync failed ('+(job.last_run||'unknown date')+'): '+job.error:'';}
+   const dismiss=document.querySelector('[data-job-dismiss="'+CSS.escape(job.id)+'"]');
+   if(dismiss)dismiss.hidden=!job.error||job.running;
     const el=(attr)=>document.querySelector('['+attr+'="'+CSS.escape(job.id)+'"]');
     const bytes=Number(job.total_upload_bytes||0)+Number(job.total_download_bytes||0);
     const files=Number(job.total_uploads||0)+Number(job.total_downloads||0);
