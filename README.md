@@ -6,13 +6,17 @@
 
 **Keep your files together, wherever you save them.**
 
-**Interface (v0.8.0):** Syncria uses a quieter, locally bundled Tailwind CSS design with straightforward navigation, forms, progress, and storage management. No browser CDN or external UI service is needed.
+**Interface (v0.8.5):** Syncria uses a quieter, locally bundled Tailwind CSS design with straightforward navigation, forms, progress, and storage management. No browser CDN or external UI service is needed.
 
 Syncria helps you keep folders matched between Google Drive, Dropbox, and storage boxes on your home or work network. Those storage boxes are called **NAS devices**.
 
 For example, you can have family photos in Google Drive and keep a matching copy on your NAS. Or you can keep two NAS boxes matched without using the cloud at all.
 
 Syncria does not become another place that stores your files. Your files stay in your cloud account or on your NAS.
+
+## Administrator sign-in
+
+An administrator password protects the workspace, sync status, activity, and configuration. Regular sign-in uses a browser-session cookie with a seven-day server-side maximum. Choose **Remember me** to keep the browser signed in for up to 30 days. Sign out to end either session. No password is stored in browser local storage.
 
 ## Getting started
 
