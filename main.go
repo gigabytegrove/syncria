@@ -787,7 +787,7 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     if e:=a.index.finishRun(jobID,runID,status,job.LastSummary,func()string{if err!=nil{return err.Error()};return ""}(),job);e!=nil{
       if err==nil{err=fmt.Errorf("Run history could not finalize: %w",e)}
     }
-    if err==nil&&job.ScheduleMode=="changes"&&(job.Provider=="bridge"||job.Provider=="nas_bridge"){a.validatedNAS(jobID)}
+    if _,stopped:=a.stopRequests.Load(jobID);!stopped&&err==nil&&job.ScheduleMode=="changes"&&(job.Provider=="bridge"||job.Provider=="nas_bridge"){a.validatedNAS(jobID)}
     a.setSyncProgress(jobID,func(p *SyncProgress){
       p.Running=false
       if _,stopped:=a.stopRequests.Load(jobID);stopped {p.Phase="cancelled";p.Error=""} else if err!=nil {p.Phase="failed";p.Error=err.Error()} else {p.Phase="complete"}
