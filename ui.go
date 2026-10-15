@@ -1290,37 +1290,36 @@ function renderActiveSyncs(jobs){
   set('.active-sync-scanned',phase==='scanning'?scanned.toLocaleString()+' items discovered':total>0?scanned.toLocaleString()+' / '+total.toLocaleString()+' entries checked':'Preparing file list');
   set('.active-sync-current',p.current?(phase==='scanning'?'Scanning: ':'Current file: ')+p.current:p.initial_baseline?'One-time cloud/NAS inventory: Syncria is building its persistent local file index. Larger collections may take longer the first time.':'Checking cloud/NAS changes against the local file index…');
   set('.active-sync-bytes',formatBytes(Number(p.upload_bytes||0)+Number(p.download_bytes||0))+' transferred this run');
-  const counts=p.plan_counts||{};
-  const actionable=Object.entries(counts).filter(([a])=>a!=='unchanged').reduce((sum,[,n])=>sum+Number(n||0),0);
-  set('.active-sync-count',p.plan_counts?actionable.toLocaleString()+' file actions / exceptions':'Building transfer plan');
-  set('.active-sync-plan-label',p.plan_counts?'Files to copy, replace, delete, skip or review ('+actionable.toLocaleString()+')':'Planning transfers after the scans finish');
-  const rows=p.plan||[];
-  const signature=JSON.stringify(rows);
+  const recent=(p.events||[]).slice().reverse();
+  const isTransferring=phase==='transferring'&&!!p.current;
+  set('.active-sync-count',recent.length.toLocaleString()+' recent file operations');
+  set('.active-sync-plan-label','Actual file operations (not a speculative transfer plan)');
+  const signature=JSON.stringify({recent,current:p.current,transferring:isTransferring});
   if(card.dataset.planSignature!==signature){
    card.dataset.planSignature=signature;
    const list=card.querySelector('.active-sync-file-list');list.replaceChildren();
-   if(!rows.length)liveText(list,'p','muted',p.plan_counts?'No file changes planned.':'Waiting for the initial scan to finish…');
-   else for(const row of rows){
-    const item=liveText(list,'div','active-sync-file');item.dataset.filePath=row.path;
-    const main=liveText(item,'div','active-sync-file-main');
-    liveText(main,'strong','active-sync-file-action',row.action||'check');
-    const details=liveText(main,'div','active-sync-file-details');
-    liveText(details,'span','active-sync-file-path',row.path||'');
-    liveText(details,'small','active-sync-file-reason',row.reason||'No reason provided');
-    const initial=row.action==='skip'?'Skipped':row.action==='blocked'||row.action==='review'?'Needs attention':row.bytes?formatBytes(row.bytes)+' · queued':'Queued';
-    const meta=liveText(item,'small','active-sync-file-state',initial);
-    meta.dataset.base=initial;
+   if(isTransferring){
+    const row=liveText(list,'div','active-sync-file is-active');
+    const main=liveText(row,'div','active-sync-file-main');
+    liveText(main,'strong','active-sync-file-action','Transferring');
+    liveText(main,'span','active-sync-file-path',p.current);
+    liveText(row,'small','active-sync-file-state','In progress');
    }
-   if(p.plan_truncated)liveText(list,'p','muted','Showing the first 2,000 actionable files. The full plan is available from Test run · Preview changes.');
-  }
-  const changed=new Set((p.events||[]).filter(e=>/^(copy|delete|resolve|one-way)/i.test(e.action||'')).map(e=>e.path));
-  for(const item of card.querySelectorAll('.active-sync-file')){
-   const state=item.querySelector('.active-sync-file-state');if(!state)continue;
-   const path=item.dataset.filePath;
-   let status=changed.has(path)?'Completed':p.current===path?'Processing now':state.dataset.base||'Queued';
-   if(state.textContent!==status)state.textContent=status;
-   item.classList.toggle('is-active',status==='Processing now');
-   item.classList.toggle('is-done',status==='Completed');
+   for(const event of recent){
+    if(!event.path)continue;
+    const row=liveText(list,'div','active-sync-file is-done');
+    const main=liveText(row,'div','active-sync-file-main');
+    liveText(main,'strong','active-sync-file-action',event.action||'operation');
+    const details=liveText(main,'div','active-sync-file-details');
+    liveText(details,'span','active-sync-file-path',event.path);
+    liveText(details,'small','active-sync-file-reason',(event.from||'')+(event.to?' → '+event.to:''));
+    liveText(row,'small','active-sync-file-state','Recorded');
+   }
+   if(!recent.length&&!isTransferring)liveText(list,'p','muted','No file operations yet. Unchanged files are not listed. Use Test run / Preview for proposed changes.');
+   if(recent.length){
+    const all=liveText(list,'button','secondary','Open complete run history');
+    all.type='button';all.addEventListener('click',()=>openSyncDetails(job.id));
+   }
   }
  }
 }
