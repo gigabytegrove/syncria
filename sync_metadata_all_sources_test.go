@@ -42,3 +42,22 @@ func TestFFSOldFailureClearlyLabeledAsHistorical(t *testing.T){
   if !strings.Contains(newUI,text){t.Fatalf("missing last-error context: %s",text)}
  }
 }
+
+func TestWindowsThumbnailSidecarsAreNeverTransferredOrDeleted(t *testing.T) {
+ for _,p:=range []string{
+  "Thumbs.db","THUMBS.DB","family/photos/Thumbs.db",
+  "nested\\THUMBS.DB","Deep/ehthumbs.db","Deep/EHTHUMBS_VISTA.DB",
+ } {
+  if !ignoredSyncPath(p){t.Fatalf("Thumbnail cache was not excluded: %q",p)}
+ }
+ for _,p:=range []string{"Thumbs.db.bak","myThumbs.db","family/Thumbs.db/photos.jpg"} {
+  if ignoredSyncPath(p){t.Fatalf("Regular user file incorrectly ignored: %q",p)}
+ }
+ j:=&Job{PairStates:map[string]map[string]Item{"pair":{
+  "Thumbs.db":{ID:"old-cached-file"},
+  "A/THUMBS.DB":{ID:"old-cached-file2"},
+ }}}
+ result:=syncPreviewResult{Counts:map[string]int{},Rows:[]syncPreviewRow{}}
+ planSyncPair(&result,j,"pair",map[string]bridgeEntry{},map[string]bridgeEntry{},false,conflictManual)
+ if len(result.Rows)>0||len(result.Counts)>0{t.Fatalf("Legacy excluded cache must not cause deletion: %+v",result)}
+}

@@ -2,19 +2,22 @@ package main
 
 import "strings"
 
-// FreeFileSync uses sync.ffs_db to record its own file database. It is not
-// user content and multiple copies often exist in Google Drive with the same
-// name. Replicating it between devices is unsafe: it can corrupt the
-// other program's tracking state and duplicate names cannot map to one NAS
-// pathname. Exclude this exact sidecar, preserving every copy at its source.
+// Syncria never synchronizes metadata sidecars owned by another tool or OS.
+// The excluded files remain untouched wherever they already exist.
 func ignoredSyncMetadata(name string) bool {
- return strings.EqualFold(name,"sync.ffs_db")
+ switch strings.ToLower(name) {
+ case "sync.ffs_db", "thumbs.db", "ehthumbs.db", "ehthumbs_vista.db":
+  return true
+ default:
+  return false
+ }
 }
 
-// Ignore an FFS database at any depth, including entries retained in
-// checkpoints from an earlier Syncria version. Removing its checkpoint
-// must never be interpreted as a remote/local deletion instruction.
+// Ignore excluded metadata files at any depth, including old checkpoints.
+// Changing the ignore policy must NEVER propagate deletion of a previously
+// tracked metadata file to the cloud or NAS.
 func ignoredSyncPath(rel string) bool {
  if rel=="" {return false}
- return ignoredSyncMetadata(rel[strings.LastIndex(rel,"/")+1:])
+ normalized:=strings.ReplaceAll(rel,"\\","/")
+ return ignoredSyncMetadata(normalized[strings.LastIndex(normalized,"/")+1:])
 }

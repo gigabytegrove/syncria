@@ -77,6 +77,7 @@ func (b *bridgeDriveEndpoint) Scan(ctx context.Context)(map[string]bridgeEntry,e
  b.files=files
  out:=make(map[string]bridgeEntry,len(files))
  for rel,f:=range files{
+  if ignoredSyncPath(rel){continue}
   size,_:=strconv.ParseInt(f.Size,10,64)
   if f.MimeType==folderMime{b.folders[rel]=f.ID;out[rel]=bridgeEntry{ID:f.ID,Folder:true};continue}
   if strings.HasPrefix(f.MimeType,"application/vnd.google-apps.") {
@@ -198,15 +199,13 @@ func (a *App) executeBridge(ctx context.Context,j *Job,cloud,network bridgeEndpo
    switch{
    case hasCloud&&hasNAS:
     if !tracked{
-     if c.Size==n.Size {
-      same,checkErr:=bridgeSameContent(ctx,network,rel,c.Fingerprint)
-      if checkErr!=nil{return fmt.Errorf("Cannot verify existing NAS content at %s: %w",rel,checkErr)}
-      if same {
-       next[rel]=Item{ID:c.ID,MD5:c.Fingerprint,LocalMD5:n.Fingerprint}
-       j.State=next
-       if j.itemHook!=nil{j.itemHook(int64(index+1),int64(len(ordered)),rel)}
-       continue
-      }
+     same,checkErr:=bridgeSameFirstRun(ctx,cloud,network,rel,c,n)
+     if checkErr!=nil{return fmt.Errorf("Cannot reconcile existing file at %s: %w",rel,checkErr)}
+     if same{
+      next[rel]=Item{ID:c.ID,MD5:c.Fingerprint,LocalMD5:n.Fingerprint}
+      j.State=next
+      if j.itemHook!=nil{j.itemHook(int64(index+1),int64(len(ordered)),"")}
+      continue
      }
      return fmt.Errorf("Initial conflict at %s; cloud and NAS contain different files. Neither will be overwritten",rel)
     }

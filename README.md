@@ -6,7 +6,7 @@
 
 **Keep your files together, wherever you save them.**
 
-**Interface (v0.7.1):** Syncria uses a quieter, locally bundled Tailwind CSS design with straightforward navigation, forms, progress, and storage management. No browser CDN or external UI service is needed.
+**Interface (v0.7.2):** Syncria uses a quieter, locally bundled Tailwind CSS design with straightforward navigation, forms, progress, and storage management. No browser CDN or external UI service is needed.
 
 Syncria helps you keep folders matched between Google Drive, Dropbox, and storage boxes on your home or work network. Those storage boxes are called **NAS devices**.
 
@@ -100,6 +100,14 @@ The repository includes a [Docker Compose configuration](compose.yaml) and [Dock
 [Technical reference](docs/TECHNICAL.md) keeps advanced deployment, API, security, and release history details for administrators.
 
 **Made by [Gigabyte Grove](https://github.com/gigabytegrove).**
-### Active sync monitoring and cancellation (v0.7.1)
+### Active sync monitoring and cancellation (v0.7.2)
 
 Activity shows the files planned for the current sync after scanning both endpoints, including up to the first 120 actionable paths, pending actions, the currently processed path, and completed file operations. Scanning counts are reported as discovered files (the final total is not known until the scans finish). Live status updates only the relevant UI fields; it does not refresh the page. Stop current run cancels the in-flight job through its context while preserving completed copies and stored sync configuration. Canceling a run does not disable future automatic scheduling; use Pause automatic sync separately when desired.
+
+### Actionable file audit (v0.7.2)
+
+- Normal preview and live Activity hide unchanged filenames. Source and NAS metadata inventories still run, but a tracked unchanged file is never opened or copied just to confirm it remains unchanged.
+- All skip and replace/overwrite actions show paths, direction, source/destination modification times when known, and a reason. Preview offers filters for **Skipped and why**, **Overwrites and why**, **New copies**, **Needs a decision**, and **Deletes**. Up to 10,000 actionable file details are shown (with a truncation warning if exceeded).
+- File matching accounts for sub-two-second timestamps precision differences when file sizes match.
+- Transient read failures retry up to three times for safe staged NAS destinations; other cloud upload errors are not automatically retried because blind retries can create duplicate Drive items.
+- Active Activity lists up to 2,000 actionable records rather than filling its queue with unchanged files.

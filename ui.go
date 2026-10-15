@@ -59,6 +59,15 @@ code{overflow-wrap:anywhere}
 .active-sync-file.is-active{background:#edf8ff}
 .active-sync-file.is-done{opacity:.65}
 @media(max-width:700px){.active-sync-file{align-items:flex-start;flex-direction:column}.active-sync-file-state{padding-left:0}}
+
+.preview-filter-bar{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:12px 0}
+.preview-filter-bar label{font-size:12px;font-weight:600}
+.preview-filter-bar select{margin-left:8px;min-height:34px;padding:5px 10px;border:1px solid #d6e4ef;border-radius:7px;background:white}
+.preview-table tr[hidden]{display:none}
+.active-sync-file-details{min-width:0;display:flex;flex-direction:column;gap:5px}
+.active-sync-file-reason{font-size:11px;color:#57738c;white-space:normal;overflow-wrap:anywhere}
+.active-sync-file-main{align-items:flex-start}
+.active-sync-file-state{align-self:center}
 ` + v051Theme + `</style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">
 {{if and .Configured .Logged}}
@@ -342,13 +351,20 @@ function cancelPreview(id){
 function renderPreviewResult(output,result){
   output.replaceChildren();
   const summary=document.createElement('div');summary.className='preview-summary';
-  const totals=Object.entries(result.counts||{}).filter(([action,count])=>count>0).sort((a,b)=>b[1]-a[1]);
+  const totals=Object.entries(result.counts||{}).filter(([action,count])=>action!=='unchanged'&&count>0).sort((a,b)=>b[1]-a[1]);
   summary.textContent=totals.length?totals.map(([action,count])=>count+' '+action).join(' · '):'No changes detected';
   output.append(summary);
   const note=document.createElement('p');note.className='preview-notice';note.textContent='Preview only · No changes made · Generated '+new Date(result.generated).toLocaleString();output.append(note);
   const bootstrapInfo=document.createElement('p');bootstrapInfo.className='preview-notice';
-  bootstrapInfo.textContent='First run: Syncria proposes a newer copy using file modification times. The real sync verifies content before replacing a file. Ambiguous timestamps remain for manual review.';
+  bootstrapInfo.textContent='Only actionable files are listed below. Unchanged files are excluded. For first-time matches, Syncria uses modification timestamps and file size without reading full file contents; ambiguity requires review.';
   output.append(bootstrapInfo);
+  const filterBar=document.createElement('div');filterBar.className='preview-filter-bar';
+  const filterTitle=document.createElement('label');filterTitle.textContent='Show files: ';
+  const filterSelect=document.createElement('select');filterSelect.setAttribute('aria-label','Filter preview file actions');
+  for(const [value,label] of [['all','All actions that matter'],['skip','Skipped and why'],['replace','Overwrites and why'],['copy','New copies'],['review','Needs a decision / blocked'],['delete','Deletes']]){
+   const option=document.createElement('option');option.value=value;option.textContent=label;filterSelect.append(option);
+  }
+  filterTitle.append(filterSelect);filterBar.append(filterTitle);output.append(filterBar);
   const table=document.createElement('div');table.className='preview-table-wrap';
   const grid=document.createElement('table');grid.className='preview-table';
   const head=document.createElement('thead');
@@ -363,14 +379,17 @@ function renderPreviewResult(output,result){
    const localTime=value=>value?new Date(value).toLocaleString():'Unknown';
    const modified=row.primary_modified||row.secondary_modified?
      'Primary: '+localTime(row.primary_modified)+' / Secondary: '+localTime(row.secondary_modified):'Not available';
-   const displayAction=row.first_run&&row.action==='replace'?'Replace if contents differ':row.action;
+   const displayAction=row.action;
    for(const value of [row.path,displayAction,(row.from&&row.to?row.from+' → '+row.to:row.from||''),modified,row.reason]){
     const td=document.createElement('td');td.textContent=value||'—';tr.append(td);
    }
    body.append(tr);
   }
   grid.append(body);table.append(grid);output.append(table);
-  if(result.truncated){const p=document.createElement('p');p.className='preview-warning';p.textContent='Showing first 500 items. Counts include the complete scan.';output.append(p)}
+  const setFilter=()=>{const choice=filterSelect.value;let shown=0;for(const tr of body.rows){const action=tr.dataset.action;const match=choice==='all'||action===choice||(choice==='review'&&(action==='blocked'||action==='review'));tr.hidden=!match;if(match)shown++}if(!shown){empty.textContent='No '+choice+' items were found.';empty.hidden=false}else{empty.hidden=true}};
+  const empty=document.createElement('p');empty.className='muted';empty.hidden=true;output.append(empty);
+  filterSelect.addEventListener('change',setFilter);setFilter();
+  if(result.truncated){const p=document.createElement('p');p.className='preview-warning';p.textContent='The file list reached its 10,000 actionable-file limit. Counts include the complete scan.';output.append(p)}
   for(const warning of result.warnings||[]){const p=document.createElement('p');p.className='preview-notice';p.textContent=warning;output.append(p)}
 
 }
@@ -401,7 +420,7 @@ function previewSync(id){
    const scan=JSON.parse(event.data);
    if(scan.endpoint!=='Planning changes')seen.set(scan.endpoint,Number(scan.items||0));
    heading.textContent=scan.endpoint==='Planning changes'?'Comparing both locations…':'Scanning '+scan.endpoint;
-   description.textContent=scan.path||'Reading folder listings…';
+   description.textContent=scan.endpoint==='Planning changes'?'Preparing the actionable file list…':'Reading file metadata (unchanged filenames are hidden)…';
    counts.textContent=[...seen].map(([name,count])=>name+': '+count.toLocaleString()+' items discovered').join(' · ')||'Starting scan…';
   }catch(_e){}
  });
@@ -1114,15 +1133,15 @@ function renderActiveSyncs(jobs){
   }
   const set=(q,value)=>{const el=card.querySelector(q);if(el&&el.textContent!==value)el.textContent=value};
   let phase=p.phase||'working';
-  set('.active-sync-stage',phase==='scanning'?'Scanning locations':phase==='stopping'?'Stopping safely…':phase==='transferring'?'Transferring files':phase==='processing'?'Checking changes':phase);
+  set('.active-sync-stage',phase==='scanning'?(p.initial_baseline?'Building initial file baseline':'Scanning locations'):phase==='stopping'?'Stopping safely…':phase==='transferring'?'Transferring files':phase==='processing'?'Checking changes':phase);
   const scanned=Number(p.processed||0),total=Number(p.total||0);
   set('.active-sync-scanned',phase==='scanning'?scanned.toLocaleString()+' items discovered':total>0?scanned.toLocaleString()+' / '+total.toLocaleString()+' entries checked':'Preparing file list');
-  set('.active-sync-current',p.current?(phase==='scanning'?'Scanning: ':'Current file: ')+p.current:'Comparing file metadata…');
+  set('.active-sync-current',p.current?(phase==='scanning'?'Scanning: ':'Current file: ')+p.current:p.initial_baseline?'Initial inventory: this first scan can take longer. Later runs compare metadata against the saved baseline.':'Comparing metadata silently…');
   set('.active-sync-bytes',formatBytes(Number(p.upload_bytes||0)+Number(p.download_bytes||0))+' transferred this run');
   const counts=p.plan_counts||{};
-  const actionable=Object.entries(counts).filter(([a])=>!['unchanged','skip'].includes(a)).reduce((sum,[,n])=>sum+Number(n||0),0);
-  set('.active-sync-count',p.plan_counts?actionable.toLocaleString()+' planned changes':'Building transfer plan');
-  set('.active-sync-plan-label',p.plan_counts?'Planned work ('+actionable.toLocaleString()+' items)':'Planning transfers after the scans finish');
+  const actionable=Object.entries(counts).filter(([a])=>a!=='unchanged').reduce((sum,[,n])=>sum+Number(n||0),0);
+  set('.active-sync-count',p.plan_counts?actionable.toLocaleString()+' file actions / exceptions':'Building transfer plan');
+  set('.active-sync-plan-label',p.plan_counts?'Files to copy, replace, delete, skip or review ('+actionable.toLocaleString()+')':'Planning transfers after the scans finish');
   const rows=p.plan||[];
   const signature=JSON.stringify(rows);
   if(card.dataset.planSignature!==signature){
@@ -1133,13 +1152,16 @@ function renderActiveSyncs(jobs){
     const item=liveText(list,'div','active-sync-file');item.dataset.filePath=row.path;
     const main=liveText(item,'div','active-sync-file-main');
     liveText(main,'strong','active-sync-file-action',row.action||'check');
-    liveText(main,'span','active-sync-file-path',row.path||'');
-    const meta=liveText(item,'small','active-sync-file-state',row.bytes?formatBytes(row.bytes)+' · queued':'Queued');
-    meta.dataset.base=meta.textContent;
+    const details=liveText(main,'div','active-sync-file-details');
+    liveText(details,'span','active-sync-file-path',row.path||'');
+    liveText(details,'small','active-sync-file-reason',row.reason||'No reason provided');
+    const initial=row.action==='skip'?'Skipped':row.action==='blocked'||row.action==='review'?'Needs attention':row.bytes?formatBytes(row.bytes)+' · queued':'Queued';
+    const meta=liveText(item,'small','active-sync-file-state',initial);
+    meta.dataset.base=initial;
    }
-   if(p.plan_truncated)liveText(list,'p','muted','Showing the first 120 planned changes; additional files will appear as current transfers.');
+   if(p.plan_truncated)liveText(list,'p','muted','Showing the first 2,000 actionable files. The full plan is available from Test run · Preview changes.');
   }
-  const changed=new Set((p.events||[]).map(e=>e.path));
+  const changed=new Set((p.events||[]).filter(e=>/^(copy|delete|resolve|one-way)/i.test(e.action||'')).map(e=>e.path));
   for(const item of card.querySelectorAll('.active-sync-file')){
    const state=item.querySelector('.active-sync-file-state');if(!state)continue;
    const path=item.dataset.filePath;
