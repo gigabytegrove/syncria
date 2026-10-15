@@ -18,6 +18,7 @@ type SyncActionEvent struct {
  Path string `json:"path"`
  From string `json:"from,omitempty"`
  To string `json:"to,omitempty"`
+ Reason string `json:"reason,omitempty"`
 }
 type SyncProgress struct {
  Events []SyncActionEvent `json:"events,omitempty"`
