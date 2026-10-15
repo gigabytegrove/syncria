@@ -96,7 +96,7 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
     }else{
      row.Action="review";row.Reason="A modification timestamp is missing; no automatic replacement"
     }
-   }else if l.Modified.Equal(r.Modified){
+   }else if indexedTimeEqual(l.Modified,r.Modified){
     if l.Size==r.Size{
      row.Action="unchanged";row.Reason="Modification times and sizes match; no file contents read"
     }else{
@@ -173,7 +173,7 @@ func (a *App) previewBridgeProgress(ctx context.Context,j *Job,notify func(strin
   var err error
   sourceKey:=""
   oneWay:=false
-  policy:=conflictManual
+  policy:=conflictNewer
   if j.Provider=="nas_bridge"{
    primary,err=a.openNAS(ctx,NASDestination{ShareID:j.NASSourceID,Folder:j.NASSourceFolder})
    sourceKey="nas:"+j.NASSourceID+":"+j.NASSourceFolder
