@@ -505,8 +505,12 @@ function renderSyncDetailLive(){
  const container=$('syncDetailLive');if(!container||!job)return;
  const p=job.progress||{};
  const label=job.running?'Running · '+(p.phase||'working')+(p.current?' · '+p.current:''):'Idle';
+ const direction=job.direction==='one_way'?'One-way (cloud → NAS)':'Bidirectional (cloud ↔ NAS)';
+ const deletePolicy=job.propagate_deletions?'Deletes propagate to matching copies':'Deletes are not propagated';
+ const recovery=job.recovery_enabled?' · 10-minute deletion recovery enabled':' · deletion recovery disabled';
  container.textContent=label+' · '+(job.successful_runs||0)+' successful / '+(job.failed_runs||0)+' failed runs'+
- (job.running?' · '+Number(p.uploads||0)+' sent, '+Number(p.downloads||0)+' received':'');
+  ' · '+direction+' · '+deletePolicy+recovery+
+  (job.running?' · '+Number(p.uploads||0)+' sent, '+Number(p.downloads||0)+' received':'');
 }
 function openSyncDetails(id){
  selectedSyncID=id;selectedSyncRunID='';runPageOffset=0;eventPageOffset=0;
