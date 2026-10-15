@@ -9,6 +9,7 @@ import (
  "io"
  "strings"
  "testing"
+ "time"
 )
 
 type fakeBridgeEndpoint struct{
@@ -20,7 +21,7 @@ func (m *fakeBridgeEndpoint) Scan(ctx context.Context)(map[string]bridgeEntry,er
  out:=map[string]bridgeEntry{}
  for p,v:=range m.files{
   h:=md5.Sum([]byte(v))
-  out[p]=bridgeEntry{ID:"file-"+p,Size:int64(len(v)),Fingerprint:hex.EncodeToString(h[:])}
+  out[p]=bridgeEntry{ID:"file-"+p,Size:int64(len(v)),Fingerprint:hex.EncodeToString(h[:]),Modified:time.Unix(1700000000,0).UTC()}
  }
  for p:=range m.folders{out[p]=bridgeEntry{ID:"folder-"+p,Folder:true}}
  return out,nil
