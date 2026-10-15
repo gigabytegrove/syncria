@@ -210,7 +210,7 @@ code{overflow-wrap:anywhere}
     <span class="recovery-visible-count" id="recovery-visible-{{.ID}}" role="status">{{len .PendingDeletions}} files eligible for recovery</span>
    </div>
    <div class="recovery-dialog-items" id="recovery-items-{{.ID}}">
-    {{range .PendingDeletions}}<div class="recovery-dialog-item" data-recovery-path="{{.Path}}"><div class="recovery-dialog-item-copy"><strong>{{.Path}}</strong><small>Undo before {{.Expires.Format "Jan 2, 2006 · 15:04:05 MST"}}</small></div>
+    {{range .PendingDeletions}}<div class="recovery-dialog-item" data-recovery-path="{{.Path}}" data-recovery-expires-ms="{{.Expires.UnixMilli}}"><div class="recovery-dialog-item-copy"><strong>{{.Path}}</strong><small>Undo before {{.Expires.Format "Jan 2, 2006 · 15:04:05 MST"}}</small></div>
      <form method="post" action="/api/recovery/undo" class="inline"><input type="hidden" name="operation" value="undo"><input type="hidden" name="id" value="{{$job.ID}}"><input type="hidden" name="pair" value="{{.Pair}}"><input type="hidden" name="path" value="{{.Path}}"><button type="submit" class="secondary">Restore file</button></form></div>{{end}}
    </div>
    <div class="recovery-dialog-empty hidden" id="recovery-empty-{{.ID}}">No filenames match. Try another search.</div>
@@ -580,7 +580,8 @@ function openRecoveryDialog(id){
  if(dialog.open)return;
  const input=document.getElementById('recovery-search-'+id);
  if(input)input.value='';
- filterRecoveryFiles(id);
+ refreshRecoveryExpirations();
+ if(!dialog.querySelector('[data-recovery-path]'))return;
  dialog.showModal();
  if(input)input.focus();
 }
@@ -593,8 +594,16 @@ function filterRecoveryFiles(id){
  const list=document.getElementById('recovery-items-'+id);
  if(!list)return;
  const term=(input?.value||'').trim().toLocaleLowerCase();
+ const now=Date.now();
  let visible=0,total=0;
  for(const item of list.querySelectorAll('[data-recovery-path]')){
+  const deadline=Number(item.dataset.recoveryExpiresMs);
+  // Remove both the filename and its POST Restore form at expiration,
+  // regardless of whether remote cleanup has succeeded yet.
+  if(!Number.isFinite(deadline)||deadline<=now){
+   item.remove();
+   continue;
+  }
   total++;
   const match=item.dataset.recoveryPath.toLocaleLowerCase().includes(term);
   item.hidden=!match;
@@ -602,8 +611,44 @@ function filterRecoveryFiles(id){
  }
  const count=document.getElementById('recovery-visible-'+id);
  if(count)count.textContent=term?visible+' of '+total+' files shown':total+' files eligible for recovery';
- document.getElementById('recovery-empty-'+id)?.classList.toggle('hidden',visible!==0);
+ const summary=document.querySelector('[data-recovery-summary="'+CSS.escape(id)+'"]');
+ if(summary){
+  summary.hidden=total===0;
+  const badge=summary.querySelector('.recovery-count');
+  if(badge)badge.textContent=String(total);
+ }
+ const bar=document.getElementById('syncDetailRecoveryBar');
+ if(bar&&selectedSyncID===id){
+  bar.classList.toggle('hidden',total===0);
+  const badge=document.getElementById('syncDetailRecoveryCount');
+  if(badge)badge.textContent=String(total);
+ }
+ const empty=document.getElementById('recovery-empty-'+id);
+ if(empty){
+  empty.classList.toggle('hidden',visible!==0);
+  empty.textContent=total===0?'The ten-minute recovery window has ended. No files remain eligible for restoration.':'No filenames match. Try another search.';
+ }
 }
+let recoveryExpiryTimer=null;
+function refreshRecoveryExpirations(){
+ if(recoveryExpiryTimer!==null){clearTimeout(recoveryExpiryTimer);recoveryExpiryTimer=null}
+ let nearest=Infinity;
+ const now=Date.now();
+ for(const dialog of document.querySelectorAll('dialog.recovery-dialog')){
+  const id=dialog.id.slice('recovery-'.length);
+  filterRecoveryFiles(id);
+  for(const row of dialog.querySelectorAll('[data-recovery-expires-ms]')){
+   const deadline=Number(row.dataset.recoveryExpiresMs);
+   if(Number.isFinite(deadline)&&deadline>now)nearest=Math.min(nearest,deadline);
+  }
+ }
+ if(Number.isFinite(nearest)){
+  recoveryExpiryTimer=setTimeout(refreshRecoveryExpirations,Math.max(20,Math.min(nearest-Date.now()+20,60_000)));
+ }
+}
+document.addEventListener('DOMContentLoaded',refreshRecoveryExpirations);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshRecoveryExpirations()});
+window.addEventListener('focus',refreshRecoveryExpirations);
 document.addEventListener('click',event=>{
  const modal=event.target;
  if(modal instanceof HTMLDialogElement&&modal.classList.contains('recovery-dialog'))modal.close();
