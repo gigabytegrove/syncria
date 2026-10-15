@@ -144,7 +144,7 @@ code{overflow-wrap:anywhere}
 <article class="relationship-card">
  <div class="flow-card-main">
    <div class="flow-card-emblem">{{if eq .Provider "bridge"}}☁{{else}}⇄{{end}}</div>
-   <div class="flow-card-identity"><span class="mini-overline">{{if eq .Provider "bridge"}}CLOUD / NAS{{else if eq .Provider "nas_bridge"}}NAS / NAS{{else}}FOLDER / FOLDER{{end}}</span><h3>{{.Name}}</h3><p>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} · {{if eq .Direction "one_way"}}One way: cloud → NAS{{else}}Both ways: cloud ↔ NAS{{end}} · {{len .NASDestinations}} NAS destination(s){{else if eq .Provider "nas_bridge"}}{{if eq .Direction "one_way"}}Copy one way{{else}}Keep both ways matched{{end}} · {{len .NASDestinations}} NAS destination(s){{else}}Existing filesystem sync{{end}}</p></div>
+   <div class="flow-card-identity"><span class="mini-overline">{{if eq .Provider "bridge"}}CLOUD / NAS{{else if eq .Provider "nas_bridge"}}NAS / NAS{{else}}FOLDER / FOLDER{{end}}</span><h3><button type="button" class="sync-title-link" onclick="openSyncDetails('{{.ID}}')">{{.Name}}</button></h3><p>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} · {{if eq .Direction "one_way"}}One way: cloud → NAS{{else}}Both ways: cloud ↔ NAS{{end}} · {{len .NASDestinations}} NAS destination(s){{else if eq .Provider "nas_bridge"}}{{if eq .Direction "one_way"}}Copy one way{{else}}Keep both ways matched{{end}} · {{len .NASDestinations}} NAS destination(s){{else}}Existing filesystem sync{{end}}</p></div>
    <div class="flow-card-health">{{if .Enabled}}<span class="flow-state is-on" data-job-enabled="{{.ID}}"><span></span> On</span>{{else}}<span class="flow-state is-off" data-job-enabled="{{.ID}}"><span></span> Paused</span>{{end}}</div>
  </div>
  <div class="flow-card-facts">
@@ -175,6 +175,7 @@ code{overflow-wrap:anywhere}
  </section>
  <details class="sync-run-events hidden" data-job-events="{{.ID}}"><summary>What actually changed in the last run</summary><div class="sync-run-event-list" data-job-events-list="{{.ID}}"></div></details>
  <div class="flow-card-actions">
+ <button type="button" class="secondary" onclick="openSyncDetails('{{.ID}}')">View sync details &amp; run history</button>
  <button type="button" class="secondary" onclick="previewSync('{{.ID}}')">Test run · Preview changes</button>
   <button type="button" class="secondary hidden" data-job-cancel="{{.ID}}" onclick="requestStopSync('{{.ID}}',this)">Stop current run</button>
  {{if or (eq .Provider "bridge") (eq .Provider "nas_bridge")}}<button type="button" class="secondary" onclick="editSync('{{.ID}}')">Edit sync</button>{{end}}
@@ -285,6 +286,17 @@ code{overflow-wrap:anywhere}
 {{if .ClientID}}<a class="primary" href="/oauth/start">Sign in with Google Drive →</a>{{else}}<p class="wizard-status bad">Google sign-in is not set up yet.</p><button type="button" class="secondary" onclick="navigate('settings')">Open sign-in settings</button>{{end}}</div>
 <div class="hidden" id="dropboxAccountAuthorize"><p>Dropbox needs sign-in settings first. The person running Syncria can set them up in Settings.</p>{{if .DropboxClientID}}<a class="primary" href="/oauth/dropbox/start">Sign in with Dropbox →</a>{{else}}<p class="wizard-status bad">Dropbox sign-in is not set up yet.</p><button type="button" class="secondary" onclick="navigate('settings')">Open sign-in settings</button>{{end}}</div><div class="row"><button type="button" class="secondary" onclick="showAccountStep(1)">← Back</button></div></div>
 </section>
+</section>
+<section class="view" id="view-sync-detail">
+ <div class="sync-detail-back"><button type="button" class="secondary" onclick="navigate('sync')">← My Syncs</button><button type="button" class="secondary" onclick="loadSyncRunList()">Refresh history</button></div>
+ <section class="panel sync-details-shell">
+  <div class="section-heading"><div><span class="mini-overline">SYNC DETAILS</span><h2 id="syncDetailTitle">Sync details</h2><p id="syncDetailSubtitle">Runs, files transferred, and why.</p></div></div>
+  <div id="syncDetailLive" class="sync-detail-live">Loading current status…</div>
+  <div class="sync-detail-columns">
+   <div class="sync-detail-run-column"><h3>Run history</h3><p class="muted">Choose a run to see exactly which files were processed.</p><div id="syncRunList" class="sync-run-list"></div><div id="syncRunPager" class="sync-detail-pager"></div></div>
+   <div class="sync-detail-files-column"><h3>File operations</h3><p id="syncRunSummary" class="muted">Select a run.</p><div id="syncRunEvents" class="sync-run-files"></div><div id="syncEventPager" class="sync-detail-pager"></div></div>
+  </div>
+ </section>
 </section>
 <section class="view" id="view-activity">
 <section class="panel live-sync-workspace" aria-label="Active synchronization runs"><div class="section-heading"><div><span class="mini-overline">WORK IN PROGRESS</span><h2>Active syncs</h2><p>Watch what needs copying, what is transferring, and stop a run without restarting Syncria.</p></div><span class="pill">Live</span></div><div id="activeSyncList" class="active-sync-list"><p class="muted">No sync is running right now.</p></div></section>
@@ -461,6 +473,7 @@ function navigate(view){
   storage:['Storage devices','MY NAS BOXES'],
   accounts:['Cloud connections','CLOUD ACCOUNTS'],
   activity:['Transfer activity','ACTIVITY'],
+  'sync-detail':['Sync details','SYNC DETAILS'],
   updates:['App updates','UPDATES'],
   settings:['Settings','PREFERENCES']
  };
