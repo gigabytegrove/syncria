@@ -97,6 +97,7 @@ type Job struct {
     NASFolder string `json:"nas_folder,omitempty"`
     ScheduleMode string `json:"schedule_mode,omitempty"`
     progressHook func(up,down,upBytes,downBytes int64) `json:"-"`
+    transferHook func(rel string) `json:"-"`
     itemHook func(processed,total int64,current string) `json:"-"`
     operationHook func(action,rel,from,to string) `json:"-"`
     scanHook func(endpoint,rel string,count int64) `json:"-"`
@@ -669,7 +670,7 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     }
     job.scanHook=func(endpoint,rel string,count int64){
       a.setSyncProgress(jobID,func(p *SyncProgress){
-        p.Phase="scanning";p.Current=endpoint+": "+rel;p.Processed=count;p.Total=0
+        p.Phase="scanning";p.Current=endpoint;p.Processed=count;p.Total=0
       })
     }
     job.operationHook=func(action,rel,from,to string){
@@ -679,7 +680,10 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
       })
     }
     job.itemHook=func(done,total int64,current string){
-      a.setSyncProgress(jobID,func(p *SyncProgress){p.Phase="processing";p.Processed=done;p.Total=total;p.Current=current})
+      a.setSyncProgress(jobID,func(p *SyncProgress){p.Phase="processing";if done>=0{p.Processed=done};if total>=0{p.Total=total};p.Current=current})
+    }
+    job.transferHook=func(rel string){
+      a.setSyncProgress(jobID,func(p *SyncProgress){p.Phase="transferring";p.Current=rel})
     }
     started := time.Now()
     job.LastUploads, job.LastDownloads = 0, 0
