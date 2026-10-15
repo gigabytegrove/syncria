@@ -717,6 +717,14 @@ function openSyncDetails(id,tab='overview'){
  loadSyncRunList();
  if(!job)refreshDashboardStatus();
 }
+let runFileSearchTimer=null;
+function debounceRunFileSearch(){
+ if(runFileSearchTimer)clearTimeout(runFileSearchTimer);
+ runFileSearchTimer=setTimeout(reloadRunFileFilters,300);
+}
+function reloadRunFileFilters(){
+ if(selectedSyncRunID)loadSyncRun(selectedSyncRunID);
+}
 async function loadSyncRunList(more=false){
  if(!selectedSyncID)return;
  if(!more)runPageOffset=0;
@@ -728,6 +736,7 @@ async function loadSyncRunList(more=false){
   if(jobID!==selectedSyncID)return;
   if(!more)list.replaceChildren();
   if(!data.runs.length&&!more)makeHistoryNode(list,'p','muted','No detailed run records yet. Run history begins with this version; earlier runs only retained summary counts and up to 100 recent file events.');
+  if(!more)renderLastDetailedRun(data.runs?.[0]||null);
   for(const run of data.runs||[]){
    const card=makeHistoryNode(list,'button','sync-history-run');
    card.type='button';card.dataset.runId=run.id;
@@ -752,7 +761,9 @@ async function loadSyncRun(runID,more=false){
  const id=selectedSyncID;
  if(!more){$('syncRunEvents').replaceChildren();$('syncRunSummary').textContent='Loading recorded file operations…'}
  try{
-  const data=await fetchSyncHistory({id,run:runID,offset:eventPageOffset});
+  const query=$('syncFileSearch')?.value?.trim()||'';
+  const action=$('syncFileActionFilter')?.value||'';
+  const data=await fetchSyncHistory({id,run:runID,offset:eventPageOffset,q:query,action});
   if(id!==selectedSyncID||runID!==selectedSyncRunID)return;
   for(const card of $('syncRunList').querySelectorAll('[data-run-id]'))card.classList.toggle('selected',card.dataset.runId===runID);
   const r=data.run,container=$('syncRunEvents'),pager=$('syncEventPager');
@@ -768,7 +779,12 @@ async function loadSyncRun(runID,more=false){
    if(event.reason)makeHistoryNode(item,'small','sync-history-file-reason',event.reason);
   }
   eventPageOffset+=data.events.length;
-  if(!eventPageOffset)makeHistoryNode(container,'p','muted','No files were transferred or changed in this run. Syncria checked metadata without touching unchanged file contents.');
+  if(!eventPageOffset){
+   const filtering=!!($('syncFileSearch')?.value||$('syncFileActionFilter')?.value);
+   const empty=makeHistoryNode(container,'div','sync-detail-empty');
+   makeHistoryNode(empty,'strong','',filtering?'No files match your filters':'No files needed changing');
+   makeHistoryNode(empty,'p','',filtering?'Try a different filename or operation type. The entire run journal is searched.':'No file transfers were recorded for this run. Unchanged file paths are deliberately kept out of activity.');
+  }
   pager.replaceChildren();
   if(data.more){
    const next=makeHistoryNode(pager,'button','secondary','Load more file operations');
@@ -1527,6 +1543,7 @@ function applyLiveStatus(data){
  if(!data||!Array.isArray(data.jobs))return;
  const jobs=data.jobs;
  lastSyncDashboardJobs=jobs;
+ filterSyncLibrary();
  if(currentView==='sync-detail')renderSyncDetailLive();
  const active=jobs.filter(j=>j.running);
  renderActiveSyncs(jobs);
