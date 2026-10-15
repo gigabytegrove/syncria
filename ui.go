@@ -508,8 +508,9 @@ function renderSyncDetailLive(){
  const direction=job.direction==='one_way'?'One-way (cloud → NAS)':'Bidirectional (cloud ↔ NAS)';
  const deletePolicy=job.propagate_deletions?'Deletes propagate to matching copies':'Deletes are not propagated';
  const recovery=job.recovery_enabled?' · 10-minute deletion recovery enabled':' · deletion recovery disabled';
+ const watcher=job.schedule_mode==='changes'?(job.nas_watcher_verified?' · NAS change feed verified; fast checks eligible':' · Full NAS verification required until notifications are validated'):'';
  container.textContent=label+' · '+(job.successful_runs||0)+' successful / '+(job.failed_runs||0)+' failed runs'+
-  ' · '+direction+' · '+deletePolicy+recovery+
+  ' · '+direction+' · '+deletePolicy+recovery+watcher+
   (job.running?' · '+Number(p.uploads||0)+' sent, '+Number(p.downloads||0)+' received':'');
 }
 function openSyncDetails(id){
