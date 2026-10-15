@@ -70,12 +70,13 @@ type bridgeDriveEndpoint struct {
  files map[string]driveFile
  scanHook func(string,int64)
  useIndexedScan bool
+ usePreviewIndex bool
 }
 func (b *bridgeDriveEndpoint) Close(){}
 func (b *bridgeDriveEndpoint) Scan(ctx context.Context)(map[string]bridgeEntry,error){
  var files map[string]driveFile
  var err error
- if b.useIndexedScan{files,err=b.app.remoteTreeIndexed(ctx,b.account,b.root,b.scanHook)}else{files,err=b.app.remoteTreeProgress(ctx,b.account,b.root,b.scanHook)}
+ if b.useIndexedScan{files,err=b.app.remoteTreeIndexed(ctx,b.account,b.root,b.scanHook)}else if b.usePreviewIndex{files,err=b.app.remoteTreePreviewIndexed(ctx,b.account,b.root,b.scanHook)}else{files,err=b.app.remoteTreeProgress(ctx,b.account,b.root,b.scanHook)}
  if err!=nil{return nil,err}
  b.folders=map[string]string{"":b.root}
  b.files=files
