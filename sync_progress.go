@@ -27,6 +27,8 @@ type SyncProgress struct {
  PlanTruncated bool `json:"plan_truncated,omitempty"`
  Phase string `json:"phase"`
  InitialBaseline bool `json:"initial_baseline,omitempty"`
+ ScanCounts map[string]int64 `json:"scan_counts,omitempty"`
+ ScanDetail string `json:"scan_detail,omitempty"`
  Current string `json:"current,omitempty"`
  Processed int64 `json:"processed"`
  Total int64 `json:"total"`
