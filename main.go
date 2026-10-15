@@ -684,6 +684,9 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     for k,v:=range j.CloudOriginHashes{job.CloudOriginHashes[k]=v}
 
     a.mu.Unlock()
+    runID,beginErr:=a.index.beginRun(jobID)
+    if beginErr!=nil{return fmt.Errorf("Cannot start durable run history: %w",beginErr)}
+    var journalErr error
     a.setSyncProgress(jobID,func(p *SyncProgress){*p=SyncProgress{Phase:"scanning",Running:true,Started:time.Now(),InitialBaseline:job.SuccessfulRuns==0 || len(job.PairStates)==0}})
     job.progressHook=func(up,down,upBytes,downBytes int64){
       a.setSyncProgress(jobID,func(p *SyncProgress){
@@ -697,8 +700,15 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
       })
     }
     job.operationHook=func(action,rel,from,to string){
+      event:=SyncActionEvent{At:time.Now().UTC(),Action:action,Path:rel,From:from,To:to}
+      if journalErr==nil {
+       if e:=a.index.appendRunEvent(jobID,runID,event);e!=nil{
+        journalErr=fmt.Errorf("Run history could not save file operation: %w",e)
+        runCancel()
+       }
+      }
       a.setSyncProgress(jobID,func(p *SyncProgress){
-        p.Events=append(p.Events,SyncActionEvent{At:time.Now(),Action:action,Path:rel,From:from,To:to})
+        p.Events=append(p.Events,event)
         if len(p.Events)>100{p.Events=p.Events[len(p.Events)-100:]}
       })
     }
@@ -724,6 +734,7 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     default:
       err=fmt.Errorf("Unsupported sync provider: %s",job.Provider)
     }
+    if journalErr!=nil{err=journalErr}
     recent:=a.getSyncProgress(jobID).Events
 	a.mu.Lock()
 	if actual := a.job(jobID); actual != nil {
@@ -759,6 +770,11 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
         }
 	}
     a.mu.Unlock()
+    status:="success"
+    if _,stopped:=a.stopRequests.Load(jobID);stopped{status="cancelled"}else if err!=nil{status="failed"}
+    if e:=a.index.finishRun(jobID,runID,status,job.LastSummary,func()string{if err!=nil{return err.Error()};return ""}(),job);e!=nil{
+      if err==nil{err=fmt.Errorf("Run history could not finalize: %w",e)}
+    }
     a.setSyncProgress(jobID,func(p *SyncProgress){
       p.Running=false
       if _,stopped:=a.stopRequests.Load(jobID);stopped {p.Phase="cancelled";p.Error=""} else if err!=nil {p.Phase="failed";p.Error=err.Error()} else {p.Phase="complete"}
@@ -1623,6 +1639,7 @@ func main() {
     mux.HandleFunc("/api/browse/nas/create", a.createNASFolder)
     mux.HandleFunc("/api/nas/action", a.directNASAction)
 	mux.HandleFunc("/api/dashboard/status", a.dashboardStatus)
+    mux.HandleFunc("/api/sync/history", a.syncHistoryAPI)
     mux.HandleFunc("/api/live", a.liveStatus)
     mux.HandleFunc("/api/sync/preview", a.previewSyncAPI)
     mux.HandleFunc("/api/sync/config", a.syncEditorConfig)
