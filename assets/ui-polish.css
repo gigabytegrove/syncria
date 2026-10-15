@@ -247,3 +247,6 @@ body{background:var(--sd-background)}
  .recovery-dialog-footer{padding:14px 18px;align-items:flex-start}
 }
 @media(prefers-reduced-motion:reduce){.recovery-dialog::backdrop{backdrop-filter:none}}
+
+/* Expired records and filename-filtered rows must not be resurrected by flex styles. */
+.recovery-summary[hidden],.recovery-dialog-item[hidden]{display:none!important}
