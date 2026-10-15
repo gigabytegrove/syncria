@@ -700,7 +700,7 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
       })
     }
     job.operationHook=func(action,rel,from,to string){
-      event:=SyncActionEvent{At:time.Now().UTC(),Action:action,Path:rel,From:from,To:to}
+      event:=SyncActionEvent{At:time.Now().UTC(),Action:action,Path:rel,From:from,To:to,Reason:syncOperationReason(&job,action)}
       if journalErr==nil {
        if e:=a.index.appendRunEvent(jobID,runID,event);e!=nil{
         journalErr=fmt.Errorf("Run history could not save file operation: %w",e)
@@ -717,6 +717,7 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     }
     job.transferHook=func(rel string){
       a.setSyncProgress(jobID,func(p *SyncProgress){p.Phase="transferring";p.Current=rel})
+      if job.operationHook!=nil{job.operationHook("transfer started",rel,"","")}
     }
     started := time.Now()
     job.LastUploads, job.LastDownloads = 0, 0
@@ -733,6 +734,10 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
       err=a.execute(ctx,&job)
     default:
       err=fmt.Errorf("Unsupported sync provider: %s",job.Provider)
+    }
+    if err!=nil{
+     progress:=a.getSyncProgress(jobID)
+     if progress.Current!=""&&job.operationHook!=nil{job.operationHook("transfer failed",progress.Current,"","")}
     }
     if journalErr!=nil{err=journalErr}
     recent:=a.getSyncProgress(jobID).Events
