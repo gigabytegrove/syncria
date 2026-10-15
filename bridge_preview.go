@@ -115,8 +115,7 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
     }
    }
   default:
-   changeL:=old.MD5!=l.Fingerprint||(old.ID!=""&&l.ID!=""&&old.ID!=l.ID)
-   changeR:=old.LocalMD5!=r.Fingerprint
+   changeL,changeR:=metadataChanged(old,l,r)
    switch {
    case changeL&&changeR:
     if oneWay&&j.Provider=="nas_bridge"{row.Action="blocked";row.Reason="Both files changed in one-way NAS relationship"
