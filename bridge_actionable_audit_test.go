@@ -30,8 +30,8 @@ func TestTrackedUnchangedFilesNeverOpenFileBodies(t *testing.T){
  if err:=app.executePolicyPair(context.Background(),&job,primary,secondary,key,true,conflictManual);err!=nil{t.Fatal(err)}
  if primary.opens!=0||secondary.opens!=0{t.Fatalf("Unchanged file was opened: source=%d destination=%d",primary.opens,secondary.opens)}
  if job.LastUploads!=0||job.LastDownloads!=0{t.Fatal("Unchanged file was retransferred")}
- if a:=app.getSyncProgress(job.ID);len(a.Plan)!=0 || a.PlanCounts["unchanged"]!=1{
-  t.Fatalf("Unchanged file must be absent from actionable list: %+v",a)
+ if a:=app.getSyncProgress(job.ID);len(a.Plan)!=0 || len(a.PlanCounts)!=0{
+  t.Fatalf("Live sync must not rebuild a speculative transfer plan: %+v",a)
  }
 }
 
@@ -80,7 +80,7 @@ func TestRetryOnlyHandlesTransientReadErrors(t *testing.T){
  if retryableBridgeRead(errors.New("file permission denied")){t.Fatal("permanent errors must not retry")}
 }
 func TestPreviewContainsFilterControlsAndDoesNotAdvertiseHashReads(t *testing.T){
- for _,want:=range []string{"Skipped and why","Overwrites and why","action!=='unchanged'","row.reason||'No reason provided'"}{
+ for _,want:=range []string{"Skipped and why","Overwrites and why","action!=='unchanged'","event.reason"}{
   if !strings.Contains(newUI,want){t.Fatalf("UI missing %q",want)}
  }
  if strings.Contains(newUI,"The real sync verifies content before replacing a file"){t.Fatal("Outdated preview copy still claims full-file comparison")}

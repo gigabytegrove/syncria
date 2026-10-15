@@ -19,6 +19,7 @@ func (a *App) watchBridgeChanges(ctx context.Context,id string) {
  defer cancel()
  events:=make(chan struct{},1)
  watched:=map[string]bool{}
+ monitors:=[]struct{share StorageShare;folder string}{}
  ticker:=time.NewTicker(20*time.Second)
  defer ticker.Stop()
 
@@ -43,9 +44,11 @@ func (a *App) watchBridgeChanges(ctx context.Context,id string) {
   watched[key]=true
   share,err:=a.directShare(d.ShareID)
   if err!=nil{log.Printf("Syncria SMB change notification setup: %v",err);continue}
-  go a.monitorSMBChanges(watchCtx,share,d.Folder,events)
+  monitors=append(monitors,struct{share StorageShare;folder string}{share:share,folder:d.Folder})
  }
- if len(watched)==0 {
+ a.setNASWatchExpected(id,len(watched))
+ for _,monitor:=range monitors {go a.monitorSMBChanges(watchCtx,id,monitor.share,monitor.folder,events)}
+ if len(monitors)==0 {
   log.Printf("Syncria relationship %s has no NAS folder available for remote events; using periodic reconciliation",id)
   return
  }
@@ -69,14 +72,12 @@ func (a *App) watchBridgeChanges(ctx context.Context,id string) {
    active:=current!=nil&&current.Enabled&&current.ScheduleMode=="changes"
    a.mu.Unlock()
    if !active{return}
-   if err:=a.syncJob(ctx,id);err!=nil&&err.Error()!="job already running" {
-    log.Printf("Syncria remote NAS change-triggered relationship %s: %v",id,err)
-   }
+   a.launchScheduledRun(ctx,id,true)
   }
  }
 }
 
-func (a *App) monitorSMBChanges(ctx context.Context,share StorageShare,folder string,event chan<-struct{}) {
+func (a *App) monitorSMBChanges(ctx context.Context,jobID string,share StorageShare,folder string,event chan<-struct{}) {
  if _,err:=exec.LookPath("smbclient");err!=nil {
   log.Printf("Syncria remote NAS notifications unavailable: smbclient is not installed")
   return
@@ -98,6 +99,7 @@ func (a *App) monitorSMBChanges(ctx context.Context,share StorageShare,folder st
   if err!=nil{log.Printf("Syncria SMB notifications %s: %v",share.Label,err);return}
   cmd.Stderr=io.Discard
   if err=cmd.Start();err==nil{
+   a.watchConnected(jobID)
    scanner:=bufio.NewScanner(stdout)
    scanner.Buffer(make([]byte,4096),128*1024)
    for scanner.Scan() {
@@ -105,9 +107,11 @@ func (a *App) monitorSMBChanges(ctx context.Context,share StorageShare,folder st
     if line==""||strings.HasPrefix(line,"Domain=[")||
        strings.HasPrefix(strings.ToLower(line),"try ")||
        strings.HasPrefix(line,"smb:") {continue}
+    a.watchChanged(jobID)
     select{case event<-struct{}{}:default:}
    }
    err=cmd.Wait()
+   a.watchDisconnected(jobID)
   }
   if ctx.Err()!=nil{return}
   log.Printf("Syncria NAS change notifications disconnected on %s: %v; retrying",share.Label,err)
