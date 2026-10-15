@@ -149,6 +149,7 @@ type App struct {
     updateBusy bool
     updateProgress UpdateProgress
     syncProgress map[string]SyncProgress
+    index *syncIndex
     watchers sync.Map
     runCancels sync.Map // job ID -> context.CancelFunc
     stopRequests sync.Map // job ID -> explicit user-requested stop
@@ -213,7 +214,19 @@ func passwordOK(p string, c Config) bool {
 	return subtle.ConstantTimeCompare(got, expected) == 1
 }
 func (a *App) save() error {
-	b, err := json.MarshalIndent(a.cfg, "", "  ")
+ // Update the durable indexed records BEFORE writing lightweight config.
+ // A failed DB transaction aborts this save and never advances the index.
+ if a.index!=nil{
+  if err:=a.index.commitJobs(a.cfg.Jobs);err!=nil{return err}
+ }
+ cfg:=a.cfg
+ if a.index!=nil {
+  // The separate DB is authoritative. Keep the user-facing settings file
+  // small, even with hundreds of thousands of indexed files.
+  cfg.Jobs=append([]Job(nil),a.cfg.Jobs...)
+  for i:=range cfg.Jobs{cfg.Jobs[i].PairStates=nil}
+ }
+ b, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -1551,12 +1564,25 @@ func main() {
 		log.Fatal(e)
 	}
 	if a.cfg.Secret == "" {
-		a.cfg.Secret = b64rand()
-		if e := a.save(); e != nil {
-			log.Fatal(e)
-		}
-	}
-	a.reconcileUpdateOnStartup()
+  a.cfg.Secret = b64rand()
+  if e := a.save(); e != nil {log.Fatal(e)}
+ }
+ // One-time backup of the legacy JSON checkpoint before moving that state
+ // into the local transactional database. Never overwrite an old backup.
+ oldData,readErr:=os.ReadFile(file)
+ if readErr==nil {
+  backup:=file+".pre-index-v0.8.0"
+  if _,err:=os.Stat(backup);os.IsNotExist(err){
+   if err=os.WriteFile(backup,oldData,0600);err!=nil{log.Fatal("Index migration backup failed: ",err)}
+  }
+ }
+ indexed,err:=loadSyncIndex(filepath.Join(dir,"syncria-index.db"))
+ if err!=nil{log.Fatal("File index unavailable, refusing to start sync: ",err)}
+ defer indexed.Close()
+ if err=indexed.hydratePairs(a.cfg.Jobs);err!=nil{log.Fatal("File index migration failed: ",err)}
+ a.index=indexed
+ if err=a.save();err!=nil{log.Fatal("Saving migrated index state failed: ",err)}
+ a.reconcileUpdateOnStartup()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go a.scheduler(ctx)
