@@ -600,15 +600,23 @@ document.addEventListener('keydown',e=>{
 });
 let latestDetailedRun=null;
 let mountedSyncPreview=null;
-function mountSyncPreview(id){
- if(mountedSyncPreview&&mountedSyncPreview!==id){
-  const prior=document.querySelector('[data-sync-card="'+CSS.escape(mountedSyncPreview)+'"]');
-  const node=document.querySelector('[data-preview="'+CSS.escape(mountedSyncPreview)+'"]');
-  if(prior&&node){const actions=prior.querySelector('.flow-card-actions');if(actions)prior.insertBefore(node,actions);node.classList.add('hidden')}
+function unmountSyncPreview(){
+ if(!mountedSyncPreview)return;
+ const prior=document.querySelector('[data-sync-card="'+CSS.escape(mountedSyncPreview)+'"]');
+ const node=document.querySelector('[data-preview="'+CSS.escape(mountedSyncPreview)+'"]');
+ if(prior&&node){
+  const actions=prior.querySelector('.flow-card-actions');
+  if(actions)prior.insertBefore(node,actions);
+  node.classList.add('hidden');
  }
- mountedSyncPreview=id;
+ mountedSyncPreview=null;
+}
+function mountSyncPreview(id){
  const host=$('syncDetailPreviewHost');if(!host)return;
+ if(mountedSyncPreview===id&&host.querySelector('[data-preview="'+CSS.escape(id)+'"]'))return;
+ unmountSyncPreview();
  host.replaceChildren();
+ mountedSyncPreview=id;
  const preview=document.querySelector('[data-preview="'+CSS.escape(id)+'"]');
  if(preview){
   preview.classList.remove('hidden');
@@ -627,7 +635,7 @@ function showSyncDetailTab(name){
   if(panel)panel.classList.toggle('is-active',tab===name);
  }
  if(name==='files'&&selectedSyncID)mountSyncPreview(selectedSyncID);
- if(name==='history'&&selectedSyncID&&runPageOffset===0)loadSyncRunList();
+ // History is already loaded when the detail view opens.
 }
 function runDetailPreview(){
  if(!selectedSyncID)return;
@@ -646,6 +654,7 @@ function submitSyncAction(action){
 function renderLastDetailedRun(run){
  latestDetailedRun=run;
  const target=$('syncDetailLastRun');if(!target)return;
+ target.className=run?'sync-detail-pair sync-detail-last-run':'sync-detail-empty';
  target.replaceChildren();
  if(!run){
   const empty=makeHistoryNode(target,'div','sync-detail-empty');
@@ -710,6 +719,7 @@ function openSyncDetails(id,tab='overview'){
  $('syncEventPager').replaceChildren();
  if($('syncFileSearch'))$('syncFileSearch').value='';
  if($('syncFileActionFilter'))$('syncFileActionFilter').value='';
+ unmountSyncPreview();
  $('syncDetailPreviewHost').replaceChildren();
  renderLastDetailedRun(null);
  renderSyncDetailLive();navigate('sync-detail');
