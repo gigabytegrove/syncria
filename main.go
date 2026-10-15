@@ -1235,7 +1235,7 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
         a.mu.Unlock()
         if e != nil {http.Error(w,e.Error(),500);return}
         http.Redirect(w,r,"/?msg="+url.QueryEscape("Relationship created paused. Enable or run it below to start syncing.")+"#sync",http.StatusSeeOther)
-	case "toggle_job", "run_job", "delete_job", "cancel_job":
+	case "toggle_job", "run_job", "delete_job", "cancel_job", "dismiss_job_error":
 		id := r.FormValue("id")
 		a.mu.Lock()
 		j := a.job(id)
@@ -1244,6 +1244,20 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 			redirect(w, r, "Job not found")
 			return
 		}
+        if action=="dismiss_job_error" {
+            if j.LastError=="" {a.mu.Unlock();http.Redirect(w,r,"/?msg="+url.QueryEscape("No failure is currently displayed.")+"#sync",http.StatusSeeOther);return}
+            previous:=j.LastError
+            j.LastError=""
+            if err:=a.save();err!=nil {
+                j.LastError=previous
+                a.mu.Unlock()
+                http.Error(w,"Could not save dismissed failure: "+err.Error(),http.StatusInternalServerError)
+                return
+            }
+            a.mu.Unlock()
+            http.Redirect(w,r,"/?msg="+url.QueryEscape("Old sync failure dismissed. Historical failed-run counts were preserved.")+"#sync",http.StatusSeeOther)
+            return
+        }
         if action=="cancel_job" {
             a.mu.Unlock()
             if !a.stopRunningJob(id){redirect(w,r,"Sync is not currently running or is starting; try again");return}
