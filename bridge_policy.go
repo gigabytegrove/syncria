@@ -4,6 +4,8 @@ import (
  "context"
  "errors"
  "fmt"
+ "io"
+ "net"
  "path"
  "sort"
  "strings"
@@ -102,7 +104,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
  prev:=j.PairStates[key];if prev==nil{prev=map[string]Item{}}
  // Build the actual-run queue from the scans already performed; never re-read
  // file contents or re-scan endpoints for the Activity view.
- plan:=syncPreviewResult{Rows:[]syncPreviewRow{},Counts:map[string]int{},ChangesOnly:true,MaxRows:120}
+ plan:=syncPreviewResult{Rows:[]syncPreviewRow{},Counts:map[string]int{},ChangesOnly:true,MaxRows:2000}
  planSyncPair(&plan,j,key,left,right,oneWay,policy)
  a.setSyncProgress(j.ID,func(p *SyncProgress){
   p.Phase="processing";p.Current="";p.Processed=0;p.Total=int64(len(left)+len(right))
@@ -124,7 +126,9 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
   if ignoredSyncPath(rel){continue}
   if err:=ctx.Err();err!=nil{return err}
   if isPending(j,key,rel){continue}
-  if j.itemHook!=nil{j.itemHook(int64(i),int64(len(ordered)),rel)}
+  // Every file still participates in metadata reconciliation, but the live
+ // UI must not announce an unchanged file as if it were being transferred.
+ if j.itemHook!=nil{j.itemHook(int64(i),int64(len(ordered)),"")}
   l,hasL:=left[rel];r,hasR:=right[rel];prior,tracked:=prev[rel]
   if (hasL&&l.Unsupported)||(hasR&&r.Unsupported){
    if j.operationHook!=nil{j.operationHook("unsupported Google document — kept on Drive",rel,"Google Drive","No NAS copy")}
@@ -142,7 +146,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     var copied int64
     if l.Folder{r,err=secondary.Mkdir(ctx,rel)}else{
      sum:="";if len(l.Fingerprint)==32||len(l.Fingerprint)==64{sum=l.Fingerprint}
-     r,err=bridgeCopy(ctx,primary,secondary,rel,sum,func(n int64){
+     r,err=bridgeCopyLogged(ctx,j,primary,secondary,rel,sum,func(n int64){
       copied=n
       if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}
      })
@@ -191,7 +195,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
   if !hasL{
    if oneWay {continue}
    var bytes int64
-   l,err=bridgeCopy(ctx,secondary,primary,rel,"",func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
+   l,err=bridgeCopyLogged(ctx,j,secondary,primary,rel,"",func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
    if err!=nil{return err}
    recordTransfer(j,false,bytes);countBack++;if j.operationHook!=nil{j.operationHook("copy",rel,"Secondary","Primary")}
    recordCloudOrigin(j,key,rel,l.Fingerprint)
@@ -201,7 +205,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    var bytes int64
    lChecksum:=""
    if len(l.Fingerprint)==32||len(l.Fingerprint)==64{lChecksum=l.Fingerprint}
-   r,err=bridgeCopy(ctx,primary,secondary,rel,lChecksum,func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
+   r,err=bridgeCopyLogged(ctx,j,primary,secondary,rel,lChecksum,func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
    if err!=nil{return err}
    recordTransfer(j,true,bytes);countForward++;if j.operationHook!=nil{j.operationHook("copy",rel,"Primary","Secondary")}
   }else if !tracked{
@@ -246,7 +250,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    }else if changedPrimary{
     var bytes int64
     checksum:="";if len(l.Fingerprint)==32||len(l.Fingerprint)==64{checksum=l.Fingerprint}
-    r,err=bridgeCopy(ctx,primary,secondary,rel,checksum,func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
+    r,err=bridgeCopyLogged(ctx,j,primary,secondary,rel,checksum,func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
     if err!=nil{return err}
     recordTransfer(j,true,bytes);countForward++;if j.operationHook!=nil{j.operationHook("copy",rel,"Primary","Secondary")}
    }else if changedSecondary{
@@ -254,13 +258,13 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     if oneWay{
      checksum:="";if len(l.Fingerprint)==32||len(l.Fingerprint)==64{checksum=l.Fingerprint}
      var bytes int64
-     r,err=bridgeCopy(ctx,primary,secondary,rel,checksum,func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
+     r,err=bridgeCopyLogged(ctx,j,primary,secondary,rel,checksum,func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
      if err!=nil{return err}
      recordTransfer(j,true,bytes);countForward++
      if j.operationHook!=nil{j.operationHook("one-way source wins",rel,"Primary","Secondary")}
     }else{
     var bytes int64
-    l,err=bridgeCopy(ctx,secondary,primary,rel,"",func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes,j.LastDownloadBytes+n)}})
+    l,err=bridgeCopyLogged(ctx,j,secondary,primary,rel,"",func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes,j.LastDownloadBytes+n)}})
     if err!=nil{return err}
     recordTransfer(j,false,bytes);countBack++;if j.operationHook!=nil{j.operationHook("copy",rel,"Secondary","Primary")}
    recordCloudOrigin(j,key,rel,l.Fingerprint)
@@ -278,6 +282,35 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
  if err=a.checkpointBridge(j);err!=nil{return err}
  j.LastSummary=fmt.Sprintf("%d files copied to secondary, %d to primary; recovery window 10 minutes",countForward,countBack)
  return nil
+}
+// Open a transfer only after metadata comparison proves that work is needed.
+// One retry is safe for NAS destinations because Put uses a fresh staging
+// file and only replaces the destination after verification. Do not retry
+// cloud uploads here: a lost response to a create request can cause duplicates.
+func bridgeCopyLogged(ctx context.Context,j *Job,src,dst bridgeEndpoint,rel,checksum string,notify func(int64))(bridgeEntry,error){
+ if j.transferHook!=nil{j.transferHook(rel)}
+ attempts:=1
+ if _,safe:=dst.(*bridgeSMBEndpoint);safe{attempts=3}
+ var last error
+ for attempt:=1;attempt<=attempts;attempt++{
+  if err:=ctx.Err();err!=nil{return bridgeEntry{},err}
+  result,err:=bridgeCopy(ctx,src,dst,rel,checksum,notify)
+  if err==nil{return result,nil}
+  last=err
+  if !retryableBridgeRead(err)||attempt==attempts {break}
+  wait:=time.Duration(attempt*2)*time.Second
+  select{case <-ctx.Done():return bridgeEntry{},ctx.Err();case <-time.After(wait):}
+ }
+ return bridgeEntry{},fmt.Errorf("Transfer %q failed after %d attempt(s): %w",rel,attempts,last)
+}
+func retryableBridgeRead(err error)bool{
+ if err==nil{return false}
+ if errors.Is(err,context.Canceled){return false}
+ if errors.Is(err,context.DeadlineExceeded)||errors.Is(err,io.ErrUnexpectedEOF){return true}
+ var netError net.Error
+ if errors.As(err,&netError)&&netError.Timeout(){return true}
+ s:=strings.ToLower(err.Error())
+ return strings.Contains(s,"context deadline exceeded")||strings.Contains(s,"connection reset")||strings.Contains(s,"broken pipe")
 }
 func pickConflict(policy string,l,r bridgeEntry)(string,error){
  switch policy {
@@ -323,10 +356,10 @@ func resolveBridgeConflict(ctx context.Context,j *Job,p,s recoverableBridgeEndpo
  var err error
  if direction=="primary"{
   sum:="";if len(l.Fingerprint)==32||len(l.Fingerprint)==64{sum=l.Fingerprint}
-  *r,err=bridgeCopy(ctx,p,s,rel,sum,func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
+  *r,err=bridgeCopyLogged(ctx,j,p,s,rel,sum,func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes+n,j.LastDownloadBytes)}})
   if err==nil{recordTransfer(j,true,bytes)}
  }else{
-  *l,err=bridgeCopy(ctx,s,p,rel,"",func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes,j.LastDownloadBytes+n)}})
+  *l,err=bridgeCopyLogged(ctx,j,s,p,rel,"",func(n int64){bytes=n;if j.progressHook!=nil{j.progressHook(j.LastUploads,j.LastDownloads,j.LastUploadBytes,j.LastDownloadBytes+n)}})
   if err==nil{recordTransfer(j,false,bytes)}
  }
  return err
