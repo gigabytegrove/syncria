@@ -276,7 +276,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
   next[rel]=Item{ID:l.ID,MD5:l.Fingerprint,LocalMD5:r.Fingerprint}
   j.PairStates[key]=next
   if i%20==0 {if err=a.checkpointBridge(j);err!=nil{return err}}
-  if j.itemHook!=nil{j.itemHook(int64(i+1),int64(len(ordered)),rel)}
+  if j.itemHook!=nil{j.itemHook(int64(i+1),int64(len(ordered)),"")}
  }
  j.PairStates[key]=next
  if err=a.checkpointBridge(j);err!=nil{return err}
@@ -332,9 +332,12 @@ func bridgeSameFirstRun(ctx context.Context,primary,secondary bridgeEndpoint,rel
  if l.Modified.IsZero()||r.Modified.IsZero(){
   return false,nil // no metadata match: defer to the configured first-run conflict policy
  }
- if l.Modified.Equal(r.Modified) {
+ // Account for SMB/cloud timestamp precision (often one second).
+ // Do not declare equal when sizes conflict, and never open the file.
+ delta:=l.Modified.Sub(r.Modified)
+ if delta<2*time.Second&&delta >-2*time.Second {
   if l.Size!=r.Size{
-   return false,fmt.Errorf("Cannot compare %s: matching timestamps but differing sizes; manual review required",rel)
+   return false,fmt.Errorf("Cannot compare %s: matching timestamps within 2 seconds but differing sizes; manual review required",rel)
   }
   return true,nil
  }
