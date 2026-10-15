@@ -21,6 +21,7 @@ func (a *App) dashboardStatus(w http.ResponseWriter,r *http.Request) {
   PropagateDeletions bool `json:"propagate_deletions"`
   RecoveryEnabled bool `json:"recovery_enabled"`
   LastRun string `json:"last_run"`
+  LastChecked string `json:"last_checked,omitempty"`
   Summary string `json:"summary"`
   Error string `json:"error"`
   Running bool `json:"running"`
@@ -49,7 +50,7 @@ func (a *App) dashboardStatus(w http.ResponseWriter,r *http.Request) {
   if !j.LastRun.IsZero(){last=j.LastRun.Format("Jan 2, 2006 15:04")}
   progress:=a.syncProgress[j.ID]
   if !progress.Running && len(progress.Events)==0 && len(j.RecentEvents)>0{progress.Events=append([]SyncActionEvent(nil),j.RecentEvents...)}
-  jobs=append(jobs,jobState{ID:j.ID,Name:j.Name,Enabled:j.Enabled,Direction:j.Direction,Provider:j.Provider,PropagateDeletions:enabledByDefault(j.PropagateDeletions),RecoveryEnabled:enabledByDefault(j.RecoveryEnabled),Progress:progress,LastRun:last,Summary:j.LastSummary,Error:j.LastError,SuccessfulRuns:j.SuccessfulRuns,FailedRuns:j.FailedRuns,LastDurationMillis:j.LastDurationMillis,LastUploads:j.LastUploads,LastDownloads:j.LastDownloads,LastUploadBytes:j.LastUploadBytes,LastDownloadBytes:j.LastDownloadBytes,TotalUploads:j.TotalUploads,TotalDownloads:j.TotalDownloads,TotalUploadBytes:j.TotalUploadBytes,TotalDownloadBytes:j.TotalDownloadBytes})
+  jobs=append(jobs,jobState{ID:j.ID,Name:j.Name,Enabled:j.Enabled,Direction:j.Direction,Provider:j.Provider,PropagateDeletions:enabledByDefault(j.PropagateDeletions),RecoveryEnabled:enabledByDefault(j.RecoveryEnabled),Progress:progress,LastRun:last,LastChecked:func()string{if j.LastChecked.IsZero(){return ""};return j.LastChecked.Format("Jan 2, 2006 15:04:05")}(),Summary:j.LastSummary,Error:j.LastError,SuccessfulRuns:j.SuccessfulRuns,FailedRuns:j.FailedRuns,LastDurationMillis:j.LastDurationMillis,LastUploads:j.LastUploads,LastDownloads:j.LastDownloads,LastUploadBytes:j.LastUploadBytes,LastDownloadBytes:j.LastDownloadBytes,TotalUploads:j.TotalUploads,TotalDownloads:j.TotalDownloads,TotalUploadBytes:j.TotalUploadBytes,TotalDownloadBytes:j.TotalDownloadBytes})
  }
  shares:=append([]StorageShare(nil),a.cfg.Shares...)
  totals:=summarizeMetrics(a.cfg.Jobs)
