@@ -398,7 +398,7 @@ code{overflow-wrap:anywhere}
 <div class="workspace-intro"><div><p>Transfer counts and recent results, updated as your syncs run.</p></div><button class="secondary" type="button" onclick="refreshDashboardStatus()">Refresh activity ↻</button></div>
 <div class="activity-scoreboard grid gap-3">
  <div class="activity-score activity-score-highlight"><small>CHECKS THAT WORKED</small><strong id="activitySuccessful">{{.Metrics.Runs}}</strong><span>completed checks</span></div>
- <div class="activity-score"><small>CHECKS WITH ERRORS</small><strong id="activityFailed">{{.Metrics.Failures}}</strong><span>need attention</span></div>
+ <div class="activity-score"><small>CHECKS WITH ERRORS</small><strong id="activityFailed">{{.Metrics.Failures}}</strong><span>historical failed checks</span></div>
  <div class="activity-score"><small>FILES COPIED</small><strong id="activityFiles">—</strong><span>across all syncs</span></div>
  <div class="activity-score"><small>FILES SENT</small><strong id="activityUploaded">—</strong><span>to another place</span></div>
  <div class="activity-score"><small>FILES RECEIVED</small><strong id="activityDownloaded">—</strong><span>from another place</span></div>
@@ -1570,7 +1570,7 @@ function applyLiveStatus(data){
    detail.textContent=active.length+' sync'+(active.length===1?'':'s')+' running · '+(p.phase||'Working')+(p.current?' · '+p.current:'')+(Number(p.total||0)>0?' · '+Number(p.processed||0)+' / '+Number(p.total)+' checked':' · '+Number(p.processed||0)+' scanned');
   }else{
    const failures=jobs.filter(j=>j.error);
-   detail.textContent=failures.length?failures.length+' sync'+(failures.length===1?'':'s')+' need attention':'All syncs idle · Live monitoring connected';
+   detail.textContent=failures.length?failures.length+' sync'+(failures.length===1?' needs':'s need')+' attention':'All syncs idle · Live monitoring connected';
   }
  }
  const feed=$('liveActivityFeed');
