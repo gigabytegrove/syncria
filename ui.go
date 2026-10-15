@@ -196,10 +196,28 @@ code{overflow-wrap:anywhere}
  <form method="post" action="/api/conflicts/resolve" class="inline"><input type="hidden" name="id" value="{{$job.ID}}"><input type="hidden" name="pair" value="{{.Pair}}"><input type="hidden" name="path" value="{{.Path}}">
  <label class="field"><span class="sr-only">Which copy to keep</span><select name="choice"><option value="primary">Use first NAS copy</option><option value="secondary">Use other NAS copy</option><option value="keep_both">Keep both copies</option></select></label><button type="submit" class="secondary">Save choice</button></form></div>{{end}}
  </section>{{end}}
- {{if .PendingDeletions}}<section class="relationship-alert recovery-alert" aria-label="Files you can restore"><div class="alert-title"><span>↶</span><div><h4>Recently deleted · 10-minute Undo</h4><p>These files can be brought back before their recovery time runs out.</p></div></div>
- {{range .PendingDeletions}}<div class="decision-row"><div><strong>{{.Path}}</strong><small>Undo before {{.Expires.Format "Jan 2, 2006 · 15:04:05 MST"}}</small></div>
- <form method="post" action="/api/recovery/undo" class="inline"><input type="hidden" name="operation" value="undo"><input type="hidden" name="id" value="{{$job.ID}}"><input type="hidden" name="pair" value="{{.Pair}}"><input type="hidden" name="path" value="{{.Path}}"><button type="submit" class="secondary">Bring back file</button></form></div>{{end}}
- </section>{{end}}
+ {{if .PendingDeletions}}
+ <div class="recovery-summary" data-recovery-summary="{{.ID}}">
+  <div class="recovery-summary-main"><span class="recovery-symbol" aria-hidden="true">↶</span><div><strong>Recently deleted <span class="recovery-count">{{len .PendingDeletions}}</span></strong><small>Files can be restored during their recovery window.</small></div></div>
+  <button type="button" class="secondary" onclick="openRecoveryDialog('{{.ID}}')">Review &amp; restore <span aria-hidden="true">→</span></button>
+ </div>
+ <dialog class="recovery-dialog" id="recovery-{{.ID}}" aria-labelledby="recovery-title-{{.ID}}" aria-describedby="recovery-help-{{.ID}}">
+  <div class="recovery-dialog-shell">
+   <header class="recovery-dialog-header"><div><span class="mini-overline">SYNC FILE RECOVERY</span><h2 id="recovery-title-{{.ID}}">Recently deleted files</h2><p id="recovery-help-{{.ID}}">Restore individual files while their recovery window is still open. No other files are changed.</p></div>
+    <button type="button" class="secondary recovery-close" onclick="closeRecoveryDialog('{{.ID}}')" aria-label="Close recently deleted files">Close <span aria-hidden="true">×</span></button>
+   </header>
+   <div class="recovery-dialog-toolbar"><label for="recovery-search-{{.ID}}">Find a file <input id="recovery-search-{{.ID}}" type="search" autocomplete="off" placeholder="Search filename or folder…" oninput="filterRecoveryFiles('{{.ID}}')"></label>
+    <span class="recovery-visible-count" id="recovery-visible-{{.ID}}" role="status">{{len .PendingDeletions}} files eligible for recovery</span>
+   </div>
+   <div class="recovery-dialog-items" id="recovery-items-{{.ID}}">
+    {{range .PendingDeletions}}<div class="recovery-dialog-item" data-recovery-path="{{.Path}}"><div class="recovery-dialog-item-copy"><strong>{{.Path}}</strong><small>Undo before {{.Expires.Format "Jan 2, 2006 · 15:04:05 MST"}}</small></div>
+     <form method="post" action="/api/recovery/undo" class="inline"><input type="hidden" name="operation" value="undo"><input type="hidden" name="id" value="{{$job.ID}}"><input type="hidden" name="pair" value="{{.Pair}}"><input type="hidden" name="path" value="{{.Path}}"><button type="submit" class="secondary">Restore file</button></form></div>{{end}}
+   </div>
+   <div class="recovery-dialog-empty hidden" id="recovery-empty-{{.ID}}">No filenames match. Try another search.</div>
+   <footer class="recovery-dialog-footer"><span>Recovery is temporary; expired files may no longer be restorable.</span><button type="button" class="secondary" onclick="closeRecoveryDialog('{{.ID}}')">Done</button></footer>
+  </div>
+ </dialog>
+ {{end}}
  <section class="sync-preview hidden" data-preview="{{.ID}}" aria-label="Read-only sync preview">
   <div class="sync-preview-heading"><div><strong>Test this sync without changing files</strong><p>See which files would move, which side wins, and what needs a decision.</p></div><button class="secondary" type="button" onclick="previewSync('{{.ID}}')">Refresh preview</button></div>
   <div class="sync-preview-result" data-preview-result="{{.ID}}" role="status">Scanning both locations…</div>
@@ -350,6 +368,7 @@ code{overflow-wrap:anywhere}
    </div>
    <div class="sync-detail-section"><h3>Current status</h3><div id="syncDetailLive" class="sync-detail-live" aria-live="polite">Loading live status…</div><p class="sync-detail-note" id="syncDetailWatchNote">Synchronization checks use saved file metadata and change detection where supported.</p></div>
    <div class="sync-detail-section"><div class="sync-run-history-heading"><h3>Latest run</h3><button type="button" class="secondary" onclick="showSyncDetailTab('history')">Browse every run →</button></div><div id="syncDetailLastRun" class="sync-detail-empty"><strong>No detailed run loaded yet</strong><p>The most recent result will appear here. Older versions recorded totals rather than full file-by-file history.</p></div></div>
+   <div class="sync-detail-section hidden" id="syncDetailRecoveryBar"><div class="sync-run-history-heading"><h3>Recently deleted files</h3><button type="button" class="secondary" onclick="openRecoveryDialog(selectedSyncID)">Review &amp; restore <span id="syncDetailRecoveryCount"></span> →</button></div><p class="sync-detail-note">Recover eligible files before their undo window expires.</p></div>
    <div class="sync-detail-section"><h3>What happens to your files</h3><div class="sync-detail-pairs">
     <div class="sync-detail-pair"><small>Transfer direction</small><strong id="syncDetailDirection">—</strong></div>
     <div class="sync-detail-pair"><small>Deletion behavior</small><strong id="syncDetailDeletion">—</strong></div>
@@ -551,6 +570,50 @@ function previewSync(id){
   output.textContent='Live scan connection interrupted. No files were changed. Try again or check your reverse proxy streaming settings.';
  };
 }
+let recoveryDialogReturnFocus=null;
+function openRecoveryDialog(id){
+ const dialog=document.getElementById('recovery-'+id);
+ if(!dialog||typeof dialog.showModal!=='function')return;
+ // A native dialog must not remain beneath a hidden SPA view.
+ if(dialog.parentElement!==document.body)document.body.append(dialog);
+ recoveryDialogReturnFocus=document.activeElement;
+ if(dialog.open)return;
+ const input=document.getElementById('recovery-search-'+id);
+ if(input)input.value='';
+ filterRecoveryFiles(id);
+ dialog.showModal();
+ if(input)input.focus();
+}
+function closeRecoveryDialog(id){
+ const dialog=document.getElementById('recovery-'+id);
+ if(dialog?.open)dialog.close();
+}
+function filterRecoveryFiles(id){
+ const input=document.getElementById('recovery-search-'+id);
+ const list=document.getElementById('recovery-items-'+id);
+ if(!list)return;
+ const term=(input?.value||'').trim().toLocaleLowerCase();
+ let visible=0,total=0;
+ for(const item of list.querySelectorAll('[data-recovery-path]')){
+  total++;
+  const match=item.dataset.recoveryPath.toLocaleLowerCase().includes(term);
+  item.hidden=!match;
+  if(match)visible++;
+ }
+ const count=document.getElementById('recovery-visible-'+id);
+ if(count)count.textContent=term?visible+' of '+total+' files shown':total+' files eligible for recovery';
+ document.getElementById('recovery-empty-'+id)?.classList.toggle('hidden',visible!==0);
+}
+document.addEventListener('click',event=>{
+ const modal=event.target;
+ if(modal instanceof HTMLDialogElement&&modal.classList.contains('recovery-dialog'))modal.close();
+});
+document.addEventListener('close',event=>{
+ if(!event.target?.classList?.contains('recovery-dialog'))return;
+ const target=recoveryDialogReturnFocus;
+ recoveryDialogReturnFocus=null;
+ if(target?.isConnected&&typeof target.focus==='function')target.focus();
+},true);
 let selectedSyncID='',selectedSyncRunID='',runPageOffset=0,eventPageOffset=0;
 let lastSyncDashboardJobs=[];
 function makeHistoryNode(parent,tag,className,text){
@@ -687,6 +750,11 @@ function renderSyncDetailLive(){
  const deletion=job.propagate_deletions?'Deletions propagate to previously synchronized copies':'Deletions are not shared';
  const recovery=job.recovery_enabled?'10-minute deletion undo enabled':'Deletion undo disabled';
  const schedule=job.schedule_mode==='changes'?'On changes · five-minute checks':'Every configured interval';
+ const recovered=document.querySelector('[data-recovery-summary="'+CSS.escape(selectedSyncID)+'"]');
+ const recoveryBar=$('syncDetailRecoveryBar');
+ if(recoveryBar)recoveryBar.classList.toggle('hidden',!recovered);
+ const recoveries=$('syncDetailRecoveryCount');
+ if(recoveries)recoveries.textContent=recovered?.querySelector('.recovery-count')?.textContent?.trim()||'';
  const watcher=job.schedule_mode==='changes'?(job.nas_watcher_verified?'NAS watcher verified; fast checks eligible':'NAS watcher unverified; a full metadata check may be required'):'Periodic scheduled checks';
  const recent=job.last_checked?'Last quick check '+job.last_checked:'No quick check recorded';
  const line=job.running?(p.phase==='scanning'?'Reading '+(p.current||'metadata')+' · '+Number(p.processed||0).toLocaleString()+' entries':p.phase==='transferring'?'Transferring '+(p.current||'file'):p.phase||'Working')+' · '+formatBytes(Number(p.upload_bytes||0)+Number(p.download_bytes||0))+' moved this run':recent+' · '+watcher;
@@ -1737,6 +1805,12 @@ if(location.hash){
   const id=decodeURIComponent(parts[1]);
   if(document.querySelector('[data-sync-card="'+CSS.escape(id)+'"]'))openSyncDetails(id,parts[2]||'overview');
   else navigate('sync');
+ }else if(parts[0]==='sync'&&parts[1]==='recover'&&parts[2]){
+  const id=decodeURIComponent(parts[2]);
+  navigate('sync');
+  openRecoveryDialog(id);
+ }else if(parts[0]==='accounts'&&parts[1]==='connect'){
+  startAccountWizard(parts[2]==='dropbox'?'dropbox':'google_drive');
  }else if($('view-'+parts[0])&&parts[0]!=='sync-detail')navigate(parts[0]);
 }
 </script></body></html>`

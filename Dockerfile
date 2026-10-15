@@ -9,7 +9,7 @@ RUN npm install --no-audit --no-fund && npm run build:css
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS build
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
-ARG APP_VERSION=v0.8.2
+ARG APP_VERSION=v0.8.3
 WORKDIR /src
 COPY go.mod ./
 COPY *.go ./

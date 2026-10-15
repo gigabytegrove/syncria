@@ -50,14 +50,20 @@ jobs:
           chrome="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
           test -n "$chrome"
           "$chrome" --version
-          for screen in overview sync sync-detail activity accounts updates; do
+          for screen in overview sync sync-detail activity accounts accounts-connect recovery updates; do
             route="#$screen"
             if [[ "$screen" == "sync-detail" ]]; then route="#sync-detail/photos/overview"; fi
+            if [[ "$screen" == "accounts-connect" ]]; then route="#accounts/connect/google_drive"; fi
+            if [[ "$screen" == "recovery" ]]; then route="#sync/recover/photos"; fi
             "$chrome" --headless --disable-gpu --no-sandbox --no-first-run --hide-scrollbars --virtual-time-budget=800 --window-size=1440,920 --screenshot="$RUNNER_TEMP/${screen}.png" "file://$RUNNER_TEMP/syncria-preview.html${route}" >/dev/null 2>&1
             test -s "$RUNNER_TEMP/${screen}.png"
           done
           "$chrome" --headless --disable-gpu --no-sandbox --no-first-run --hide-scrollbars --virtual-time-budget=800 --window-size=390,844 --screenshot="$RUNNER_TEMP/mobile.png" "file://$RUNNER_TEMP/syncria-preview.html#sync" >/dev/null 2>&1
           test -s "$RUNNER_TEMP/mobile.png"
+          "$chrome" --headless --disable-gpu --no-sandbox --no-first-run --hide-scrollbars --virtual-time-budget=800 --window-size=390,844 --screenshot="$RUNNER_TEMP/mobile-accounts-connect.png" "file://$RUNNER_TEMP/syncria-preview.html#accounts/connect/google_drive" >/dev/null 2>&1
+          test -s "$RUNNER_TEMP/mobile-accounts-connect.png"
+          "$chrome" --headless --disable-gpu --no-sandbox --no-first-run --hide-scrollbars --virtual-time-budget=800 --window-size=390,844 --screenshot="$RUNNER_TEMP/mobile-recovery.png" "file://$RUNNER_TEMP/syncria-preview.html#sync/recover/photos" >/dev/null 2>&1
+          test -s "$RUNNER_TEMP/mobile-recovery.png"
           ls -lh "$RUNNER_TEMP"/*.png
       - uses: actions/upload-artifact@v4
         with:
@@ -68,6 +74,10 @@ jobs:
             ${{ runner.temp }}/sync-detail.png
             ${{ runner.temp }}/activity.png
             ${{ runner.temp }}/accounts.png
+            ${{ runner.temp }}/accounts-connect.png
+            ${{ runner.temp }}/recovery.png
+            ${{ runner.temp }}/mobile-accounts-connect.png
+            ${{ runner.temp }}/mobile-recovery.png
             ${{ runner.temp }}/updates.png
             ${{ runner.temp }}/mobile.png
           retention-days: 7
@@ -76,7 +86,7 @@ jobs:
           python3 - <<'PY'
           import os,pathlib
           root=pathlib.Path(os.environ['RUNNER_TEMP'])
-          for name in ('overview','sync','sync-detail','activity','accounts','updates','mobile'):
+          for name in ('overview','sync','sync-detail','activity','accounts','accounts-connect','recovery','updates','mobile','mobile-accounts-connect','mobile-recovery'):
               file=root/(name+'.png')
               assert file.is_file() and file.stat().st_size>5000, name
               print(f"{name}: {file.stat().st_size:,} bytes")
