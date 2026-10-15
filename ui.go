@@ -324,14 +324,72 @@ code{overflow-wrap:anywhere}
 </section>
 </section>
 <section class="view" id="view-sync-detail">
- <div class="sync-detail-back"><button type="button" class="secondary" onclick="navigate('sync')">← My Syncs</button><button type="button" class="secondary" onclick="loadSyncRunList()">Refresh history</button></div>
- <section class="panel sync-details-shell">
-  <div class="section-heading"><div><span class="mini-overline">SYNC DETAILS</span><h2 id="syncDetailTitle">Sync details</h2><p id="syncDetailSubtitle">Runs, files transferred, and why.</p></div></div>
-  <div id="syncDetailLive" class="sync-detail-live">Loading current status…</div>
-  <div class="sync-detail-columns">
-   <div class="sync-detail-run-column"><h3>Run history</h3><p class="muted">Choose a run to see exactly which files were processed.</p><div id="syncRunList" class="sync-run-list"></div><div id="syncRunPager" class="sync-detail-pager"></div></div>
-   <div class="sync-detail-files-column"><h3>File operations</h3><p id="syncRunSummary" class="muted">Select a run.</p><div id="syncRunEvents" class="sync-run-files"></div><div id="syncEventPager" class="sync-detail-pager"></div></div>
+ <div class="sync-detail-back"><button type="button" class="secondary" onclick="navigate('sync')">← All syncs</button><span class="sync-library-hint">Details update automatically as synchronization runs.</span></div>
+ <section class="panel sync-details-shell" aria-label="Selected synchronization">
+  <div class="sync-details-head">
+   <div><span class="mini-overline">SYNCHRONIZATION</span><h2 class="sync-details-name" id="syncDetailTitle">Sync details</h2><p class="sync-details-meta" id="syncDetailSubtitle">Choose a sync to inspect its activity and settings.</p></div>
+   <div class="sync-status-row"><span class="sync-status-pill" id="syncDetailStatus" data-kind="healthy">Loading</span></div>
   </div>
+  <div class="sync-details-toolbar">
+   <button type="button" class="primary" id="syncDetailRun" onclick="submitSyncAction('run_job')">Sync now</button>
+   <button type="button" class="secondary hidden" id="syncDetailStop" onclick="requestStopSync(selectedSyncID,this)">Stop current run</button>
+   <button type="button" class="secondary" id="syncDetailPause" onclick="submitSyncAction('toggle_job')">Pause automatic checks</button>
+   <button type="button" class="secondary" id="syncDetailEdit" onclick="editSync(selectedSyncID)">Edit configuration</button>
+  </div>
+  <div class="sync-details-tabs" role="tablist" aria-label="Sync detail sections">
+   <button type="button" role="tab" aria-controls="syncDetailOverview" id="syncTabOverview" aria-selected="true" onclick="showSyncDetailTab('overview')">Overview</button>
+   <button type="button" role="tab" aria-controls="syncDetailFiles" id="syncTabFiles" aria-selected="false" onclick="showSyncDetailTab('files')">Files &amp; preview</button>
+   <button type="button" role="tab" aria-controls="syncDetailHistory" id="syncTabHistory" aria-selected="false" onclick="showSyncDetailTab('history')">Run history</button>
+   <button type="button" role="tab" aria-controls="syncDetailSettings" id="syncTabSettings" aria-selected="false" onclick="showSyncDetailTab('settings')">Settings</button>
+  </div>
+  <section class="sync-details-tab is-active" id="syncDetailOverview" role="tabpanel" aria-labelledby="syncTabOverview">
+   <div class="sync-detail-grid">
+    <div class="sync-detail-stat"><span>Last successful checks</span><strong id="syncDetailSuccess">—</strong></div>
+    <div class="sync-detail-stat"><span>Files moved overall</span><strong id="syncDetailMoved">—</strong></div>
+    <div class="sync-detail-stat"><span>Data transferred</span><strong id="syncDetailBytes">—</strong></div>
+   </div>
+   <div class="sync-detail-section"><h3>Current status</h3><div id="syncDetailLive" class="sync-detail-live" aria-live="polite">Loading live status…</div><p class="sync-detail-note" id="syncDetailWatchNote">Synchronization checks use saved file metadata and change detection where supported.</p></div>
+   <div class="sync-detail-section"><div class="sync-run-history-heading"><h3>Latest run</h3><button type="button" class="secondary" onclick="showSyncDetailTab('history')">Browse every run →</button></div><div id="syncDetailLastRun" class="sync-detail-empty"><strong>No detailed run loaded yet</strong><p>The most recent result will appear here. Older versions recorded totals rather than full file-by-file history.</p></div></div>
+   <div class="sync-detail-section"><h3>What happens to your files</h3><div class="sync-detail-pairs">
+    <div class="sync-detail-pair"><small>Transfer direction</small><strong id="syncDetailDirection">—</strong></div>
+    <div class="sync-detail-pair"><small>Deletion behavior</small><strong id="syncDetailDeletion">—</strong></div>
+   </div></div>
+  </section>
+  <section class="sync-details-tab" id="syncDetailFiles" role="tabpanel" aria-labelledby="syncTabFiles">
+   <div class="sync-preview-head"><div><h3>Planned file changes</h3><p class="muted">Compare file metadata without copying anything. See replacements, skips, deletions and explanations—not unchanged files.</p></div><button type="button" class="secondary" onclick="runDetailPreview()">Run read-only preview</button></div>
+   <div id="syncDetailPreviewHost" class="sync-detail-preview-host"></div>
+   <p class="sync-detail-note">Looking for files that already transferred? Open Run history and select a completed run.</p>
+  </section>
+  <section class="sync-details-tab" id="syncDetailHistory" role="tabpanel" aria-labelledby="syncTabHistory">
+   <div class="sync-run-history-heading"><div><h3>Recorded sync runs</h3><p class="muted">Select any run to see the actual files and operations recorded for it.</p></div><button type="button" class="secondary" onclick="loadSyncRunList()">Refresh history</button></div>
+   <div class="sync-run-history-layout">
+    <div class="sync-detail-run-column"><div id="syncRunList" class="sync-run-list" aria-label="Run history"></div><div id="syncRunPager" class="sync-detail-pager"></div></div>
+    <div class="sync-detail-files-column">
+     <div class="sync-run-history-heading"><h3>Files in selected run</h3></div>
+     <p id="syncRunSummary" class="muted">Choose a run to inspect recorded changes.</p>
+     <div class="sync-detail-files-toolbar"><div class="sync-file-filter">
+      <label class="sr-only" for="syncFileSearch">Search filenames in the selected run</label><input id="syncFileSearch" type="search" placeholder="Find filename or folder…" oninput="debounceRunFileSearch()">
+      <label class="sr-only" for="syncFileActionFilter">Filter file operations</label><select id="syncFileActionFilter" onchange="reloadRunFileFilters()"><option value="">All operations</option><option value="copy">Copied</option><option value="replace">Replaced</option><option value="delete">Deleted</option><option value="transfer failed">Failed</option><option value="unsupported Google document — kept on Drive">Skipped unsupported</option></select>
+     </div></div>
+     <div id="syncRunEvents" class="sync-run-files" aria-label="Files in selected run"></div><div id="syncEventPager" class="sync-detail-pager"></div>
+    </div>
+   </div>
+  </section>
+  <section class="sync-details-tab" id="syncDetailSettings" role="tabpanel" aria-labelledby="syncTabSettings">
+   <h3>Relationship settings</h3><p class="muted">What Syncria does, when it runs, and how it handles deletions.</p>
+   <div class="sync-detail-pairs">
+    <div class="sync-detail-pair"><small>Sync direction</small><strong id="syncSettingDirection">—</strong></div>
+    <div class="sync-detail-pair"><small>Checking schedule</small><strong id="syncSettingSchedule">—</strong></div>
+    <div class="sync-detail-pair"><small>Deletion sharing</small><strong id="syncSettingDelete">—</strong></div>
+    <div class="sync-detail-pair"><small>Undo protection</small><strong id="syncSettingRecovery">—</strong></div>
+   </div>
+   <p class="sync-detail-alert" id="syncDeleteWarning" role="note">Review how deletions are shared before enabling this sync.</p>
+   <div class="sync-detail-section"><h3>Manage this connection</h3><div class="sync-settings-actions">
+    <button type="button" class="primary" onclick="editSync(selectedSyncID)">Edit source, destination and policies</button>
+    <button type="button" class="secondary" onclick="showSyncDetailTab('files')">Preview before syncing</button>
+    <button type="button" class="danger" onclick="submitSyncAction('delete_job')">Remove sync configuration</button>
+   </div><p class="sync-detail-note">Removing a sync configuration does not delete the underlying cloud or NAS files. Changes to deletion settings only take effect when saved.</p></div>
+  </section>
  </section>
 </section>
 <section class="view" id="view-activity">
