@@ -2,6 +2,8 @@ package main
 
 import (
  "os"
+ "bytes"
+ "encoding/json"
  "path/filepath"
  "strconv"
  "testing"
@@ -83,4 +85,34 @@ func TestIndexCanCommitFiveThousandEntriesWithoutPayloadReads(t *testing.T){
  if err=idx.hydratePairs(jobs);err!=nil{t.Fatal(err)}
  if len(idx.last["bulk"]["pair"])!=5800{t.Fatal("Index lost files")}
  if err=idx.commitJobs(jobs);err!=nil{t.Fatal(err)}
+}
+
+func TestAppSettingsAreSmallAndIndexRemainsAuthoritative(t *testing.T){
+ dir:=t.TempDir()
+ idx,err:=loadSyncIndex(filepath.Join(dir,"syncria-index.db"));if err!=nil{t.Fatal(err)}
+ a:=&App{file:filepath.Join(dir,"state.json"),index:idx,cfg:Config{
+  Jobs:[]Job{{ID:"j",PairStates:map[string]map[string]Item{
+   "pair":{"important.txt":{ID:"file-important",MD5:"source",LocalMD5:"destination"}},
+  }}},
+ }}
+ if err=a.save();err!=nil{t.Fatal(err)}
+ b,err:=os.ReadFile(a.file);if err!=nil{t.Fatal(err)}
+ if bytes.Contains(b,[]byte("important.txt")){t.Fatal("High-cardinality file records must live only in index DB")}
+ if err=idx.Close();err!=nil{t.Fatal(err)}
+ idx,err=loadSyncIndex(filepath.Join(dir,"syncria-index.db"));if err!=nil{t.Fatal(err)}
+ defer idx.Close()
+ var cfg Config
+ if err=json.Unmarshal(b,&cfg);err!=nil{t.Fatal(err)}
+ if err=idx.hydratePairs(cfg.Jobs);err!=nil{t.Fatal(err)}
+ if cfg.Jobs[0].PairStates["pair"]["important.txt"].ID!="file-important"{t.Fatal("Index did not restore the full checkpoint")}
+}
+func TestBrokenIndexFailsClosed(t *testing.T){
+ dir:=t.TempDir()
+ idx,err:=loadSyncIndex(filepath.Join(dir,"syncria-index.db"));if err!=nil{t.Fatal(err)}
+ app:=&App{index:idx,file:filepath.Join(dir,"state.json"),cfg:Config{Jobs:[]Job{{ID:"job"}}}}
+ if err=app.save();err!=nil{t.Fatal(err)}
+ if err=idx.Close();err!=nil{t.Fatal(err)}
+ app.cfg.Jobs[0].PairStates=map[string]map[string]Item{"pair":{"file.txt":{MD5:"new"}}}
+ if err=app.save();err==nil{t.Fatal("A closed index cannot acknowledge a transfer")}
+ if !app.indexBroken{t.Fatal("Index failure must block future syncs")}
 }
