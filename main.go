@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-var appVersion = "v0.8.4"
+var appVersion = "v0.8.5"
 const folderMime = "application/vnd.google-apps.folder"
 const scope = "https://www.googleapis.com/auth/drive"
 
@@ -1018,7 +1018,7 @@ func (a *App) authenticated(r *http.Request) bool {
 		Expires int64  `json:"expires"`
 		Nonce   string `json:"nonce"`
 	}
-	if json.Unmarshal(raw, &payload) != nil || time.Now().Unix() > payload.Expires {
+	if json.Unmarshal(raw, &payload) != nil || time.Now().Unix() >= payload.Expires {
 		return false
 	}
 	a.mu.Lock()
@@ -1029,15 +1029,38 @@ func (a *App) authenticated(r *http.Request) bool {
 	want := hex.EncodeToString(mac.Sum(nil))
 	return subtle.ConstantTimeCompare([]byte(want), []byte(parts[1])) == 1
 }
-func (a *App) setSession(w http.ResponseWriter, r *http.Request) {
+// Unremembered sessions expire when the browser closes (server-side maximum:
+// seven days). Explicitly remembered sessions persist for up to 30 days.
+// Both modes use the existing HMAC-signed, HttpOnly session token.
+const (
+	defaultSessionLifetime = 7 * 24 * time.Hour
+	rememberedSessionLifetime = 30 * 24 * time.Hour
+)
+
+func sessionCookieSecure(r *http.Request) bool {
+	// A TLS-terminating reverse proxy commonly forwards the original scheme.
+	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
+
+func (a *App) setSession(w http.ResponseWriter, r *http.Request, remember bool) {
 	a.mu.Lock()
 	secret := a.cfg.Secret
 	a.mu.Unlock()
-	payload, _ := json.Marshal(map[string]any{"expires": time.Now().Add(24 * time.Hour).Unix(), "nonce": newID()})
+	lifetime := defaultSessionLifetime
+	maxAge := 0 // Browser-session cookie, unless Remember me was selected.
+	if remember {
+		lifetime = rememberedSessionLifetime
+		maxAge = int(lifetime / time.Second)
+	}
+	payload, _ := json.Marshal(map[string]any{"expires": time.Now().Add(lifetime).Unix(), "nonce": newID()})
 	part := base64.RawURLEncoding.EncodeToString(payload)
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(part))
-	http.SetCookie(w, &http.Cookie{Name: "gdsync_session", Value: part + "." + hex.EncodeToString(mac.Sum(nil)), HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: r.TLS != nil, Path: "/", MaxAge: 86400})
+	http.SetCookie(w, &http.Cookie{
+		Name: "gdsync_session", Value: part + "." + hex.EncodeToString(mac.Sum(nil)),
+		HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: sessionCookieSecure(r),
+		Path: "/", MaxAge: maxAge,
+	})
 }
 func localPost(r *http.Request) bool {
 	if r.Method != "POST" {
@@ -1093,7 +1116,7 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, e.Error(), 500)
 			return
 		}
-		a.setSession(w, r)
+		a.setSession(w, r, false)
 		redirect(w, r, "Welcome to Syncria")
 		return
 	}
@@ -1106,7 +1129,7 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 			redirect(w, r, "Invalid password")
 			return
 		}
-		a.setSession(w, r)
+		a.setSession(w, r, r.FormValue("remember") == "on")
 		redirect(w, r, "Signed in")
 		return
 	}
@@ -1135,7 +1158,7 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
         http.Redirect(w,r,"/#updates",http.StatusSeeOther)
         return
     case "logout":
-		http.SetCookie(w, &http.Cookie{Name: "gdsync_session", MaxAge: -1, Path: "/", HttpOnly: true})
+		http.SetCookie(w, &http.Cookie{Name: "gdsync_session", Value: "", MaxAge: -1, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: sessionCookieSecure(r)})
 		redirect(w, r, "Signed out")
 		return
 	case "oauth_settings":
@@ -1534,6 +1557,12 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 	if base == "" {
 		base = "http://localhost:9764"
 	}
+    logged := a.authenticated(r)
+    message := r.URL.Query().Get("msg")
+    // Do not render action notifications from an expired authenticated page.
+    if !logged && message != "Invalid password" && message != "Signed out" && message != "Session expired. Please sign in again." {
+        message = ""
+    }
     data:=struct{
       Version,Message,ClientID,BaseURL,Callback string
       DropboxClientID,DropboxCallback string
@@ -1545,10 +1574,10 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
       Metrics DashboardTotals
       MountingEnabled bool
     }{
-      Version:appVersion,Message:r.URL.Query().Get("msg"),ClientID:cfg.OAuthID,
+      Version:appVersion,Message:message,ClientID:cfg.OAuthID,
       BaseURL:base,Callback:base+"/oauth/callback",
       DropboxClientID:cfg.DropboxOAuthID,DropboxCallback:base+"/oauth/dropbox/callback",
-      Configured:cfg.PasswordHash!="",Logged:a.authenticated(r),
+      Configured:cfg.PasswordHash!="",Logged:logged,
       Accounts:cfg.Accounts,DropboxAccounts:cfg.DropboxAccounts,
       Jobs:cfg.Jobs,Shares:cfg.Shares,Metrics:summarizeMetrics(cfg.Jobs),
       MountingEnabled:os.Getenv("SYNCRIA_ENABLE_MOUNTS")=="1" && runtime.GOOS=="linux",
