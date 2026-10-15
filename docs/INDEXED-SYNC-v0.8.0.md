@@ -10,8 +10,16 @@ The engine loads the DB index at start and compares provider metadata (file size
 
 A successful file transfer commits its checkpoint before moving to the next transfer; initial unchanged metadata matches are committed in batches. If index writing fails, the sync stops rather than claiming work completed.
 
+## Google Drive incremental inventory
+- At initial inventory, obtain a Drive Changes API cursor **before** listing files to avoid missing concurrent updates, then persist the tree snapshot and cursor together in the local database.
+- On normal five-minute checks, ask Google Drive for changes since that cursor. Unchanged Drive folders are not re-listed. File moves, renames and edits can update the snapshot without opening unchanged file bodies.
+- The read-only preview uses the same Drive delta feed without persisting its cursor, so running a preview never consumes changes that the live sync must still process.
+- Unknown folder structure, ambiguous removal (including possible loss of access), token invalidation, name collision or a periodic 24-hour reconciliation triggers a complete Drive inventory instead of guessing and potentially deleting data.
+- A transient Drive API failure stops safely and leaves the last committed cursor untouched. NAS metadata still must be discovered independently.
+- Cloud bidirectional conflicts use the newer timestamp as requested. First-run manual review remains an explicit optional preference.
+
 ## Important limitations
-- Syncria still needs to discover what changed remotely. The index makes *local comparison and persistence* fast but does not make a remote SMB recursive scan or Google Drive full-tree listing instantaneous. Google's changes cursor and reliable SMB notifications are separately tracked in Issue #12.
+- Syncria now uses the Google Drive change cursor on live syncs and read-only previews, but must still discover NAS metadata. A local index does not make a recursive SMB scan instantaneous. Existing remote SMB notifications can trigger reconciliations; dependable event-driven NAS inventory skipping is not yet implemented. Periodic reconciliation remains essential to catch missed events.
 - The existing `Thumbs.db` exclusions remain in force. Excluded files are not copied or deleted.
 - A timestamp-preserving content edit cannot be discovered through timestamp-only comparison.
 - Keep an independent backup of critical NAS/Drive data while testing the new index migration.
