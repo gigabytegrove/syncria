@@ -600,6 +600,7 @@ document.addEventListener('keydown',e=>{
 });
 let latestDetailedRun=null;
 let mountedSyncPreview=null;
+let selectedSyncDetailTab='overview';
 function unmountSyncPreview(){
  if(!mountedSyncPreview)return;
  const prior=document.querySelector('[data-sync-card="'+CSS.escape(mountedSyncPreview)+'"]');
@@ -628,6 +629,8 @@ function mountSyncPreview(id){
 function showSyncDetailTab(name){
  const names=['overview','files','history','settings'];
  if(!names.includes(name))name='overview';
+ selectedSyncDetailTab=name;
+ if(currentView==='sync-detail'&&selectedSyncID)history.replaceState(null,'','#sync-detail/'+encodeURIComponent(selectedSyncID)+'/'+name);
  for(const tab of names){
   const key=tab[0].toUpperCase()+tab.slice(1);
   const b=$('syncTab'+key),panel=$('syncDetail'+key);
@@ -825,7 +828,7 @@ function navigate(view){
  const page=pages[view]||[view,view.toUpperCase()];
  $('pageTitle').textContent=page[0];
  const breadcrumb=$('pageBreadcrumb');if(breadcrumb)breadcrumb.textContent=page[1];
- history.replaceState(null,'','#'+view);
+ history.replaceState(null,'',view==='sync-detail'&&selectedSyncID?'#sync-detail/'+encodeURIComponent(selectedSyncID)+'/'+selectedSyncDetailTab:'#'+view);
  if(view==='updates')checkUpdate();
 }
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.view)));
@@ -1727,5 +1730,13 @@ setInterval(()=>{if(!document.hidden&&!updateRunning&&!updateSubmitting)checkUpd
 // Live streaming is primary; polling starts only when unavailable.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDashboardStatus()});
 window.addEventListener('pageshow',event=>{if(event.persisted)refreshDashboardStatus();});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closePicker()});if(location.hash){let page=location.hash.slice(1);if($('view-'+page))navigate(page)}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePicker()});
+if(location.hash){
+ const parts=location.hash.slice(1).split('/');
+ if(parts[0]==='sync-detail'&&parts[1]){
+  const id=decodeURIComponent(parts[1]);
+  if(document.querySelector('[data-sync-card="'+CSS.escape(id)+'"]'))openSyncDetails(id,parts[2]||'overview');
+  else navigate('sync');
+ }else if($('view-'+parts[0])&&parts[0]!=='sync-detail')navigate(parts[0]);
+}
 </script></body></html>`
