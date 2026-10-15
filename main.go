@@ -701,7 +701,9 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     }
     job.scanHook=func(endpoint,rel string,count int64){
       a.setSyncProgress(jobID,func(p *SyncProgress){
-        p.Phase="scanning";p.Current=endpoint;p.Processed=count;p.Total=0
+        p.Phase="scanning";p.Current=endpoint;p.Processed=count;p.Total=0;p.ScanDetail=rel
+        if p.ScanCounts==nil{p.ScanCounts=map[string]int64{}}
+        p.ScanCounts[endpoint]=count
       })
     }
     job.operationHook=func(action,rel,from,to string){
