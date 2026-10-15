@@ -119,3 +119,11 @@ Syncria now stores per-file sync records in a private transactional index under 
 The first v0.8.0 update imports prior state automatically and keeps a `state.json.pre-index-v0.8.0` backup. **Back up the entire Syncria data volume before upgrading.** Older executables cannot read the new index; automatic rollback across the migration is blocked to prevent resetting sync knowledge. See [v0.8.0 release notes](docs/RELEASE-v0.8.0.md).
 
 A prior error message can be cleared by choosing **Dismiss old failure** on the sync card. This removes the old warning from the interface without deleting failed-run counts or other history. Future failures appear normally.
+
+### Fast five-minute checks and durable run history (v0.8.1)
+
+Click a sync's name in **My Syncs** or **Activity** to inspect its complete new run history, including operations, timestamps, outcome, paths, and transfer directions. Run history beginning with v0.8.1 is stored in the transactional local index database and survives service restarts.
+
+In on-change mode, Syncria uses Google Drive's changes cursor and a continuously verified recursive SMB notification connection. With no changes on either side, five-minute checks can finish without re-listing thousands of NAS files. If SMB notifications are unavailable/disconnected or a full reconciliation is due (at least every 45 minutes), it intentionally rescans metadata rather than risk missing edits. The scheduler prevents pending duplicate starts and never runs the same sync twice concurrently in one process. Live Activity now displays actual file operations, not a duplicate speculative transfer plan.
+
+See [v0.8.1 release and migration notes](docs/RELEASE-v0.8.1.md).
