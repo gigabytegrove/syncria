@@ -105,9 +105,7 @@ func (a *App) watchChangedJob(ctx context.Context,id string) {
    if enabled {
     // Debounce bursty writes and protect against run overlap.
     select{case <-ctx.Done():return;case <-time.After(2*time.Second):}
-    if e:=a.syncJob(ctx,id);e!=nil&&e.Error()!="job already running"{
-     log.Printf("Syncria change-triggered sync %s: %v",id,e)
-    }
+    a.launchScheduledRun(ctx,id,true)
    }
   } else if !strings.Contains(err.Error(),"exit status 2"){
    log.Printf("Syncria inotify watcher %s: %v",id,err)
