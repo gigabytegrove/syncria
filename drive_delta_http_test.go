@@ -52,6 +52,26 @@ func TestDriveChangeCursorAvoidsSecondFullListing(t *testing.T){
  if err!=nil||!ok||snapshot.Cursor!="102"{t.Fatalf("Change cursor was not persisted atomically: %+v %v",snapshot,err)}
 }
 
+func TestDrivePreviewUsesCacheWithoutAdvancingStoredCursor(t *testing.T){
+ idx,err:=loadSyncIndex(filepath.Join(t.TempDir(),"idx.db"));if err!=nil{t.Fatal(err)}
+ defer idx.Close()
+ snap:=driveTreeSnapshot{
+  Account:"acc",Root:"subfolder",RootID:"subfolder",Cursor:"baseline-token",FullScanAt:time.Now(),
+  Files:map[string]driveFile{"old.txt":{ID:"file1",Name:"old.txt",Parents:[]string{"subfolder"},MimeType:"text/plain",Size:"7"}},
+ }
+ if err=idx.saveDriveTree(snap);err!=nil{t.Fatal(err)}
+ listings:=0
+ app:=&App{index:idx,cfg:Config{Accounts:[]Account{{ID:"acc",AccessToken:"fake",Expires:time.Now().Add(time.Hour)}}}}
+ app.client=&http.Client{Transport:driveTestTransport(func(req *http.Request)(*http.Response,error){
+  if req.URL.Path=="/drive/v3/files"{listings++;return driveTestResponse(500,"no full scan expected"),nil}
+  return driveTestResponse(200,`{"newStartPageToken":"next-token","changes":[{"fileId":"file2","file":{"id":"file2","name":"new.txt","mimeType":"text/plain","size":"3","parents":["subfolder"]}}]}`),nil
+ })}
+ files,err:=app.remoteTreePreviewIndexed(context.Background(),"acc","subfolder",nil)
+ if err!=nil||len(files)!=2||listings!=0{t.Fatalf("Read-only preview unexpectedly listed full tree: err=%v count=%d listings=%d",err,len(files),listings)}
+ saved,_,err:=idx.getDriveTree("acc","subfolder")
+ if err!=nil||saved.Cursor!="baseline-token"||len(saved.Files)!=1{t.Fatal("Preview must never update the persisted change token or cache")}
+}
+
 func TestDriveDeltaFailureKeepsLastKnownCursor(t *testing.T){
  idx,err:=loadSyncIndex(filepath.Join(t.TempDir(),"index.db"));if err!=nil{t.Fatal(err)}
  defer idx.Close()
