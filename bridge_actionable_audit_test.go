@@ -30,8 +30,8 @@ func TestTrackedUnchangedFilesNeverOpenFileBodies(t *testing.T){
  if err:=app.executePolicyPair(context.Background(),&job,primary,secondary,key,true,conflictManual);err!=nil{t.Fatal(err)}
  if primary.opens!=0||secondary.opens!=0{t.Fatalf("Unchanged file was opened: source=%d destination=%d",primary.opens,secondary.opens)}
  if job.LastUploads!=0||job.LastDownloads!=0{t.Fatal("Unchanged file was retransferred")}
- if a:=app.getSyncProgress(job.ID);len(a.Plan)!=0 || a.PlanCounts["unchanged"]!=1{
-  t.Fatalf("Unchanged file must be absent from actionable list: %+v",a)
+ if a:=app.getSyncProgress(job.ID);len(a.Plan)!=0 || len(a.PlanCounts)!=0{
+  t.Fatalf("Live sync must not rebuild a speculative transfer plan: %+v",a)
  }
 }
 
