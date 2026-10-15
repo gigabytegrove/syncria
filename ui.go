@@ -571,31 +571,151 @@ function syncDurationText(run){
  return (duration/1000).toFixed(1)+'s';
 }
 function formatHistoryDate(value){return value?new Date(value).toLocaleString():'Unknown time'}
+function filterSyncLibrary(){
+ const needle=($('syncLibrarySearch')?.value||'').trim().toLocaleLowerCase();
+ const filter=$('syncLibraryFilter')?.value||'all';
+ const cards=[...document.querySelectorAll('[data-sync-card]')];
+ let shown=0,running=0,attention=0;
+ for(const card of cards){
+  const job=lastSyncDashboardJobs.find(j=>j.id===card.dataset.syncCard);
+  const active=!!job?.running,problem=!!job?.error&&!active,enabled=job?.enabled??!!card.querySelector('.flow-state.is-on');
+  if(active)running++;
+  if(problem)attention++;
+  const status=filter==='all'||filter==='running'&&active||filter==='attention'&&problem||
+   filter==='active'&&enabled||filter==='paused'&&!enabled;
+  const match=card.dataset.syncName.toLocaleLowerCase().includes(needle)&&status;
+  card.hidden=!match;if(match)shown++;
+ }
+ const set=(id,value)=>{const el=$(id);if(el)el.textContent=String(value)};
+ set('syncLibraryTotal',cards.length);set('syncLibraryRunning',running);set('syncLibraryAttention',attention);
+ $('syncLibraryNoMatch')?.classList.toggle('hidden',shown!==0||cards.length===0);
+}
+document.addEventListener('click',e=>{
+ for(const menu of document.querySelectorAll('details.sync-card-more[open]')){
+  if(!menu.contains(e.target))menu.open=false;
+ }
+});
+document.addEventListener('keydown',e=>{
+ if(e.key==='Escape')document.querySelectorAll('details.sync-card-more[open]').forEach(menu=>menu.open=false);
+});
+let latestDetailedRun=null;
+let mountedSyncPreview=null;
+function mountSyncPreview(id){
+ if(mountedSyncPreview&&mountedSyncPreview!==id){
+  const prior=document.querySelector('[data-sync-card="'+CSS.escape(mountedSyncPreview)+'"]');
+  const node=document.querySelector('[data-preview="'+CSS.escape(mountedSyncPreview)+'"]');
+  if(prior&&node){const actions=prior.querySelector('.flow-card-actions');if(actions)prior.insertBefore(node,actions);node.classList.add('hidden')}
+ }
+ mountedSyncPreview=id;
+ const host=$('syncDetailPreviewHost');if(!host)return;
+ host.replaceChildren();
+ const preview=document.querySelector('[data-preview="'+CSS.escape(id)+'"]');
+ if(preview){
+  preview.classList.remove('hidden');
+  const output=preview.querySelector('[data-preview-result]');
+  if(output&&output.textContent==='Scanning both locations…')output.textContent='Run a read-only preview to see files Syncria would copy, replace, skip or delete.';
+  host.append(preview);
+ }else makeHistoryNode(host,'p','sync-detail-empty','Preview is unavailable for this connection.');
+}
+function showSyncDetailTab(name){
+ const names=['overview','files','history','settings'];
+ if(!names.includes(name))name='overview';
+ for(const tab of names){
+  const key=tab[0].toUpperCase()+tab.slice(1);
+  const b=$('syncTab'+key),panel=$('syncDetail'+key);
+  if(b){b.setAttribute('aria-selected',String(tab===name));b.tabIndex=tab===name?0:-1}
+  if(panel)panel.classList.toggle('is-active',tab===name);
+ }
+ if(name==='files'&&selectedSyncID)mountSyncPreview(selectedSyncID);
+ if(name==='history'&&selectedSyncID&&runPageOffset===0)loadSyncRunList();
+}
+function runDetailPreview(){
+ if(!selectedSyncID)return;
+ mountSyncPreview(selectedSyncID);previewSync(selectedSyncID);
+}
+function submitSyncAction(action){
+ if(!selectedSyncID)return;
+ if(action==='delete_job'&&!confirm('Remove this sync configuration? Files on your cloud and NAS will remain in place.'))return;
+ if(action==='run_job'&&lastSyncDashboardJobs.find(j=>j.id===selectedSyncID)?.running)return;
+ const form=document.createElement('form');form.method='post';form.action='/action';form.hidden=true;
+ for(const [name,value] of Object.entries({action,id:selectedSyncID})){
+  const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.append(input);
+ }
+ document.body.append(form);form.submit();
+}
+function renderLastDetailedRun(run){
+ latestDetailedRun=run;
+ const target=$('syncDetailLastRun');if(!target)return;
+ target.replaceChildren();
+ if(!run){
+  const empty=makeHistoryNode(target,'div','sync-detail-empty');
+  makeHistoryNode(empty,'strong','', 'No detailed run history yet');
+  makeHistoryNode(empty,'p','', 'New runs are recorded individually. Older release totals remain in Activity but cannot be reconstructed into a per-file journal.');
+  return;
+ }
+ const top=makeHistoryNode(target,'div','sync-history-file-head');
+ makeHistoryNode(top,'strong','',run.status==='success'?'Completed successfully':run.status==='failed'?'Finished with errors':run.status==='cancelled'?'Stopped':'In progress');
+ makeHistoryNode(top,'span','',formatHistoryDate(run.started));
+ makeHistoryNode(target,'div','sync-history-file-path',Number(run.event_count||0).toLocaleString()+' file operations · '+formatBytes(Number(run.upload_bytes||0)+Number(run.download_bytes||0))+' · '+syncDurationText(run));
+ if(run.error)makeHistoryNode(target,'p','sync-detail-alert',run.error);
+ const view=makeHistoryNode(target,'button','secondary','Inspect files in this run →');
+ view.type='button';view.addEventListener('click',()=>{showSyncDetailTab('history');loadSyncRun(run.id)});
+}
 function renderSyncDetailLive(){
  if(!selectedSyncID)return;
  const job=lastSyncDashboardJobs.find(j=>j.id===selectedSyncID);
- const container=$('syncDetailLive');if(!container||!job)return;
+ const container=$('syncDetailLive');if(!container)return;
+ if(!job){container.textContent='Connecting to live sync status…';return}
  const p=job.progress||{};
- const label=job.running?'Running · '+(p.phase==='scanning'?'Checking '+(p.current||'file metadata'):(p.phase||'working'))+(p.phase==='scanning'?' · '+Number(p.processed||0)+' entries':'' ):'Idle'+(job.last_checked?' · Last fast check: '+job.last_checked:'');
- const direction=job.direction==='one_way'?'One-way (cloud → NAS)':'Bidirectional (cloud ↔ NAS)';
- const deletePolicy=job.propagate_deletions?'Deletes propagate to matching copies':'Deletes are not propagated';
- const recovery=job.recovery_enabled?' · 10-minute deletion recovery enabled':' · deletion recovery disabled';
- const watcher=job.schedule_mode==='changes'?(job.nas_watcher_verified?' · NAS change feed verified; fast checks eligible':' · Full NAS verification required until notifications are validated'):'';
- container.textContent=label+' · '+(job.successful_runs||0)+' successful / '+(job.failed_runs||0)+' failed runs'+
-  ' · '+direction+' · '+deletePolicy+recovery+watcher+
-  (job.running?' · '+Number(p.uploads||0)+' sent, '+Number(p.downloads||0)+' received':'');
+ const status=$('syncDetailStatus');
+ const kind=job.running?'running':job.error?'attention':job.enabled?'healthy':'paused';
+ status.dataset.kind=kind;
+ status.textContent=job.running?'Syncing now':job.error?'Needs attention':job.enabled?'Automatic checks on':'Paused';
+ const direction=job.direction==='one_way'?'One-way · cloud → NAS':job.provider==='nas_bridge'?'NAS ↔ NAS':'Two-way · cloud ↔ NAS';
+ const deletion=job.propagate_deletions?'Deletions propagate to previously synchronized copies':'Deletions are not shared';
+ const recovery=job.recovery_enabled?'10-minute deletion undo enabled':'Deletion undo disabled';
+ const schedule=job.schedule_mode==='changes'?'On changes · five-minute checks':'Every configured interval';
+ const watcher=job.schedule_mode==='changes'?(job.nas_watcher_verified?'NAS watcher verified; fast checks eligible':'NAS watcher unverified; a full metadata check may be required'):'Periodic scheduled checks';
+ const recent=job.last_checked?'Last quick check '+job.last_checked:'No quick check recorded';
+ const line=job.running?(p.phase==='scanning'?'Reading '+(p.current||'metadata')+' · '+Number(p.processed||0).toLocaleString()+' entries':p.phase==='transferring'?'Transferring '+(p.current||'file'):p.phase||'Working')+' · '+formatBytes(Number(p.upload_bytes||0)+Number(p.download_bytes||0))+' moved this run':recent+' · '+watcher;
+ container.textContent=line;
+ $('syncDetailSubtitle').textContent=direction+' · '+schedule;
+ $('syncDetailDirection').textContent=direction;
+ $('syncDetailDeletion').textContent=deletion;
+ $('syncSettingDirection').textContent=direction;
+ $('syncSettingSchedule').textContent=schedule;
+ $('syncSettingDelete').textContent=deletion;
+ $('syncSettingRecovery').textContent=recovery;
+ $('syncDetailWatchNote').textContent=watcher+(job.last_run?' · Last full run '+job.last_run:'');
+ $('syncDeleteWarning').textContent=job.propagate_deletions?
+  'Deletion sharing is active. Removing a previously synchronized file from the source can also remove its counterpart, subject to recovery settings.':
+  'Deletion sharing is off. Deleting a file at one location will not automatically delete its counterpart.';
+ const set=(id,value)=>{const target=$(id);if(target)target.textContent=value};
+ set('syncDetailSuccess',Number(job.successful_runs||0).toLocaleString());
+ set('syncDetailMoved',(Number(job.total_uploads||0)+Number(job.total_downloads||0)).toLocaleString());
+ set('syncDetailBytes',formatBytes(Number(job.total_upload_bytes||0)+Number(job.total_download_bytes||0)));
+ const run=$('syncDetailRun'),stop=$('syncDetailStop'),pause=$('syncDetailPause');
+ if(run)run.disabled=job.running;
+ if(stop)stop.classList.toggle('hidden',!job.running);
+ if(pause)pause.textContent=job.enabled?'Pause automatic checks':'Enable automatic checks';
 }
-function openSyncDetails(id){
- selectedSyncID=id;selectedSyncRunID='';runPageOffset=0;eventPageOffset=0;
+function openSyncDetails(id,tab='overview'){
+ if(!id)return;
+ selectedSyncID=id;selectedSyncRunID='';runPageOffset=0;eventPageOffset=0;latestDetailedRun=null;
  const job=lastSyncDashboardJobs.find(j=>j.id===id);
- $('syncDetailTitle').textContent=job?.name||'Sync details';
- $('syncRunSummary').textContent='Select a run to inspect every file action.';
- $('syncRunEvents').replaceChildren();
- $('syncRunList').textContent='Loading run history…';
+ const card=document.querySelector('[data-sync-card="'+CSS.escape(id)+'"]');
+ $('syncDetailTitle').textContent=job?.name||card?.dataset.syncName||'Sync details';
+ $('syncRunSummary').textContent='Choose a run to inspect recorded files.';
+ $('syncRunEvents').replaceChildren();$('syncRunList').textContent='Loading run history…';
  $('syncEventPager').replaceChildren();
- renderSyncDetailLive();
- navigate('sync-detail');
+ if($('syncFileSearch'))$('syncFileSearch').value='';
+ if($('syncFileActionFilter'))$('syncFileActionFilter').value='';
+ $('syncDetailPreviewHost').replaceChildren();
+ renderLastDetailedRun(null);
+ renderSyncDetailLive();navigate('sync-detail');
+ showSyncDetailTab(tab);
  loadSyncRunList();
+ if(!job)refreshDashboardStatus();
 }
 async function loadSyncRunList(more=false){
  if(!selectedSyncID)return;
