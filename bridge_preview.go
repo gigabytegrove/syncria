@@ -36,9 +36,12 @@ type syncPreviewResult struct {
 }
 func addPreviewRow(p *syncPreviewResult,row syncPreviewRow) {
  p.Counts[row.Action]++
- if p.ChangesOnly && (row.Action=="unchanged" || row.Action=="skip"){return}
+ // Unchanged entries are counted for aggregate diagnostics but never
+ // presented as individual work items. Skipped files MUST remain visible,
+ // with their complete path and exact reason.
+ if row.Action=="unchanged"{return}
  limit:=p.MaxRows
- if limit<=0{limit=500}
+ if limit<=0{limit=10000}
  if len(p.Rows)<limit {p.Rows=append(p.Rows,row)}else{p.Truncated=true}
 }
 func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]bridgeEntry,oneWay bool,policy string){
