@@ -53,7 +53,7 @@ jobs:
           for screen in overview sync sync-detail activity accounts updates; do
             route="#$screen"
             if [[ "$screen" == "sync-detail" ]]; then route="#sync-detail/photos/overview"; fi
-            "$chrome" --headless --disable-gpu --no-sandbox --no-first-run --hide-scrollbars --virtual-time-budget=800 --window-size=1440,920 --screenshot="$RUNNER_TEMP/${screen}.png" "file://$RUNNER_TEMP/syncria-preview.html#${screen}" >/dev/null 2>&1
+            "$chrome" --headless --disable-gpu --no-sandbox --no-first-run --hide-scrollbars --virtual-time-budget=800 --window-size=1440,920 --screenshot="$RUNNER_TEMP/${screen}.png" "file://$RUNNER_TEMP/syncria-preview.html${route}" >/dev/null 2>&1
             test -s "$RUNNER_TEMP/${screen}.png"
           done
           "$chrome" --headless --disable-gpu --no-sandbox --no-first-run --hide-scrollbars --virtual-time-budget=800 --window-size=390,844 --screenshot="$RUNNER_TEMP/mobile.png" "file://$RUNNER_TEMP/syncria-preview.html#sync" >/dev/null 2>&1
