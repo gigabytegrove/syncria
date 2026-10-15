@@ -1522,6 +1522,13 @@ func (a *App) home(w http.ResponseWriter, r *http.Request) {
 	cfg.Jobs = append([]Job(nil), a.cfg.Jobs...)
 	cfg.Shares = append([]StorageShare(nil), a.cfg.Shares...)
 	a.mu.Unlock()
+    // Rendering must not depend on whether remote cleanup succeeded.
+    // Work with the home-page copy only: expired recovery records remain
+    // persisted so expiry housekeeping can retry on the next pass.
+    now:=time.Now()
+    for i:=range cfg.Jobs {
+     cfg.Jobs[i].PendingDeletions=eligiblePendingDeletions(cfg.Jobs[i].PendingDeletions,now)
+    }
 	for i:=range cfg.Shares {if cfg.Shares[i].Local!="" {cfg.Shares[i].Mounted=shareMounted(cfg.Shares[i].Local)}}
 	base := cfg.BaseURL
 	if base == "" {
