@@ -80,7 +80,7 @@ func TestRetryOnlyHandlesTransientReadErrors(t *testing.T){
  if retryableBridgeRead(errors.New("file permission denied")){t.Fatal("permanent errors must not retry")}
 }
 func TestPreviewContainsFilterControlsAndDoesNotAdvertiseHashReads(t *testing.T){
- for _,want:=range []string{"Skipped and why","Overwrites and why","action!=='unchanged'","row.reason||'No reason provided'"}{
+ for _,want:=range []string{"Skipped and why","Overwrites and why","action!=='unchanged'","event.reason"}{
   if !strings.Contains(newUI,want){t.Fatalf("UI missing %q",want)}
  }
  if strings.Contains(newUI,"The real sync verifies content before replacing a file"){t.Fatal("Outdated preview copy still claims full-file comparison")}
