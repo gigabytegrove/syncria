@@ -661,7 +661,7 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     for k,v:=range j.CloudOriginHashes{job.CloudOriginHashes[k]=v}
 
     a.mu.Unlock()
-    a.setSyncProgress(jobID,func(p *SyncProgress){*p=SyncProgress{Phase:"scanning",Running:true,Started:time.Now()}})
+    a.setSyncProgress(jobID,func(p *SyncProgress){*p=SyncProgress{Phase:"scanning",Running:true,Started:time.Now(),InitialBaseline:job.SuccessfulRuns==0 || len(job.PairStates)==0}})
     job.progressHook=func(up,down,upBytes,downBytes int64){
       a.setSyncProgress(jobID,func(p *SyncProgress){
         p.Phase="transferring"
