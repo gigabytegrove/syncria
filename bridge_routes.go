@@ -107,6 +107,7 @@ func (a *App) syncBridge(ctx context.Context,j *Job) error {
  if related&&len(destinations)>1{destinations=destinations[:1]}
  for i,d:=range destinations{
   cloud,err:=a.cloudEndpoint(j);if err!=nil{return err}
+  if drive,ok:=cloud.(*bridgeDriveEndpoint);ok{drive.useIndexedScan=true}
   nas,err:=a.openNAS(ctx,d);if err!=nil{cloud.Close();return err}
   sourceName:=j.CloudProvider;if sourceName==""{sourceName="google_drive"}
   account:=j.AccountID;if sourceName=="dropbox"{account=j.DropboxAccountID}
