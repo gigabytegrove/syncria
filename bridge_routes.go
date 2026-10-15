@@ -123,7 +123,7 @@ func (a *App) syncBridge(ctx context.Context,j *Job) error {
   if share,e:=a.directShare(d.ShareID);e==nil&&share.Label!=""{destLabel=share.Label}
   wireNASScan(j,nas,destLabel)
   restore:=a.labelSyncOperation(j,primaryLabel,destLabel)
-  err=a.executePolicyPair(ctx,j,cloud,nas,key,oneWay,conflictManual)
+  err=a.executePolicyPair(ctx,j,cloud,nas,key,oneWay,conflictNewer)
   restore()
   if err!=nil{return err}
  }
