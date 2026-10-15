@@ -572,6 +572,7 @@ async function loadSyncRun(runID,more=false){
    makeHistoryNode(head,'span','',formatHistoryDate(event.at));
    makeHistoryNode(item,'div','sync-history-file-path',event.path||'');
    makeHistoryNode(item,'small','',event.from&&event.to?event.from+' → '+event.to:'');
+   if(event.reason)makeHistoryNode(item,'small','sync-history-file-reason',event.reason);
   }
   eventPageOffset+=data.events.length;
   if(!eventPageOffset)makeHistoryNode(container,'p','muted','No files were transferred or changed in this run. Syncria checked metadata without touching unchanged file contents.');
