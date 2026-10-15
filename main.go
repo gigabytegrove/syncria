@@ -1571,11 +1571,7 @@ func (a *App) scheduler(ctx context.Context) {
             }
             cadence:=j.Interval
             if j.ScheduleMode=="changes"{cadence=5}
-            lastCheck:=j.LastRun
-            if j.LastChecked.After(lastCheck){lastCheck=j.LastChecked}
-            if j.Enabled && (lastCheck.IsZero() || time.Since(lastCheck) >= time.Duration(cadence)*time.Minute) {
-              a.launchScheduledRun(ctx,j.ID,false)
-            }
+            if syncCheckDue(j,time.Now()) {a.launchScheduledRun(ctx,j.ID,false)}
 		}
 	}
 }
