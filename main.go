@@ -1569,8 +1569,6 @@ func (a *App) scheduler(ctx context.Context) {
 			if j.Enabled && j.ScheduleMode=="changes" {
              if _,loaded:=a.watchers.LoadOrStore(j.ID,true);!loaded{go a.watchChangedJob(ctx,j.ID)}
             }
-            cadence:=j.Interval
-            if j.ScheduleMode=="changes"{cadence=5}
             if syncCheckDue(j,time.Now()) {a.launchScheduledRun(ctx,j.ID,false)}
 		}
 	}
