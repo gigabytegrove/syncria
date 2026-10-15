@@ -1133,10 +1133,10 @@ function renderActiveSyncs(jobs){
   }
   const set=(q,value)=>{const el=card.querySelector(q);if(el&&el.textContent!==value)el.textContent=value};
   let phase=p.phase||'working';
-  set('.active-sync-stage',phase==='scanning'?(p.initial_baseline?'Building initial file baseline':'Scanning locations'):phase==='stopping'?'Stopping safely…':phase==='transferring'?'Transferring files':phase==='processing'?'Checking changes':phase);
+  set('.active-sync-stage',phase==='scanning'?(p.initial_baseline?'Building initial file index':'Checking for changes'):phase==='stopping'?'Stopping safely…':phase==='transferring'?'Transferring files':phase==='processing'?'Checking changes':phase);
   const scanned=Number(p.processed||0),total=Number(p.total||0);
   set('.active-sync-scanned',phase==='scanning'?scanned.toLocaleString()+' items discovered':total>0?scanned.toLocaleString()+' / '+total.toLocaleString()+' entries checked':'Preparing file list');
-  set('.active-sync-current',p.current?(phase==='scanning'?'Scanning: ':'Current file: ')+p.current:p.initial_baseline?'Initial inventory: this first scan can take longer. Later runs compare metadata against the saved baseline.':'Comparing metadata silently…');
+  set('.active-sync-current',p.current?(phase==='scanning'?'Scanning: ':'Current file: ')+p.current:p.initial_baseline?'One-time cloud/NAS inventory: Syncria is building its persistent local file index. Larger collections may take longer the first time.':'Checking cloud/NAS changes against the local file index…');
   set('.active-sync-bytes',formatBytes(Number(p.upload_bytes||0)+Number(p.download_bytes||0))+' transferred this run');
   const counts=p.plan_counts||{};
   const actionable=Object.entries(counts).filter(([a])=>a!=='unchanged').reduce((sum,[,n])=>sum+Number(n||0),0);
