@@ -7,6 +7,7 @@ import (
  "fmt"
  "net/http"
  "strconv"
+ "strings"
  "time"
 
  bolt "go.etcd.io/bbolt"
@@ -137,6 +138,40 @@ func (idx *syncIndex) readRun(jobID,runID string,offset,limit int)(syncRunEvents
  })
  return result,err
 }
+// Search is performed on the persistent journal, not merely the events
+// visible on the current page. Offset is relative to the filtered results.
+// No filesystem or NAS reads are required.
+func (idx *syncIndex) readRunFiltered(jobID,runID string,offset,limit int,query,action string)(syncRunEventsResponse,error){
+ if query==""&&action==""{return idx.readRun(jobID,runID,offset,limit)}
+ result:=syncRunEventsResponse{Events:[]SyncActionEvent{}}
+ if idx==nil{return result,errors.New("Run history database unavailable")}
+ if offset<0||offset>1000000||limit<1||limit>250||len(query)>256||len(action)>80{
+  return result,errors.New("Invalid search or pagination")
+ }
+ query=strings.ToLower(strings.TrimSpace(query))
+ err:=idx.db.View(func(tx *bolt.Tx)error{
+  root:=tx.Bucket(runHistoryBucket);if root==nil{return errors.New("Run not found")}
+  job:=root.Bucket([]byte(jobID));if job==nil{return errors.New("Run not found")}
+  run:=job.Bucket([]byte(runID));if run==nil{return errors.New("Run not found")}
+  if err:=json.Unmarshal(run.Get(historyMetaKey),&result.Run);err!=nil{return err}
+  events:=run.Bucket(historyEventsKey);if events==nil{return errors.New("Event history missing")}
+  seen:=0
+  return events.ForEach(func(key,raw []byte)error{
+   if raw==nil{return nil}
+   var e SyncActionEvent
+   if err:=json.Unmarshal(raw,&e);err!=nil{return err}
+   if query!=""&&!strings.Contains(strings.ToLower(e.Path),query){return nil}
+   if action!=""&&!strings.EqualFold(e.Action,action){return nil}
+   if seen<offset{seen++;return nil}
+   if len(result.Events)>=limit{result.More=true;return nil}
+   result.Events=append(result.Events,e)
+   seen++
+   return nil
+  })
+ })
+ return result,err
+}
+
 func (a *App) syncHistoryAPI(w http.ResponseWriter,r *http.Request){
  if r.Method!=http.MethodGet{http.Error(w,"GET required",http.StatusMethodNotAllowed);return}
  if !a.authenticated(r){http.Error(w,"Unauthorized",http.StatusUnauthorized);return}
@@ -150,7 +185,9 @@ func (a *App) syncHistoryAPI(w http.ResponseWriter,r *http.Request){
  w.Header().Set("Cache-Control","no-store")
  w.Header().Set("Content-Type","application/json; charset=utf-8")
  if runID:=r.URL.Query().Get("run");runID!=""{
-  output,err:=a.index.readRun(id,runID,offset,100)
+  query:=r.URL.Query().Get("q")
+  action:=r.URL.Query().Get("action")
+  output,err:=a.index.readRunFiltered(id,runID,offset,100,query,action)
   if err!=nil{http.Error(w,err.Error(),http.StatusBadRequest);return}
   _=json.NewEncoder(w).Encode(output)
   return
