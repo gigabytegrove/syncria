@@ -127,3 +127,11 @@ Click a sync's name in **My Syncs** or **Activity** to inspect its complete new 
 In on-change mode, Syncria uses Google Drive's changes cursor and a continuously verified recursive SMB notification connection. With no changes on either side, five-minute checks can finish without re-listing thousands of NAS files. If SMB notifications are unavailable/disconnected or a full reconciliation is due (at least every 45 minutes), it intentionally rescans metadata rather than risk missing edits. The scheduler prevents pending duplicate starts and never runs the same sync twice concurrently in one process. Live Activity now displays actual file operations, not a duplicate speculative transfer plan.
 
 See [v0.8.1 release and migration notes](docs/RELEASE-v0.8.1.md).
+
+### A connected sync workspace (v0.8.2)
+
+The **My Syncs** page is a searchable, filterable library with clear statuses and grouped actions. Open any sync to work from one intentional detail page: **Overview**, **Files & Preview**, **Run history**, and **Settings**. Live transfer controls and the active deletion policy are shown in context. You can bookmark an individual sync/tab.
+
+**Run history** includes complete records generated since v0.8.1, with actual per-file operations and reasons. Filename and action filters search the durable journal on the server, across all stored events rather than only the first page. **Test run / Preview** remains explicitly read-only. History from earlier versions cannot be reconstructed.
+
+The v0.8.2 UI does not modify sync policies, data destinations, credentials, or the indexed sync engine. It has dedicated desktop/mobile browser and embedded-JavaScript checks. See [v0.8.2 release notes](docs/RELEASE-v0.8.2.md).

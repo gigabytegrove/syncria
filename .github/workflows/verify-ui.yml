@@ -1,5 +1,12 @@
 name: Verify Syncria Tailwind UI
 on:
+  pull_request:
+    paths:
+      - 'ui.go'
+      - 'ui_theme.go'
+      - 'sync_run_history.go'
+      - 'assets/ui-polish.css'
+      - '.github/workflows/verify-ui.yml'
   push:
     branches: [main]
     paths:
