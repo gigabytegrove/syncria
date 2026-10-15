@@ -86,6 +86,12 @@ func (a *App) beginUpdate(operation string) error {
  a.updateMu.Lock()
  defer a.updateMu.Unlock()
  if a.updateBusy{return errors.New("an update is already in progress")}
+ // A pre-index executable cannot read the separately stored PairStates.
+ // Blind binary rollback could make every existing pair appear untracked.
+ // Block rather than silently replacing/reconciling user files.
+ if operation=="rollback" && a.cfg.FileIndexVersion>=1{
+  return errors.New("Automatic rollback is disabled after v0.8.0 index migration. Preserve /data/syncria-index.db and restore the matching state.json.pre-index-v0.8.0 backup with syncs stopped before running an older binary.")
+ }
  if runtime.GOOS=="windows"{return errors.New("in-app executable replacement is unavailable on Windows")}
  busy:=false
  a.runs.Range(func(_, _ any)bool{busy=true;return false})
