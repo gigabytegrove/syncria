@@ -96,7 +96,7 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
     }else{
      row.Action="review";row.Reason="A modification timestamp is missing; no automatic replacement"
     }
-   }else if l.Modified.Equal(r.Modified){
+   }else if indexedTimeEqual(l.Modified,r.Modified){
     if l.Size==r.Size{
      row.Action="unchanged";row.Reason="Modification times and sizes match; no file contents read"
     }else{
@@ -115,8 +115,7 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
     }
    }
   default:
-   changeL:=old.MD5!=l.Fingerprint||(old.ID!=""&&l.ID!=""&&old.ID!=l.ID)
-   changeR:=old.LocalMD5!=r.Fingerprint
+   changeL,changeR:=metadataChanged(old,l,r)
    switch {
    case changeL&&changeR:
     if oneWay&&j.Provider=="nas_bridge"{row.Action="blocked";row.Reason="Both files changed in one-way NAS relationship"
@@ -174,7 +173,7 @@ func (a *App) previewBridgeProgress(ctx context.Context,j *Job,notify func(strin
   var err error
   sourceKey:=""
   oneWay:=false
-  policy:=conflictManual
+  policy:=conflictNewer
   if j.Provider=="nas_bridge"{
    primary,err=a.openNAS(ctx,NASDestination{ShareID:j.NASSourceID,Folder:j.NASSourceFolder})
    sourceKey="nas:"+j.NASSourceID+":"+j.NASSourceFolder
@@ -187,6 +186,7 @@ func (a *App) previewBridgeProgress(ctx context.Context,j *Job,notify func(strin
    oneWay=j.Direction=="one_way"||(i>0&&!j.CrossNASPropagation)
   }
   if err!=nil{return result,fmt.Errorf("Primary connection: %w",err)}
+  if drive,ok:=primary.(*bridgeDriveEndpoint);ok{drive.usePreviewIndex=true}
   secondary,err:=a.openNAS(ctx,d)
   if err!=nil{primary.Close();return result,fmt.Errorf("Secondary connection: %w",err)}
   primaryName:="Google Drive"
