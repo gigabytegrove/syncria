@@ -135,3 +135,11 @@ The **My Syncs** page is a searchable, filterable library with clear statuses an
 **Run history** includes complete records generated since v0.8.1, with actual per-file operations and reasons. Filename and action filters search the durable journal on the server, across all stored events rather than only the first page. **Test run / Preview** remains explicitly read-only. History from earlier versions cannot be reconstructed.
 
 The v0.8.2 UI does not modify sync policies, data destinations, credentials, or the indexed sync engine. It has dedicated desktop/mobile browser and embedded-JavaScript checks. See [v0.8.2 release notes](docs/RELEASE-v0.8.2.md).
+
+### Recently deleted and connection layout polish (v0.8.3)
+
+**Recently deleted** no longer expands a sync card into a massive file list. A compact count and **Review & restore** button opens a searchable, scrollable modal with per-file expiration times and the original Undo action. The same dialog is available from a sync's Overview page. No recovery or deletion rules were altered.
+
+**Cloud Accounts** has corrected provider-card alignment, full-width Add Account buttons, consistent Test/Remove sizing, and a properly padded Connect your cloud files wizard on desktop and mobile. The NAS connection form uses the same spacing conventions.
+
+See [v0.8.3 release notes](docs/RELEASE-v0.8.3.md).
