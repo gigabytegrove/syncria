@@ -3,16 +3,6 @@ name: Publish Syncria v0.8.0 for in-app updater
 # The release is built and published by GitHub Actions, not on an end user's NAS.
 # The updater binaries and checksums publish first. GHCR is optional.
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/publish-v080.yml'
-      - '*.go'
-      - 'go.mod'
-      - 'go.sum'
-      - 'VERSION'
-      - 'Dockerfile'
-      - 'docs/RELEASE-v0.8.0.md'
   workflow_dispatch:
 
 permissions:
