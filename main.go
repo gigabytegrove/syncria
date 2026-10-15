@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-var appVersion = "v0.7.2"
+var appVersion = "v0.8.0"
 const folderMime = "application/vnd.google-apps.folder"
 const scope = "https://www.googleapis.com/auth/drive"
 
@@ -51,6 +51,12 @@ type Account struct {
 	Expires      time.Time `json:"expires"`
 }
 type Item struct {
+    // File metadata recorded after a verified sync, never from a failed transfer.
+    IndexVersion int `json:"index_version,omitempty"`
+    SourceSize int64 `json:"source_size,omitempty"`
+    DestinationSize int64 `json:"destination_size,omitempty"`
+    SourceModified time.Time `json:"source_modified,omitempty"`
+    DestinationModified time.Time `json:"destination_modified,omitempty"`
 	ID       string `json:"id"`
 	MD5      string `json:"md5"`
 	LocalMD5 string `json:"local_md5"`
@@ -127,6 +133,7 @@ type Job struct {
     TotalDownloadBytes int64 `json:"total_download_bytes"`
 }
 type Config struct {
+    FileIndexVersion int `json:"file_index_version,omitempty"`
 	Salt         string    `json:"salt"`
 	PasswordHash string    `json:"password_hash"`
 	Secret       string    `json:"secret"`
@@ -149,6 +156,8 @@ type App struct {
     updateBusy bool
     updateProgress UpdateProgress
     syncProgress map[string]SyncProgress
+    index *syncIndex
+    indexBroken bool
     watchers sync.Map
     runCancels sync.Map // job ID -> context.CancelFunc
     stopRequests sync.Map // job ID -> explicit user-requested stop
@@ -213,7 +222,20 @@ func passwordOK(p string, c Config) bool {
 	return subtle.ConstantTimeCompare(got, expected) == 1
 }
 func (a *App) save() error {
-	b, err := json.MarshalIndent(a.cfg, "", "  ")
+ // Update the durable indexed records BEFORE writing lightweight config.
+ // A failed DB transaction aborts this save and never advances the index.
+ if a.index!=nil{
+  if err:=a.index.commitJobs(a.cfg.Jobs);err!=nil{a.indexBroken=true;return err}
+ }
+ cfg:=a.cfg
+ if a.index!=nil {
+  cfg.FileIndexVersion=1
+  // The separate DB is authoritative. Keep the user-facing settings file
+  // small, even with hundreds of thousands of indexed files.
+  cfg.Jobs=append([]Job(nil),a.cfg.Jobs...)
+  for i:=range cfg.Jobs{cfg.Jobs[i].PairStates=nil}
+ }
+ b, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -636,6 +658,7 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     defer func(){runCancel();a.runCancels.Delete(jobID);a.stopRequests.Delete(jobID);a.runs.Delete(jobID)}()
     ctx=runCtx
 	a.mu.Lock()
+    if a.indexBroken {a.mu.Unlock();return errors.New("Syncria file index failed previously; syncs paused for safety until the index is repaired and Syncria restarted")}
 	j := a.job(jobID)
 	if j == nil {
 		a.mu.Unlock()
@@ -724,7 +747,16 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
         actual.Conflicts=job.Conflicts
         actual.ConflictOverrides=job.ConflictOverrides
         actual.CloudOriginHashes=job.CloudOriginHashes
-		_ = a.save()
+        if saveErr:=a.save();saveErr!=nil {
+         if err==nil{
+          if _,stopped:=a.stopRequests.Load(jobID);!stopped{
+           if actual.SuccessfulRuns>0{actual.SuccessfulRuns--}
+           actual.FailedRuns++
+          }
+         }
+         err=fmt.Errorf("File-index commit failed, current run not safely recorded: %w",saveErr)
+         actual.LastError=err.Error()
+        }
 	}
     a.mu.Unlock()
     a.setSyncProgress(jobID,func(p *SyncProgress){
@@ -1203,7 +1235,7 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
         a.mu.Unlock()
         if e != nil {http.Error(w,e.Error(),500);return}
         http.Redirect(w,r,"/?msg="+url.QueryEscape("Relationship created paused. Enable or run it below to start syncing.")+"#sync",http.StatusSeeOther)
-	case "toggle_job", "run_job", "delete_job", "cancel_job":
+	case "toggle_job", "run_job", "delete_job", "cancel_job", "dismiss_job_error":
 		id := r.FormValue("id")
 		a.mu.Lock()
 		j := a.job(id)
@@ -1212,6 +1244,20 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 			redirect(w, r, "Job not found")
 			return
 		}
+        if action=="dismiss_job_error" {
+            if j.LastError=="" {a.mu.Unlock();http.Redirect(w,r,"/?msg="+url.QueryEscape("No failure is currently displayed.")+"#sync",http.StatusSeeOther);return}
+            previous:=j.LastError
+            j.LastError=""
+            if err:=a.save();err!=nil {
+                j.LastError=previous
+                a.mu.Unlock()
+                http.Error(w,"Could not save dismissed failure: "+err.Error(),http.StatusInternalServerError)
+                return
+            }
+            a.mu.Unlock()
+            http.Redirect(w,r,"/?msg="+url.QueryEscape("Old sync failure dismissed. Historical failed-run counts were preserved.")+"#sync",http.StatusSeeOther)
+            return
+        }
         if action=="cancel_job" {
             a.mu.Unlock()
             if !a.stopRunningJob(id){redirect(w,r,"Sync is not currently running or is starting; try again");return}
@@ -1551,12 +1597,12 @@ func main() {
 		log.Fatal(e)
 	}
 	if a.cfg.Secret == "" {
-		a.cfg.Secret = b64rand()
-		if e := a.save(); e != nil {
-			log.Fatal(e)
-		}
-	}
-	a.reconcileUpdateOnStartup()
+  a.cfg.Secret = b64rand()
+  if e := a.save(); e != nil {log.Fatal(e)}
+ }
+ if err:=a.initializeFileIndex(dir);err!=nil{log.Fatal("File index startup failed: ",err)}
+ defer a.index.Close()
+ a.reconcileUpdateOnStartup()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go a.scheduler(ctx)
