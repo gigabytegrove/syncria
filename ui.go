@@ -70,6 +70,28 @@ code{overflow-wrap:anywhere}
 .active-sync-file-state{align-self:center}
 .flow-card-dismiss{margin:0 0 12px auto;display:block;width:max-content;max-width:100%;font-size:12px}
 .flow-card-dismiss[hidden]{display:none}
+
+.sync-title-link{font:inherit;font-weight:inherit;color:inherit;background:none;border:0;padding:0;text-align:left;cursor:pointer}
+.sync-title-link:hover{text-decoration:underline}
+.sync-detail-back{display:flex;justify-content:space-between;gap:12px;margin-bottom:16px}
+.sync-details-shell{min-width:0}
+.sync-detail-live{background:#eff7fc;border:1px solid #d2e6f5;border-radius:10px;padding:12px;font-size:13px;color:#264e6a;margin-bottom:18px;overflow-wrap:anywhere}
+.sync-detail-columns{display:grid;grid-template-columns:minmax(240px,340px) minmax(0,1fr);gap:18px}
+.sync-detail-run-column,.sync-detail-files-column{min-width:0}
+.sync-run-list,.sync-run-files{border:1px solid #dce7ee;border-radius:10px;min-height:75px;max-height:540px;overflow-y:auto}
+.sync-history-run{display:flex;flex-direction:column;text-align:left;align-items:flex-start;width:100%;background:white;border:0;border-bottom:1px solid #e6edf3;padding:12px;cursor:pointer;gap:5px;color:inherit}
+.sync-history-run:hover,.sync-history-run.selected{background:#edf6fd}
+.sync-history-run-status{text-transform:capitalize;font-weight:600;color:#416783}
+.sync-history-run-stats,.sync-history-run-count{font-size:12px;color:#5b7487}
+.sync-history-file{padding:12px;border-bottom:1px solid #e6edf3;display:flex;flex-direction:column;gap:6px;overflow-wrap:anywhere}
+.sync-history-file:last-child{border:0}
+.sync-history-file-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12px}
+.sync-history-file-head strong{text-transform:capitalize}
+.sync-history-file-head span{color:#54738e}
+.sync-history-file-path{font-size:13px;font-weight:600}
+.sync-history-file small{font-size:12px;color:#496d86}
+.sync-detail-pager{display:flex;justify-content:flex-start;margin-top:12px}
+@media(max-width:850px){.sync-detail-columns{grid-template-columns:minmax(0,1fr)}.sync-run-list{max-height:320px}}
 ` + v051Theme + `</style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">
 {{if and .Configured .Logged}}
@@ -456,6 +478,105 @@ function previewSync(id){
   connection.close();activePreviews.delete(id);
   output.textContent='Live scan connection interrupted. No files were changed. Try again or check your reverse proxy streaming settings.';
  };
+}
+let selectedSyncID='',selectedSyncRunID='',runPageOffset=0,eventPageOffset=0;
+let lastSyncDashboardJobs=[];
+function makeHistoryNode(parent,tag,className,text){
+ const n=document.createElement(tag);
+ if(className)n.className=className;
+ if(text!==undefined)n.textContent=text;
+ parent.append(n);return n;
+}
+async function fetchSyncHistory(params){
+ const url='/api/sync/history?'+new URLSearchParams(params);
+ const result=await fetch(url,{credentials:'same-origin',cache:'no-store'});
+ if(!result.ok)throw Error('History request failed (HTTP '+result.status+').');
+ return await result.json();
+}
+function syncDurationText(run){
+ if(!run.ended||!run.started)return 'In progress';
+ const duration=Math.max(0,Date.parse(run.ended)-Date.parse(run.started));
+ return (duration/1000).toFixed(1)+'s';
+}
+function formatHistoryDate(value){return value?new Date(value).toLocaleString():'Unknown time'}
+function renderSyncDetailLive(){
+ if(!selectedSyncID)return;
+ const job=lastSyncDashboardJobs.find(j=>j.id===selectedSyncID);
+ const container=$('syncDetailLive');if(!container||!job)return;
+ const p=job.progress||{};
+ const label=job.running?'Running · '+(p.phase||'working')+(p.current?' · '+p.current:''):'Idle';
+ container.textContent=label+' · '+(job.successful_runs||0)+' successful / '+(job.failed_runs||0)+' failed runs'+
+ (job.running?' · '+Number(p.uploads||0)+' sent, '+Number(p.downloads||0)+' received':'');
+}
+function openSyncDetails(id){
+ selectedSyncID=id;selectedSyncRunID='';runPageOffset=0;eventPageOffset=0;
+ const job=lastSyncDashboardJobs.find(j=>j.id===id);
+ $('syncDetailTitle').textContent=job?.name||'Sync details';
+ $('syncRunSummary').textContent='Select a run to inspect every file action.';
+ $('syncRunEvents').replaceChildren();
+ $('syncRunList').textContent='Loading run history…';
+ $('syncEventPager').replaceChildren();
+ renderSyncDetailLive();
+ navigate('sync-detail');
+ loadSyncRunList();
+}
+async function loadSyncRunList(more=false){
+ if(!selectedSyncID)return;
+ if(!more)runPageOffset=0;
+ const jobID=selectedSyncID;
+ const list=$('syncRunList'),pager=$('syncRunPager');
+ if(!more){list.replaceChildren();makeHistoryNode(list,'p','muted','Loading run history…')}
+ try{
+  const data=await fetchSyncHistory({id:jobID,offset:runPageOffset});
+  if(jobID!==selectedSyncID)return;
+  if(!more)list.replaceChildren();
+  if(!data.runs.length&&!more)makeHistoryNode(list,'p','muted','No detailed run records yet. Run history begins with this version; earlier runs only retained summary counts and up to 100 recent file events.');
+  for(const run of data.runs||[]){
+   const card=makeHistoryNode(list,'button','sync-history-run');
+   card.type='button';card.dataset.runId=run.id;
+   card.addEventListener('click',()=>loadSyncRun(run.id));
+   makeHistoryNode(card,'strong','sync-history-run-date',formatHistoryDate(run.started));
+   makeHistoryNode(card,'span','sync-history-run-status',run.status||'unknown');
+   makeHistoryNode(card,'small','sync-history-run-stats',Number(run.uploads||0)+' → destination · '+Number(run.downloads||0)+' → source · '+formatBytes(Number(run.upload_bytes||0)+Number(run.download_bytes||0))+' · '+syncDurationText(run));
+   makeHistoryNode(card,'small','sync-history-run-count',Number(run.event_count||0)+' file operations');
+  }
+  runPageOffset+=data.runs.length;
+  pager.replaceChildren();
+  if(data.more){
+   const next=makeHistoryNode(pager,'button','secondary','Older runs');
+   next.type='button';next.addEventListener('click',()=>loadSyncRunList(true));
+  }
+  if(!more&&data.runs.length)loadSyncRun(data.runs[0].id);
+ }catch(error){list.textContent='Unable to load run history: '+error.message;}
+}
+async function loadSyncRun(runID,more=false){
+ if(!selectedSyncID)return;
+ if(!more){selectedSyncRunID=runID;eventPageOffset=0;}
+ const id=selectedSyncID;
+ if(!more){$('syncRunEvents').replaceChildren();$('syncRunSummary').textContent='Loading recorded file operations…'}
+ try{
+  const data=await fetchSyncHistory({id,run:runID,offset:eventPageOffset});
+  if(id!==selectedSyncID||runID!==selectedSyncRunID)return;
+  for(const card of $('syncRunList').querySelectorAll('[data-run-id]'))card.classList.toggle('selected',card.dataset.runId===runID);
+  const r=data.run,container=$('syncRunEvents'),pager=$('syncEventPager');
+  if(!more)container.replaceChildren();
+  $('syncRunSummary').textContent=formatHistoryDate(r.started)+' · '+r.status+' · '+(r.uploads||0)+' destination / '+(r.downloads||0)+' source copies · '+formatBytes(Number(r.upload_bytes||0)+Number(r.download_bytes||0))+' · '+syncDurationText(r)+(r.error?' · '+r.error:'');
+  for(const event of data.events){
+   const item=makeHistoryNode(container,'div','sync-history-file');
+   const head=makeHistoryNode(item,'div','sync-history-file-head');
+   makeHistoryNode(head,'strong','',event.action||'operation');
+   makeHistoryNode(head,'span','',formatHistoryDate(event.at));
+   makeHistoryNode(item,'div','sync-history-file-path',event.path||'');
+   makeHistoryNode(item,'small','',event.from&&event.to?event.from+' → '+event.to:'');
+  }
+  eventPageOffset+=data.events.length;
+  if(!eventPageOffset)makeHistoryNode(container,'p','muted','No files were transferred or changed in this run. Syncria checked metadata without touching unchanged file contents.');
+  pager.replaceChildren();
+  if(data.more){
+   const next=makeHistoryNode(pager,'button','secondary','Load more file operations');
+   next.type='button';next.addEventListener('click',()=>loadSyncRun(runID,true));
+  }
+ }catch(error){$('syncRunSummary').textContent='Unable to load run details: '+error.message;}
 }
 function navigate(view){
  if(!$('view-'+view))return;
@@ -1208,6 +1329,8 @@ let dashboardPollBusy=false,dashboardSessionExpired=false;
 function applyLiveStatus(data){
  if(!data||!Array.isArray(data.jobs))return;
  const jobs=data.jobs;
+ lastSyncDashboardJobs=jobs;
+ if(currentView==='sync-detail')renderSyncDetailLive();
  const active=jobs.filter(j=>j.running);
  renderActiveSyncs(jobs);
  const banner=$('liveSystemBar'),detail=$('liveSystemDetail'),dot=$('liveSystemDot');
