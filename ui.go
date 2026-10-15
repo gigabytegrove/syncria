@@ -311,13 +311,13 @@ code{overflow-wrap:anywhere}
  <div class="activity-score"><small>DATA TRANSFERRED</small><strong id="activityTransfer">—</strong><span>total</span></div>
 </div>
 <section class="activity-table-shell"><div class="section-heading"><div><span class="mini-overline">Sync results</span><h2>Sync details</h2><p>Numbers come from Syncria's actual transfer records.</p></div></div>
-{{range .Jobs}}<div class="activity-row"><div class="activity-row-head"><div><strong>{{.Name}}</strong><small>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} ↔ NAS{{else if eq .Provider "nas_bridge"}}NAS ↔ NAS{{else}}Existing folder sync{{end}}</small></div><span class="activity-state" data-activity-running="{{.ID}}">Loading results…</span></div>
+{{range .Jobs}}<div class="activity-row"><div class="activity-row-head"><div><strong><button type="button" class="sync-title-link" onclick="openSyncDetails('{{.ID}}')">{{.Name}}</button></strong><small>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} ↔ NAS{{else if eq .Provider "nas_bridge"}}NAS ↔ NAS{{else}}Existing folder sync{{end}}</small></div><span class="activity-state" data-activity-running="{{.ID}}">Loading results…</span></div>
 <div class="activity-row-numbers">
  <div><small>GOOD CHECKS</small><strong data-job-runs="{{.ID}}">{{.SuccessfulRuns}}</strong></div>
  <div><small>ERRORS</small><strong data-job-fails="{{.ID}}">{{.FailedRuns}}</strong></div>
  <div><small>FILES MOVED</small><strong data-job-files="{{.ID}}">—</strong></div>
  <div><small>BYTES MOVED</small><strong data-job-bytes="{{.ID}}">—</strong></div>
-</div><p class="activity-row-detail" data-job-detail="{{.ID}}">Loading most recent result…</p></div>{{else}}<div class="flow-library-empty"><strong>No activity yet</strong><p>Create a sync to see its results here.</p></div>{{end}}</section>
+</div><p class="activity-row-detail" data-job-detail="{{.ID}}">Loading most recent result…</p><button type="button" class="secondary" onclick="openSyncDetails('{{.ID}}')">View individual run history</button></div>{{else}}<div class="flow-library-empty"><strong>No activity yet</strong><p>Create a sync to see its results here.</p></div>{{end}}</section>
 </section>
 <section class="view" id="view-updates">
 <div class="workspace-intro"><div><p>Install updates here. Download, verification, and restart progress appear when an update runs.</p></div></div>
