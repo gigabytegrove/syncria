@@ -504,7 +504,7 @@ function renderSyncDetailLive(){
  const job=lastSyncDashboardJobs.find(j=>j.id===selectedSyncID);
  const container=$('syncDetailLive');if(!container||!job)return;
  const p=job.progress||{};
- const label=job.running?'Running · '+(p.phase||'working')+(p.current?' · '+p.current:''):'Idle';
+ const label=job.running?'Running · '+(p.phase==='scanning'?'Checking '+(p.current||'file metadata'):(p.phase||'working'))+(p.phase==='scanning'?' · '+Number(p.processed||0)+' entries':'' ):'Idle'+(job.last_checked?' · Last fast check: '+job.last_checked:'');
  const direction=job.direction==='one_way'?'One-way (cloud → NAS)':'Bidirectional (cloud ↔ NAS)';
  const deletePolicy=job.propagate_deletions?'Deletes propagate to matching copies':'Deletes are not propagated';
  const recovery=job.recovery_enabled?' · 10-minute deletion recovery enabled':' · deletion recovery disabled';
@@ -1292,8 +1292,8 @@ function renderActiveSyncs(jobs){
   let phase=p.phase||'working';
   set('.active-sync-stage',phase==='scanning'?(p.initial_baseline?'Building initial file index':'Checking for changes'):phase==='stopping'?'Stopping safely…':phase==='transferring'?'Transferring files':phase==='processing'?'Checking changes':phase);
   const scanned=Number(p.processed||0),total=Number(p.total||0);
-  set('.active-sync-scanned',phase==='scanning'?scanned.toLocaleString()+' items discovered':total>0?scanned.toLocaleString()+' / '+total.toLocaleString()+' entries checked':'Preparing file list');
-  set('.active-sync-current',p.current?(phase==='scanning'?'Scanning: ':'Current file: ')+p.current:p.initial_baseline?'One-time cloud/NAS inventory: Syncria is building its persistent local file index. Larger collections may take longer the first time.':'Checking cloud/NAS changes against the local file index…');
+  set('.active-sync-scanned',phase==='scanning'?(p.current||'Location')+': '+scanned.toLocaleString()+' metadata entries':total>0?scanned.toLocaleString()+' / '+total.toLocaleString()+' entries checked':'Preparing file list');
+  set('.active-sync-current',phase==='scanning'?(p.initial_baseline?'Building initial file index: ':'Checking ') +(p.current||'remote metadata')+' · '+Object.entries(p.scan_counts||{}).map(([k,v])=>k+': '+Number(v).toLocaleString()).join(' · '):p.current?'Current transfer: '+p.current:'Checking cloud/NAS changes against the local file index…');
   set('.active-sync-bytes',formatBytes(Number(p.upload_bytes||0)+Number(p.download_bytes||0))+' transferred this run');
   const recent=(p.events||[]).slice().reverse();
   const isTransferring=phase==='transferring'&&!!p.current;
