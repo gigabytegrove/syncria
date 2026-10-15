@@ -335,7 +335,7 @@ func bridgeSameFirstRun(ctx context.Context,primary,secondary bridgeEndpoint,rel
  // Account for SMB/cloud timestamp precision (often one second).
  // Do not declare equal when sizes conflict, and never open the file.
  delta:=l.Modified.Sub(r.Modified)
- if delta<2*time.Second&&delta >-2*time.Second {
+ if delta<time.Second&&delta >-time.Second {
   if l.Size!=r.Size{
    return false,fmt.Errorf("Cannot compare %s: matching timestamps within 2 seconds but differing sizes; manual review required",rel)
   }
