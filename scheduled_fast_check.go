@@ -10,6 +10,16 @@ import (
 const nasFullVerificationInterval=45*time.Minute
 const changeRunCooldown=45*time.Second
 
+func syncCheckDue(job Job,now time.Time)bool{
+ if !job.Enabled{return false}
+ last:=job.LastRun
+ if job.LastChecked.After(last){last=job.LastChecked}
+ cadence:=job.Interval
+ if job.ScheduleMode=="changes"{cadence=5}
+ if cadence<1{cadence=5}
+ return last.IsZero()||now.Sub(last)>=time.Duration(cadence)*time.Minute
+}
+
 // A NAS change feed is useful only while all expected SMB notifications have
 // stayed connected since a completed full inventory. On startup/disconnection
 // we fail closed: no delta-only shortcut, so external NAS edits are discoverable.
