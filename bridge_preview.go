@@ -186,6 +186,7 @@ func (a *App) previewBridgeProgress(ctx context.Context,j *Job,notify func(strin
    oneWay=j.Direction=="one_way"||(i>0&&!j.CrossNASPropagation)
   }
   if err!=nil{return result,fmt.Errorf("Primary connection: %w",err)}
+  if drive,ok:=primary.(*bridgeDriveEndpoint);ok{drive.usePreviewIndex=true}
   secondary,err:=a.openNAS(ctx,d)
   if err!=nil{primary.Close();return result,fmt.Errorf("Secondary connection: %w",err)}
   primaryName:="Google Drive"
