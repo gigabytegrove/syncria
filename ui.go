@@ -680,7 +680,7 @@ function renderSyncDetailLive(){
  const kind=job.running?'running':job.error?'attention':job.enabled?'healthy':'paused';
  status.dataset.kind=kind;
  status.textContent=job.running?'Syncing now':job.error?'Needs attention':job.enabled?'Automatic checks on':'Paused';
- const direction=job.direction==='one_way'?'One-way · cloud → NAS':job.provider==='nas_bridge'?'NAS ↔ NAS':'Two-way · cloud ↔ NAS';
+ const direction=job.provider==='nas_bridge'?(job.direction==='one_way'?'One-way · source NAS → destination NAS':'Two-way · NAS ↔ NAS'):job.direction==='one_way'?'One-way · cloud → NAS':'Two-way · cloud ↔ NAS';
  const deletion=job.propagate_deletions?'Deletions propagate to previously synchronized copies':'Deletions are not shared';
  const recovery=job.recovery_enabled?'10-minute deletion undo enabled':'Deletion undo disabled';
  const schedule=job.schedule_mode==='changes'?'On changes · five-minute checks':'Every configured interval';
