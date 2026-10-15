@@ -92,7 +92,7 @@ code{overflow-wrap:anywhere}
 .sync-history-file small{font-size:12px;color:#496d86}
 .sync-detail-pager{display:flex;justify-content:flex-start;margin-top:12px}
 @media(max-width:850px){.sync-detail-columns{grid-template-columns:minmax(0,1fr)}.sync-run-list{max-height:320px}}
-` + v051Theme + `</style></head><body>
+` + v051Theme + syncriaDesignCSS + `</style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">
 {{if and .Configured .Logged}}
 <aside class="sidebar" aria-label="Syncria navigation">
@@ -148,7 +148,7 @@ code{overflow-wrap:anywhere}
 <section class="overview-list-panel">
  <div class="section-heading"><div><span class="mini-overline">Configured syncs</span><h2>My Syncs</h2><p>Each sync is a connection between places you've chosen.</p></div><button class="text-action" type="button" onclick="navigate('sync')">View all →</button></div>
  <div class="flow-list grid">
- {{range .Jobs}}<div class="flow-row"><span class="flow-row-icon">{{if eq .Provider "bridge"}}☁{{else}}⇄{{end}}</span><div class="flow-row-content"><strong>{{.Name}}</strong><small>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} → NAS{{else if eq .Provider "nas_bridge"}}NAS ↔ NAS{{else}}Existing folder sync{{end}}</small></div>{{if .Enabled}}<span class="flow-state is-on"><span></span> On</span>{{else}}<span class="flow-state is-off"><span></span> Paused</span>{{end}}<button class="flow-row-open" type="button" onclick="navigate('sync')" aria-label="Open {{.Name}}">↗</button></div>{{else}}<div class="overview-empty"><span>⇄</span><strong>No syncs yet</strong><p>Make your first one to start keeping folders together.</p><button class="secondary" type="button" onclick="startWizard()">Create a sync</button></div>{{end}}
+ {{range .Jobs}}<div class="flow-row"><span class="flow-row-icon">{{if eq .Provider "bridge"}}☁{{else}}⇄{{end}}</span><div class="flow-row-content"><strong>{{.Name}}</strong><small>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} → NAS{{else if eq .Provider "nas_bridge"}}NAS ↔ NAS{{else}}Existing folder sync{{end}}</small></div>{{if .Enabled}}<span class="flow-state is-on"><span></span> On</span>{{else}}<span class="flow-state is-off"><span></span> Paused</span>{{end}}<button class="flow-row-open" type="button" onclick="openSyncDetails('{{.ID}}')" aria-label="Open {{.Name}} details">↗</button></div>{{else}}<div class="overview-empty"><span>⇄</span><strong>No syncs yet</strong><p>Make your first one to start keeping folders together.</p><button class="secondary" type="button" onclick="startWizard()">Create a sync</button></div>{{end}}
  </div>
 </section>
 <section class="overview-list-panel">
@@ -160,10 +160,19 @@ code{overflow-wrap:anywhere}
 <details class="glossary-fold"><summary>New to syncing? A few words explained.</summary><div class="glossary-layout"><span><strong>NAS</strong> — A NAS is a storage box on your network.</span><span><strong>Cloud</strong> — Online files, like Google Drive.</span><span><strong>Sync</strong> — Keeping folders matched.</span><span><strong>Undo</strong> — Bringing back a recently deleted file.</span></div></details>
 </section>
 <section class="view" id="view-sync">
-<div class="workspace-intro"><div><p>Manage where files travel and when they move. New syncs are paused until you enable them.</p></div><button class="primary" type="button" onclick="startWizard()">+ Create sync</button></div>
+<div class="workspace-intro sync-library-header"><div><h2>Connections that keep your files in sync</h2><p>Select a sync to inspect its files and run history, manage its settings, and see what changes next. New syncs start paused.</p></div><button class="primary" type="button" onclick="startWizard()">+ Create sync</button></div>
+<div class="sync-toolbar" aria-label="Find and filter syncs"><div class="sync-toolbar-stats">
+ <div class="sync-toolbar-stat"><strong id="syncLibraryTotal">{{len .Jobs}}</strong><span>connections</span></div>
+ <div class="sync-toolbar-stat"><strong id="syncLibraryRunning">0</strong><span>running</span></div>
+ <div class="sync-toolbar-stat"><strong id="syncLibraryAttention">0</strong><span>need attention</span></div>
+ </div>
+ <div class="sync-toolbar-controls"><label class="sr-only" for="syncLibrarySearch">Find a sync</label><input id="syncLibrarySearch" class="sync-toolbar-search" type="search" placeholder="Search your syncs…" oninput="filterSyncLibrary()">
+ <label class="sr-only" for="syncLibraryFilter">Filter by status</label><select id="syncLibraryFilter" onchange="filterSyncLibrary()"><option value="all">All syncs</option><option value="running">Running</option><option value="attention">Needs attention</option><option value="active">Automatic on</option><option value="paused">Paused</option></select></div>
+</div>
+<p class="sync-library-empty-filter hidden" id="syncLibraryNoMatch">No connections match. Try another search term or status.</p>
 <section class="sync-library" aria-label="Your file syncs">
 {{range .Jobs}}{{$job := .}}
-<article class="relationship-card">
+<article class="relationship-card" data-sync-card="{{.ID}}" data-sync-name="{{.Name}}">
  <div class="flow-card-main">
    <div class="flow-card-emblem">{{if eq .Provider "bridge"}}☁{{else}}⇄{{end}}</div>
    <div class="flow-card-identity"><span class="mini-overline">{{if eq .Provider "bridge"}}CLOUD / NAS{{else if eq .Provider "nas_bridge"}}NAS / NAS{{else}}FOLDER / FOLDER{{end}}</span><h3><button type="button" class="sync-title-link" onclick="openSyncDetails('{{.ID}}')">{{.Name}}</button></h3><p>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} · {{if eq .Direction "one_way"}}One way: cloud → NAS{{else}}Both ways: cloud ↔ NAS{{end}} · {{len .NASDestinations}} NAS destination(s){{else if eq .Provider "nas_bridge"}}{{if eq .Direction "one_way"}}Copy one way{{else}}Keep both ways matched{{end}} · {{len .NASDestinations}} NAS destination(s){{else}}Existing filesystem sync{{end}}</p></div>
@@ -197,13 +206,18 @@ code{overflow-wrap:anywhere}
  </section>
  <details class="sync-run-events hidden" data-job-events="{{.ID}}"><summary>What actually changed in the last run</summary><div class="sync-run-event-list" data-job-events-list="{{.ID}}"></div></details>
  <div class="flow-card-actions">
- <button type="button" class="secondary" onclick="openSyncDetails('{{.ID}}')">View sync details &amp; run history</button>
- <button type="button" class="secondary" onclick="previewSync('{{.ID}}')">Test run · Preview changes</button>
-  <button type="button" class="secondary hidden" data-job-cancel="{{.ID}}" onclick="requestStopSync('{{.ID}}',this)">Stop current run</button>
- {{if or (eq .Provider "bridge") (eq .Provider "nas_bridge")}}<button type="button" class="secondary" onclick="editSync('{{.ID}}')">Edit sync</button>{{end}}
- <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="run_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="primary">Sync now <span aria-hidden="true">→</span></button></form>
- <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="toggle_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="secondary">{{if .Enabled}}Pause automatic sync{{else}}Turn on automatic sync{{end}}</button></form>
- <form method="post" action="/action" class="inline flow-danger" onsubmit="return confirm('Remove this sync? Files stay on your cloud and NAS.')"><input type="hidden" name="action" value="delete_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="danger">Remove sync</button></form>
+  <button type="button" class="secondary sync-action-open" onclick="openSyncDetails('{{.ID}}')">Open sync <span aria-hidden="true">→</span></button>
+  <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="run_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="primary" data-job-run-control="{{.ID}}">Sync now</button></form>
+  <button type="button" class="secondary hidden" data-job-cancel="{{.ID}}" onclick="requestStopSync('{{.ID}}',this)">Stop run</button>
+  <span class="sync-action-spacer"></span>
+  <details class="sync-card-more" data-sync-menu="{{.ID}}"><summary aria-label="More actions for {{.Name}}">More <span aria-hidden="true">⋯</span></summary>
+   <div class="sync-card-more-menu" role="group" aria-label="More sync actions">
+    <button type="button" onclick="openSyncDetails('{{.ID}}','files')">Preview file changes</button>
+    {{if or (eq .Provider "bridge") (eq .Provider "nas_bridge")}}<button type="button" onclick="editSync('{{.ID}}')">Edit sync configuration</button>{{end}}
+    <form method="post" action="/action"><input type="hidden" name="action" value="toggle_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit">{{if .Enabled}}Pause automatic checks{{else}}Enable automatic checks{{end}}</button></form>
+    <form method="post" action="/action" onsubmit="return confirm('Remove this sync configuration? Your original files on cloud and NAS are not deleted.')"><input type="hidden" name="action" value="delete_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="danger">Remove connection</button></form>
+   </div>
+  </details>
  </div>
 </article>
 {{else}}
@@ -310,14 +324,72 @@ code{overflow-wrap:anywhere}
 </section>
 </section>
 <section class="view" id="view-sync-detail">
- <div class="sync-detail-back"><button type="button" class="secondary" onclick="navigate('sync')">← My Syncs</button><button type="button" class="secondary" onclick="loadSyncRunList()">Refresh history</button></div>
- <section class="panel sync-details-shell">
-  <div class="section-heading"><div><span class="mini-overline">SYNC DETAILS</span><h2 id="syncDetailTitle">Sync details</h2><p id="syncDetailSubtitle">Runs, files transferred, and why.</p></div></div>
-  <div id="syncDetailLive" class="sync-detail-live">Loading current status…</div>
-  <div class="sync-detail-columns">
-   <div class="sync-detail-run-column"><h3>Run history</h3><p class="muted">Choose a run to see exactly which files were processed.</p><div id="syncRunList" class="sync-run-list"></div><div id="syncRunPager" class="sync-detail-pager"></div></div>
-   <div class="sync-detail-files-column"><h3>File operations</h3><p id="syncRunSummary" class="muted">Select a run.</p><div id="syncRunEvents" class="sync-run-files"></div><div id="syncEventPager" class="sync-detail-pager"></div></div>
+ <div class="sync-detail-back"><button type="button" class="secondary" onclick="navigate('sync')">← All syncs</button><span class="sync-library-hint">Details update automatically as synchronization runs.</span></div>
+ <section class="panel sync-details-shell" aria-label="Selected synchronization">
+  <div class="sync-details-head">
+   <div><span class="mini-overline">SYNCHRONIZATION</span><h2 class="sync-details-name" id="syncDetailTitle">Sync details</h2><p class="sync-details-meta" id="syncDetailSubtitle">Choose a sync to inspect its activity and settings.</p></div>
+   <div class="sync-status-row"><span class="sync-status-pill" id="syncDetailStatus" data-kind="healthy">Loading</span></div>
   </div>
+  <div class="sync-details-toolbar">
+   <button type="button" class="primary" id="syncDetailRun" onclick="submitSyncAction('run_job')">Sync now</button>
+   <button type="button" class="secondary hidden" id="syncDetailStop" onclick="requestStopSync(selectedSyncID,this)">Stop current run</button>
+   <button type="button" class="secondary" id="syncDetailPause" onclick="submitSyncAction('toggle_job')">Pause automatic checks</button>
+   <button type="button" class="secondary" id="syncDetailEdit" onclick="editSync(selectedSyncID)">Edit configuration</button>
+  </div>
+  <div class="sync-details-tabs" role="tablist" aria-label="Sync detail sections">
+   <button type="button" role="tab" aria-controls="syncDetailOverview" id="syncTabOverview" aria-selected="true" onclick="showSyncDetailTab('overview')">Overview</button>
+   <button type="button" role="tab" aria-controls="syncDetailFiles" id="syncTabFiles" aria-selected="false" onclick="showSyncDetailTab('files')">Files &amp; preview</button>
+   <button type="button" role="tab" aria-controls="syncDetailHistory" id="syncTabHistory" aria-selected="false" onclick="showSyncDetailTab('history')">Run history</button>
+   <button type="button" role="tab" aria-controls="syncDetailSettings" id="syncTabSettings" aria-selected="false" onclick="showSyncDetailTab('settings')">Settings</button>
+  </div>
+  <section class="sync-details-tab is-active" id="syncDetailOverview" role="tabpanel" aria-labelledby="syncTabOverview">
+   <div class="sync-detail-grid">
+    <div class="sync-detail-stat"><span>Last successful checks</span><strong id="syncDetailSuccess">—</strong></div>
+    <div class="sync-detail-stat"><span>Files moved overall</span><strong id="syncDetailMoved">—</strong></div>
+    <div class="sync-detail-stat"><span>Data transferred</span><strong id="syncDetailBytes">—</strong></div>
+   </div>
+   <div class="sync-detail-section"><h3>Current status</h3><div id="syncDetailLive" class="sync-detail-live" aria-live="polite">Loading live status…</div><p class="sync-detail-note" id="syncDetailWatchNote">Synchronization checks use saved file metadata and change detection where supported.</p></div>
+   <div class="sync-detail-section"><div class="sync-run-history-heading"><h3>Latest run</h3><button type="button" class="secondary" onclick="showSyncDetailTab('history')">Browse every run →</button></div><div id="syncDetailLastRun" class="sync-detail-empty"><strong>No detailed run loaded yet</strong><p>The most recent result will appear here. Older versions recorded totals rather than full file-by-file history.</p></div></div>
+   <div class="sync-detail-section"><h3>What happens to your files</h3><div class="sync-detail-pairs">
+    <div class="sync-detail-pair"><small>Transfer direction</small><strong id="syncDetailDirection">—</strong></div>
+    <div class="sync-detail-pair"><small>Deletion behavior</small><strong id="syncDetailDeletion">—</strong></div>
+   </div></div>
+  </section>
+  <section class="sync-details-tab" id="syncDetailFiles" role="tabpanel" aria-labelledby="syncTabFiles">
+   <div class="sync-preview-head"><div><h3>Planned file changes</h3><p class="muted">Compare file metadata without copying anything. See replacements, skips, deletions and explanations—not unchanged files.</p></div><button type="button" class="secondary" onclick="runDetailPreview()">Run read-only preview</button></div>
+   <div id="syncDetailPreviewHost" class="sync-detail-preview-host"></div>
+   <p class="sync-detail-note">Looking for files that already transferred? Open Run history and select a completed run.</p>
+  </section>
+  <section class="sync-details-tab" id="syncDetailHistory" role="tabpanel" aria-labelledby="syncTabHistory">
+   <div class="sync-run-history-heading"><div><h3>Recorded sync runs</h3><p class="muted">Select any run to see the actual files and operations recorded for it.</p></div><button type="button" class="secondary" onclick="loadSyncRunList()">Refresh history</button></div>
+   <div class="sync-run-history-layout">
+    <div class="sync-detail-run-column"><div id="syncRunList" class="sync-run-list" aria-label="Run history"></div><div id="syncRunPager" class="sync-detail-pager"></div></div>
+    <div class="sync-detail-files-column">
+     <div class="sync-run-history-heading"><h3>Files in selected run</h3></div>
+     <p id="syncRunSummary" class="muted">Choose a run to inspect recorded changes.</p>
+     <div class="sync-detail-files-toolbar"><div class="sync-file-filter">
+      <label class="sr-only" for="syncFileSearch">Search filenames in the selected run</label><input id="syncFileSearch" type="search" placeholder="Find filename or folder…" oninput="debounceRunFileSearch()">
+      <label class="sr-only" for="syncFileActionFilter">Filter file operations</label><select id="syncFileActionFilter" onchange="reloadRunFileFilters()"><option value="">All operations</option><option value="copy">Copied</option><option value="replace">Replaced</option><option value="delete">Deleted</option><option value="transfer failed">Failed</option><option value="unsupported Google document — kept on Drive">Skipped unsupported</option></select>
+     </div></div>
+     <div id="syncRunEvents" class="sync-run-files" aria-label="Files in selected run"></div><div id="syncEventPager" class="sync-detail-pager"></div>
+    </div>
+   </div>
+  </section>
+  <section class="sync-details-tab" id="syncDetailSettings" role="tabpanel" aria-labelledby="syncTabSettings">
+   <h3>Relationship settings</h3><p class="muted">What Syncria does, when it runs, and how it handles deletions.</p>
+   <div class="sync-detail-pairs">
+    <div class="sync-detail-pair"><small>Sync direction</small><strong id="syncSettingDirection">—</strong></div>
+    <div class="sync-detail-pair"><small>Checking schedule</small><strong id="syncSettingSchedule">—</strong></div>
+    <div class="sync-detail-pair"><small>Deletion sharing</small><strong id="syncSettingDelete">—</strong></div>
+    <div class="sync-detail-pair"><small>Undo protection</small><strong id="syncSettingRecovery">—</strong></div>
+   </div>
+   <p class="sync-detail-alert" id="syncDeleteWarning" role="note">Review how deletions are shared before enabling this sync.</p>
+   <div class="sync-detail-section"><h3>Manage this connection</h3><div class="sync-settings-actions">
+    <button type="button" class="primary" onclick="editSync(selectedSyncID)">Edit source, destination and policies</button>
+    <button type="button" class="secondary" onclick="showSyncDetailTab('files')">Preview before syncing</button>
+    <button type="button" class="danger" onclick="submitSyncAction('delete_job')">Remove sync configuration</button>
+   </div><p class="sync-detail-note">Removing a sync configuration does not delete the underlying cloud or NAS files. Changes to deletion settings only take effect when saved.</p></div>
+  </section>
  </section>
 </section>
 <section class="view" id="view-activity">
@@ -326,7 +398,7 @@ code{overflow-wrap:anywhere}
 <div class="workspace-intro"><div><p>Transfer counts and recent results, updated as your syncs run.</p></div><button class="secondary" type="button" onclick="refreshDashboardStatus()">Refresh activity ↻</button></div>
 <div class="activity-scoreboard grid gap-3">
  <div class="activity-score activity-score-highlight"><small>CHECKS THAT WORKED</small><strong id="activitySuccessful">{{.Metrics.Runs}}</strong><span>completed checks</span></div>
- <div class="activity-score"><small>CHECKS WITH ERRORS</small><strong id="activityFailed">{{.Metrics.Failures}}</strong><span>need attention</span></div>
+ <div class="activity-score"><small>CHECKS WITH ERRORS</small><strong id="activityFailed">{{.Metrics.Failures}}</strong><span>historical failed checks</span></div>
  <div class="activity-score"><small>FILES COPIED</small><strong id="activityFiles">—</strong><span>across all syncs</span></div>
  <div class="activity-score"><small>FILES SENT</small><strong id="activityUploaded">—</strong><span>to another place</span></div>
  <div class="activity-score"><small>FILES RECEIVED</small><strong id="activityDownloaded">—</strong><span>from another place</span></div>
@@ -499,31 +571,172 @@ function syncDurationText(run){
  return (duration/1000).toFixed(1)+'s';
 }
 function formatHistoryDate(value){return value?new Date(value).toLocaleString():'Unknown time'}
+function filterSyncLibrary(){
+ const needle=($('syncLibrarySearch')?.value||'').trim().toLocaleLowerCase();
+ const filter=$('syncLibraryFilter')?.value||'all';
+ const cards=[...document.querySelectorAll('[data-sync-card]')];
+ let shown=0,running=0,attention=0;
+ for(const card of cards){
+  const job=lastSyncDashboardJobs.find(j=>j.id===card.dataset.syncCard);
+  const active=!!job?.running,problem=!!job?.error&&!active,enabled=job?.enabled??!!card.querySelector('.flow-state.is-on');
+  if(active)running++;
+  if(problem)attention++;
+  const status=filter==='all'||filter==='running'&&active||filter==='attention'&&problem||
+   filter==='active'&&enabled||filter==='paused'&&!enabled;
+  const match=card.dataset.syncName.toLocaleLowerCase().includes(needle)&&status;
+  card.hidden=!match;if(match)shown++;
+ }
+ const set=(id,value)=>{const el=$(id);if(el)el.textContent=String(value)};
+ set('syncLibraryTotal',cards.length);set('syncLibraryRunning',running);set('syncLibraryAttention',attention);
+ $('syncLibraryNoMatch')?.classList.toggle('hidden',shown!==0||cards.length===0);
+}
+document.addEventListener('click',e=>{
+ for(const menu of document.querySelectorAll('details.sync-card-more[open]')){
+  if(!menu.contains(e.target))menu.open=false;
+ }
+});
+document.addEventListener('keydown',e=>{
+ if(e.key==='Escape')document.querySelectorAll('details.sync-card-more[open]').forEach(menu=>menu.open=false);
+});
+let latestDetailedRun=null;
+let mountedSyncPreview=null;
+let selectedSyncDetailTab='overview';
+function unmountSyncPreview(){
+ if(!mountedSyncPreview)return;
+ const prior=document.querySelector('[data-sync-card="'+CSS.escape(mountedSyncPreview)+'"]');
+ const node=document.querySelector('[data-preview="'+CSS.escape(mountedSyncPreview)+'"]');
+ if(prior&&node){
+  const actions=prior.querySelector('.flow-card-actions');
+  if(actions)prior.insertBefore(node,actions);
+  node.classList.add('hidden');
+ }
+ mountedSyncPreview=null;
+}
+function mountSyncPreview(id){
+ const host=$('syncDetailPreviewHost');if(!host)return;
+ if(mountedSyncPreview===id&&host.querySelector('[data-preview="'+CSS.escape(id)+'"]'))return;
+ unmountSyncPreview();
+ host.replaceChildren();
+ mountedSyncPreview=id;
+ const preview=document.querySelector('[data-preview="'+CSS.escape(id)+'"]');
+ if(preview){
+  preview.classList.remove('hidden');
+  const output=preview.querySelector('[data-preview-result]');
+  if(output&&output.textContent==='Scanning both locations…')output.textContent='Run a read-only preview to see files Syncria would copy, replace, skip or delete.';
+  host.append(preview);
+ }else makeHistoryNode(host,'p','sync-detail-empty','Preview is unavailable for this connection.');
+}
+function showSyncDetailTab(name){
+ const names=['overview','files','history','settings'];
+ if(!names.includes(name))name='overview';
+ selectedSyncDetailTab=name;
+ if(currentView==='sync-detail'&&selectedSyncID)history.replaceState(null,'','#sync-detail/'+encodeURIComponent(selectedSyncID)+'/'+name);
+ for(const tab of names){
+  const key=tab[0].toUpperCase()+tab.slice(1);
+  const b=$('syncTab'+key),panel=$('syncDetail'+key);
+  if(b){b.setAttribute('aria-selected',String(tab===name));b.tabIndex=tab===name?0:-1}
+  if(panel)panel.classList.toggle('is-active',tab===name);
+ }
+ if(name==='files'&&selectedSyncID)mountSyncPreview(selectedSyncID);
+ // History is already loaded when the detail view opens.
+}
+function runDetailPreview(){
+ if(!selectedSyncID)return;
+ mountSyncPreview(selectedSyncID);previewSync(selectedSyncID);
+}
+function submitSyncAction(action){
+ if(!selectedSyncID)return;
+ if(action==='delete_job'&&!confirm('Remove this sync configuration? Files on your cloud and NAS will remain in place.'))return;
+ if(action==='run_job'&&lastSyncDashboardJobs.find(j=>j.id===selectedSyncID)?.running)return;
+ const form=document.createElement('form');form.method='post';form.action='/action';form.hidden=true;
+ for(const [name,value] of Object.entries({action,id:selectedSyncID})){
+  const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.append(input);
+ }
+ document.body.append(form);form.submit();
+}
+function renderLastDetailedRun(run){
+ latestDetailedRun=run;
+ const target=$('syncDetailLastRun');if(!target)return;
+ target.className=run?'sync-detail-pair sync-detail-last-run':'sync-detail-empty';
+ target.replaceChildren();
+ if(!run){
+  const empty=makeHistoryNode(target,'div','sync-detail-empty');
+  makeHistoryNode(empty,'strong','', 'No detailed run history yet');
+  makeHistoryNode(empty,'p','', 'New runs are recorded individually. Older release totals remain in Activity but cannot be reconstructed into a per-file journal.');
+  return;
+ }
+ const top=makeHistoryNode(target,'div','sync-history-file-head');
+ makeHistoryNode(top,'strong','',run.status==='success'?'Completed successfully':run.status==='failed'?'Finished with errors':run.status==='cancelled'?'Stopped':'In progress');
+ makeHistoryNode(top,'span','',formatHistoryDate(run.started));
+ makeHistoryNode(target,'div','sync-history-file-path',Number(run.event_count||0).toLocaleString()+' file operations · '+formatBytes(Number(run.upload_bytes||0)+Number(run.download_bytes||0))+' · '+syncDurationText(run));
+ if(run.error)makeHistoryNode(target,'p','sync-detail-alert',run.error);
+ const view=makeHistoryNode(target,'button','secondary','Inspect files in this run →');
+ view.type='button';view.addEventListener('click',()=>{showSyncDetailTab('history');loadSyncRun(run.id)});
+}
 function renderSyncDetailLive(){
  if(!selectedSyncID)return;
  const job=lastSyncDashboardJobs.find(j=>j.id===selectedSyncID);
- const container=$('syncDetailLive');if(!container||!job)return;
+ const container=$('syncDetailLive');if(!container)return;
+ if(!job){container.textContent='Connecting to live sync status…';return}
  const p=job.progress||{};
- const label=job.running?'Running · '+(p.phase==='scanning'?'Checking '+(p.current||'file metadata'):(p.phase||'working'))+(p.phase==='scanning'?' · '+Number(p.processed||0)+' entries':'' ):'Idle'+(job.last_checked?' · Last fast check: '+job.last_checked:'');
- const direction=job.direction==='one_way'?'One-way (cloud → NAS)':'Bidirectional (cloud ↔ NAS)';
- const deletePolicy=job.propagate_deletions?'Deletes propagate to matching copies':'Deletes are not propagated';
- const recovery=job.recovery_enabled?' · 10-minute deletion recovery enabled':' · deletion recovery disabled';
- const watcher=job.schedule_mode==='changes'?(job.nas_watcher_verified?' · NAS change feed verified; fast checks eligible':' · Full NAS verification required until notifications are validated'):'';
- container.textContent=label+' · '+(job.successful_runs||0)+' successful / '+(job.failed_runs||0)+' failed runs'+
-  ' · '+direction+' · '+deletePolicy+recovery+watcher+
-  (job.running?' · '+Number(p.uploads||0)+' sent, '+Number(p.downloads||0)+' received':'');
+ const status=$('syncDetailStatus');
+ const kind=job.running?'running':job.error?'attention':job.enabled?'healthy':'paused';
+ status.dataset.kind=kind;
+ status.textContent=job.running?'Syncing now':job.error?'Needs attention':job.enabled?'Automatic checks on':'Paused';
+ const direction=job.provider==='nas_bridge'?(job.direction==='one_way'?'One-way · source NAS → destination NAS':'Two-way · NAS ↔ NAS'):job.direction==='one_way'?'One-way · cloud → NAS':'Two-way · cloud ↔ NAS';
+ const deletion=job.propagate_deletions?'Deletions propagate to previously synchronized copies':'Deletions are not shared';
+ const recovery=job.recovery_enabled?'10-minute deletion undo enabled':'Deletion undo disabled';
+ const schedule=job.schedule_mode==='changes'?'On changes · five-minute checks':'Every configured interval';
+ const watcher=job.schedule_mode==='changes'?(job.nas_watcher_verified?'NAS watcher verified; fast checks eligible':'NAS watcher unverified; a full metadata check may be required'):'Periodic scheduled checks';
+ const recent=job.last_checked?'Last quick check '+job.last_checked:'No quick check recorded';
+ const line=job.running?(p.phase==='scanning'?'Reading '+(p.current||'metadata')+' · '+Number(p.processed||0).toLocaleString()+' entries':p.phase==='transferring'?'Transferring '+(p.current||'file'):p.phase||'Working')+' · '+formatBytes(Number(p.upload_bytes||0)+Number(p.download_bytes||0))+' moved this run':recent+' · '+watcher;
+ container.textContent=line;
+ $('syncDetailSubtitle').textContent=direction+' · '+schedule;
+ $('syncDetailDirection').textContent=direction;
+ $('syncDetailDeletion').textContent=deletion;
+ $('syncSettingDirection').textContent=direction;
+ $('syncSettingSchedule').textContent=schedule;
+ $('syncSettingDelete').textContent=deletion;
+ $('syncSettingRecovery').textContent=recovery;
+ $('syncDetailWatchNote').textContent=watcher+(job.last_run?' · Last full run '+job.last_run:'');
+ $('syncDeleteWarning').textContent=job.propagate_deletions?
+  'Deletion sharing is active. Removing a previously synchronized file from the source can also remove its counterpart, subject to recovery settings.':
+  'Deletion sharing is off. Deleting a file at one location will not automatically delete its counterpart.';
+ const set=(id,value)=>{const target=$(id);if(target)target.textContent=value};
+ set('syncDetailSuccess',Number(job.successful_runs||0).toLocaleString());
+ set('syncDetailMoved',(Number(job.total_uploads||0)+Number(job.total_downloads||0)).toLocaleString());
+ set('syncDetailBytes',formatBytes(Number(job.total_upload_bytes||0)+Number(job.total_download_bytes||0)));
+ const run=$('syncDetailRun'),stop=$('syncDetailStop'),pause=$('syncDetailPause');
+ if(run)run.disabled=job.running;
+ if(stop)stop.classList.toggle('hidden',!job.running);
+ if(pause)pause.textContent=job.enabled?'Pause automatic checks':'Enable automatic checks';
 }
-function openSyncDetails(id){
- selectedSyncID=id;selectedSyncRunID='';runPageOffset=0;eventPageOffset=0;
+function openSyncDetails(id,tab='overview'){
+ if(!id)return;
+ selectedSyncID=id;selectedSyncRunID='';runPageOffset=0;eventPageOffset=0;latestDetailedRun=null;
  const job=lastSyncDashboardJobs.find(j=>j.id===id);
- $('syncDetailTitle').textContent=job?.name||'Sync details';
- $('syncRunSummary').textContent='Select a run to inspect every file action.';
- $('syncRunEvents').replaceChildren();
- $('syncRunList').textContent='Loading run history…';
+ const card=document.querySelector('[data-sync-card="'+CSS.escape(id)+'"]');
+ $('syncDetailTitle').textContent=job?.name||card?.dataset.syncName||'Sync details';
+ $('syncRunSummary').textContent='Choose a run to inspect recorded files.';
+ $('syncRunEvents').replaceChildren();$('syncRunList').textContent='Loading run history…';
  $('syncEventPager').replaceChildren();
- renderSyncDetailLive();
- navigate('sync-detail');
+ if($('syncFileSearch'))$('syncFileSearch').value='';
+ if($('syncFileActionFilter'))$('syncFileActionFilter').value='';
+ unmountSyncPreview();
+ $('syncDetailPreviewHost').replaceChildren();
+ renderLastDetailedRun(null);
+ renderSyncDetailLive();navigate('sync-detail');
+ showSyncDetailTab(tab);
  loadSyncRunList();
+ if(!job)refreshDashboardStatus();
+}
+let runFileSearchTimer=null;
+function debounceRunFileSearch(){
+ if(runFileSearchTimer)clearTimeout(runFileSearchTimer);
+ runFileSearchTimer=setTimeout(reloadRunFileFilters,300);
+}
+function reloadRunFileFilters(){
+ if(selectedSyncRunID)loadSyncRun(selectedSyncRunID);
 }
 async function loadSyncRunList(more=false){
  if(!selectedSyncID)return;
@@ -536,6 +749,7 @@ async function loadSyncRunList(more=false){
   if(jobID!==selectedSyncID)return;
   if(!more)list.replaceChildren();
   if(!data.runs.length&&!more)makeHistoryNode(list,'p','muted','No detailed run records yet. Run history begins with this version; earlier runs only retained summary counts and up to 100 recent file events.');
+  if(!more)renderLastDetailedRun(data.runs?.[0]||null);
   for(const run of data.runs||[]){
    const card=makeHistoryNode(list,'button','sync-history-run');
    card.type='button';card.dataset.runId=run.id;
@@ -560,7 +774,9 @@ async function loadSyncRun(runID,more=false){
  const id=selectedSyncID;
  if(!more){$('syncRunEvents').replaceChildren();$('syncRunSummary').textContent='Loading recorded file operations…'}
  try{
-  const data=await fetchSyncHistory({id,run:runID,offset:eventPageOffset});
+  const query=$('syncFileSearch')?.value?.trim()||'';
+  const action=$('syncFileActionFilter')?.value||'';
+  const data=await fetchSyncHistory({id,run:runID,offset:eventPageOffset,q:query,action});
   if(id!==selectedSyncID||runID!==selectedSyncRunID)return;
   for(const card of $('syncRunList').querySelectorAll('[data-run-id]'))card.classList.toggle('selected',card.dataset.runId===runID);
   const r=data.run,container=$('syncRunEvents'),pager=$('syncEventPager');
@@ -576,7 +792,12 @@ async function loadSyncRun(runID,more=false){
    if(event.reason)makeHistoryNode(item,'small','sync-history-file-reason',event.reason);
   }
   eventPageOffset+=data.events.length;
-  if(!eventPageOffset)makeHistoryNode(container,'p','muted','No files were transferred or changed in this run. Syncria checked metadata without touching unchanged file contents.');
+  if(!eventPageOffset){
+   const filtering=!!($('syncFileSearch')?.value||$('syncFileActionFilter')?.value);
+   const empty=makeHistoryNode(container,'div','sync-detail-empty');
+   makeHistoryNode(empty,'strong','',filtering?'No files match your filters':'No files needed changing');
+   makeHistoryNode(empty,'p','',filtering?'Try a different filename or operation type. The entire run journal is searched.':'No file transfers were recorded for this run. Unchanged file paths are deliberately kept out of activity.');
+  }
   pager.replaceChildren();
   if(data.more){
    const next=makeHistoryNode(pager,'button','secondary','Load more file operations');
@@ -607,7 +828,7 @@ function navigate(view){
  const page=pages[view]||[view,view.toUpperCase()];
  $('pageTitle').textContent=page[0];
  const breadcrumb=$('pageBreadcrumb');if(breadcrumb)breadcrumb.textContent=page[1];
- history.replaceState(null,'','#'+view);
+ history.replaceState(null,'',view==='sync-detail'&&selectedSyncID?'#sync-detail/'+encodeURIComponent(selectedSyncID)+'/'+selectedSyncDetailTab:'#'+view);
  if(view==='updates')checkUpdate();
 }
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.view)));
@@ -1335,6 +1556,7 @@ function applyLiveStatus(data){
  if(!data||!Array.isArray(data.jobs))return;
  const jobs=data.jobs;
  lastSyncDashboardJobs=jobs;
+ filterSyncLibrary();
  if(currentView==='sync-detail')renderSyncDetailLive();
  const active=jobs.filter(j=>j.running);
  renderActiveSyncs(jobs);
@@ -1348,7 +1570,7 @@ function applyLiveStatus(data){
    detail.textContent=active.length+' sync'+(active.length===1?'':'s')+' running · '+(p.phase||'Working')+(p.current?' · '+p.current:'')+(Number(p.total||0)>0?' · '+Number(p.processed||0)+' / '+Number(p.total)+' checked':' · '+Number(p.processed||0)+' scanned');
   }else{
    const failures=jobs.filter(j=>j.error);
-   detail.textContent=failures.length?failures.length+' sync'+(failures.length===1?'':'s')+' need attention':'All syncs idle · Live monitoring connected';
+   detail.textContent=failures.length?failures.length+' sync'+(failures.length===1?' needs':'s need')+' attention':'All syncs idle · Live monitoring connected';
   }
  }
  const feed=$('liveActivityFeed');
@@ -1508,5 +1730,13 @@ setInterval(()=>{if(!document.hidden&&!updateRunning&&!updateSubmitting)checkUpd
 // Live streaming is primary; polling starts only when unavailable.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDashboardStatus()});
 window.addEventListener('pageshow',event=>{if(event.persisted)refreshDashboardStatus();});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closePicker()});if(location.hash){let page=location.hash.slice(1);if($('view-'+page))navigate(page)}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePicker()});
+if(location.hash){
+ const parts=location.hash.slice(1).split('/');
+ if(parts[0]==='sync-detail'&&parts[1]){
+  const id=decodeURIComponent(parts[1]);
+  if(document.querySelector('[data-sync-card="'+CSS.escape(id)+'"]'))openSyncDetails(id,parts[2]||'overview');
+  else navigate('sync');
+ }else if($('view-'+parts[0])&&parts[0]!=='sync-detail')navigate(parts[0]);
+}
 </script></body></html>`

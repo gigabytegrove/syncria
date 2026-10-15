@@ -1,6 +1,7 @@
 package main
 
 import (
+ "strings"
  "fmt"
  "net/http"
  "net/http/httptest"
@@ -51,4 +52,27 @@ func TestRunHistoryIsAuthorizedAndScopedToJob(t *testing.T){
  w:=httptest.NewRecorder()
  a.syncHistoryAPI(w,req)
  if w.Code!=http.StatusUnauthorized{t.Fatalf("Unauthenticated access to history: %d",w.Code)}
+}
+
+func TestHistorySearchFiltersEntirePersistedRunNotOnlyCurrentPage(t *testing.T){
+ idx,err:=loadSyncIndex(filepath.Join(t.TempDir(),"history-search.db"));if err!=nil{t.Fatal(err)}
+ defer idx.Close()
+ run,err:=idx.beginRun("sync-search");if err!=nil{t.Fatal(err)}
+ for i:=0;i<420;i++{
+  name:=fmt.Sprintf("Bulk/%03d-unchanged-name.txt",i)
+  action:="copy"
+  if i==318{name="Family/Holiday/Kaleb_Xmas1.mp4";action="transfer failed"}
+  if i==400{name="Family/Holiday/Another.mp4";action="replace"}
+  if err=idx.appendRunEvent("sync-search",run,SyncActionEvent{Path:name,Action:action,At:time.Now()});err!=nil{t.Fatal(err)}
+ }
+ if err=idx.finishRun("sync-search",run,"failed","one failed file","timeout",Job{});err!=nil{t.Fatal(err)}
+ results,err:=idx.readRunFiltered("sync-search",run,0,100,"kaleb","transfer failed")
+ if err!=nil||len(results.Events)!=1||results.Events[0].Path!="Family/Holiday/Kaleb_Xmas1.mp4"{
+  t.Fatalf("Search must find files after the first 100 rows: result=%+v err=%v",results,err)
+ }
+ matches,err:=idx.readRunFiltered("sync-search",run,0,100,"Holiday","")
+ if err!=nil||len(matches.Events)!=2||matches.More{t.Fatalf("Folder search should find both entries across full history: %+v %v",matches,err)}
+ no,err:=idx.readRunFiltered("sync-search",run,0,100,"nonexistent","")
+ if err!=nil||len(no.Events)!=0{t.Fatalf("No-match search incorrect: %+v %v",no,err)}
+ if _,err=idx.readRunFiltered("sync-search",run,0,100,strings.Repeat("a",257),"");err==nil{t.Fatal("Search length guard missing")}
 }
