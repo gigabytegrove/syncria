@@ -48,6 +48,18 @@ func TestDriveDeltaFolderChangesForceFreshInventory(t *testing.T){
   if _,safe:=applyDriveDelta(snapshot,changes);safe{t.Fatal("Folder change must trigger full tree reconstruction")}
  }
 }
+func TestDriveRemovedFileRequiresFullInventoryBeforeDeletion(t *testing.T){
+ snapshot:=exampleDriveSnapshot()
+ _,safe:=applyDriveDelta(snapshot,[]driveDeltaChange{{FileID:"video-1",Removed:true}})
+ if safe{t.Fatal("Loss of access/removed event cannot silently plan deletion")}
+}
+func TestDriveUnrelatedFolderChangeDoesNotTriggerFullInventory(t *testing.T){
+ snapshot:=exampleDriveSnapshot()
+ next,safe:=applyDriveDelta(snapshot,[]driveDeltaChange{{FileID:"external-folder",File:driveFile{
+  ID:"external-folder",Name:"Outside",MimeType:folderMime,Parents:[]string{"external-parent"},
+ }}})
+ if !safe||len(next)!=len(snapshot.Files){t.Fatal("Unrelated account folder change should not trigger full tree scan")}
+}
 func TestDriveDeltaExclusionsAndExternalItems(t *testing.T){
  snapshot:=exampleDriveSnapshot()
  changes:=[]driveDeltaChange{
