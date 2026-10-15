@@ -51,6 +51,12 @@ type Account struct {
 	Expires      time.Time `json:"expires"`
 }
 type Item struct {
+    // File metadata recorded after a verified sync, never from a failed transfer.
+    IndexVersion int `json:"index_version,omitempty"`
+    SourceSize int64 `json:"source_size,omitempty"`
+    DestinationSize int64 `json:"destination_size,omitempty"`
+    SourceModified time.Time `json:"source_modified,omitempty"`
+    DestinationModified time.Time `json:"destination_modified,omitempty"`
 	ID       string `json:"id"`
 	MD5      string `json:"md5"`
 	LocalMD5 string `json:"local_md5"`
