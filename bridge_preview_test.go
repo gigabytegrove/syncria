@@ -34,7 +34,8 @@ func TestPreviewPlansDirectionAndNeverMutatesState(t *testing.T){
  if got["new.txt"].From!="Primary"||got["new.txt"].To!="Secondary"{t.Fatal("forward file plan missing")}
  if got["back.txt"].From!="Secondary"||got["back.txt"].To!="Primary"{t.Fatal("reverse file plan missing")}
  if got["changed.txt"].Action!="review"{t.Fatal("manual conflict incorrectly auto-resolved")}
- if got["old.txt"].Action!="unchanged"{t.Fatal("unchanged tracked file not recognized")}
+ if plan.Counts["unchanged"]!=1{t.Fatal("unchanged tracked file not counted")}
+ if _,visible:=got["old.txt"];visible{t.Fatal("unchanged tracked file must not appear in actionable preview")}
  if j.PairStates["p"]["changed.txt"].MD5!="leftold"{t.Fatal("preview mutated checkpoint")}
 }
 func TestPreviewCollisionAndSkipMessages(t *testing.T){

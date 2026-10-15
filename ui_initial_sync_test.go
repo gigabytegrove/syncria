@@ -13,7 +13,7 @@ func TestInitialCloudSyncPreferenceIsVisibleAndExplained(t *testing.T){
   `value="manual">Ask me which copy to keep`,
   `row.primary_modified`,
   `row.secondary_modified`,
-  `First run: Syncria proposes a newer copy`,
+  `For first-time matches, Syncria uses modification timestamps`,
  }{
   if !strings.Contains(newUI,want){t.Errorf("Missing first-run control or date evidence: %s",want)}
  }
