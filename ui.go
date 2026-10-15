@@ -92,7 +92,7 @@ code{overflow-wrap:anywhere}
 .sync-history-file small{font-size:12px;color:#496d86}
 .sync-detail-pager{display:flex;justify-content:flex-start;margin-top:12px}
 @media(max-width:850px){.sync-detail-columns{grid-template-columns:minmax(0,1fr)}.sync-run-list{max-height:320px}}
-` + v051Theme + `</style></head><body>
+` + v051Theme + syncriaDesignCSS + `</style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">
 {{if and .Configured .Logged}}
 <aside class="sidebar" aria-label="Syncria navigation">
@@ -148,7 +148,7 @@ code{overflow-wrap:anywhere}
 <section class="overview-list-panel">
  <div class="section-heading"><div><span class="mini-overline">Configured syncs</span><h2>My Syncs</h2><p>Each sync is a connection between places you've chosen.</p></div><button class="text-action" type="button" onclick="navigate('sync')">View all →</button></div>
  <div class="flow-list grid">
- {{range .Jobs}}<div class="flow-row"><span class="flow-row-icon">{{if eq .Provider "bridge"}}☁{{else}}⇄{{end}}</span><div class="flow-row-content"><strong>{{.Name}}</strong><small>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} → NAS{{else if eq .Provider "nas_bridge"}}NAS ↔ NAS{{else}}Existing folder sync{{end}}</small></div>{{if .Enabled}}<span class="flow-state is-on"><span></span> On</span>{{else}}<span class="flow-state is-off"><span></span> Paused</span>{{end}}<button class="flow-row-open" type="button" onclick="navigate('sync')" aria-label="Open {{.Name}}">↗</button></div>{{else}}<div class="overview-empty"><span>⇄</span><strong>No syncs yet</strong><p>Make your first one to start keeping folders together.</p><button class="secondary" type="button" onclick="startWizard()">Create a sync</button></div>{{end}}
+ {{range .Jobs}}<div class="flow-row"><span class="flow-row-icon">{{if eq .Provider "bridge"}}☁{{else}}⇄{{end}}</span><div class="flow-row-content"><strong>{{.Name}}</strong><small>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} → NAS{{else if eq .Provider "nas_bridge"}}NAS ↔ NAS{{else}}Existing folder sync{{end}}</small></div>{{if .Enabled}}<span class="flow-state is-on"><span></span> On</span>{{else}}<span class="flow-state is-off"><span></span> Paused</span>{{end}}<button class="flow-row-open" type="button" onclick="openSyncDetails('{{.ID}}')" aria-label="Open {{.Name}} details">↗</button></div>{{else}}<div class="overview-empty"><span>⇄</span><strong>No syncs yet</strong><p>Make your first one to start keeping folders together.</p><button class="secondary" type="button" onclick="startWizard()">Create a sync</button></div>{{end}}
  </div>
 </section>
 <section class="overview-list-panel">
@@ -160,10 +160,19 @@ code{overflow-wrap:anywhere}
 <details class="glossary-fold"><summary>New to syncing? A few words explained.</summary><div class="glossary-layout"><span><strong>NAS</strong> — A NAS is a storage box on your network.</span><span><strong>Cloud</strong> — Online files, like Google Drive.</span><span><strong>Sync</strong> — Keeping folders matched.</span><span><strong>Undo</strong> — Bringing back a recently deleted file.</span></div></details>
 </section>
 <section class="view" id="view-sync">
-<div class="workspace-intro"><div><p>Manage where files travel and when they move. New syncs are paused until you enable them.</p></div><button class="primary" type="button" onclick="startWizard()">+ Create sync</button></div>
+<div class="workspace-intro sync-library-header"><div><h2>Connections that keep your files in sync</h2><p>Select a sync to inspect its files and run history, manage its settings, and see what changes next. New syncs start paused.</p></div><button class="primary" type="button" onclick="startWizard()">+ Create sync</button></div>
+<div class="sync-toolbar" aria-label="Find and filter syncs"><div class="sync-toolbar-stats">
+ <div class="sync-toolbar-stat"><strong id="syncLibraryTotal">{{len .Jobs}}</strong><span>connections</span></div>
+ <div class="sync-toolbar-stat"><strong id="syncLibraryRunning">0</strong><span>running</span></div>
+ <div class="sync-toolbar-stat"><strong id="syncLibraryAttention">0</strong><span>need attention</span></div>
+ </div>
+ <div class="sync-toolbar-controls"><label class="sr-only" for="syncLibrarySearch">Find a sync</label><input id="syncLibrarySearch" class="sync-toolbar-search" type="search" placeholder="Search your syncs…" oninput="filterSyncLibrary()">
+ <label class="sr-only" for="syncLibraryFilter">Filter by status</label><select id="syncLibraryFilter" onchange="filterSyncLibrary()"><option value="all">All syncs</option><option value="running">Running</option><option value="attention">Needs attention</option><option value="active">Automatic on</option><option value="paused">Paused</option></select></div>
+</div>
+<p class="sync-library-empty-filter hidden" id="syncLibraryNoMatch">No connections match. Try another search term or status.</p>
 <section class="sync-library" aria-label="Your file syncs">
 {{range .Jobs}}{{$job := .}}
-<article class="relationship-card">
+<article class="relationship-card" data-sync-card="{{.ID}}" data-sync-name="{{.Name}}">
  <div class="flow-card-main">
    <div class="flow-card-emblem">{{if eq .Provider "bridge"}}☁{{else}}⇄{{end}}</div>
    <div class="flow-card-identity"><span class="mini-overline">{{if eq .Provider "bridge"}}CLOUD / NAS{{else if eq .Provider "nas_bridge"}}NAS / NAS{{else}}FOLDER / FOLDER{{end}}</span><h3><button type="button" class="sync-title-link" onclick="openSyncDetails('{{.ID}}')">{{.Name}}</button></h3><p>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} · {{if eq .Direction "one_way"}}One way: cloud → NAS{{else}}Both ways: cloud ↔ NAS{{end}} · {{len .NASDestinations}} NAS destination(s){{else if eq .Provider "nas_bridge"}}{{if eq .Direction "one_way"}}Copy one way{{else}}Keep both ways matched{{end}} · {{len .NASDestinations}} NAS destination(s){{else}}Existing filesystem sync{{end}}</p></div>
@@ -197,13 +206,18 @@ code{overflow-wrap:anywhere}
  </section>
  <details class="sync-run-events hidden" data-job-events="{{.ID}}"><summary>What actually changed in the last run</summary><div class="sync-run-event-list" data-job-events-list="{{.ID}}"></div></details>
  <div class="flow-card-actions">
- <button type="button" class="secondary" onclick="openSyncDetails('{{.ID}}')">View sync details &amp; run history</button>
- <button type="button" class="secondary" onclick="previewSync('{{.ID}}')">Test run · Preview changes</button>
-  <button type="button" class="secondary hidden" data-job-cancel="{{.ID}}" onclick="requestStopSync('{{.ID}}',this)">Stop current run</button>
- {{if or (eq .Provider "bridge") (eq .Provider "nas_bridge")}}<button type="button" class="secondary" onclick="editSync('{{.ID}}')">Edit sync</button>{{end}}
- <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="run_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="primary">Sync now <span aria-hidden="true">→</span></button></form>
- <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="toggle_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="secondary">{{if .Enabled}}Pause automatic sync{{else}}Turn on automatic sync{{end}}</button></form>
- <form method="post" action="/action" class="inline flow-danger" onsubmit="return confirm('Remove this sync? Files stay on your cloud and NAS.')"><input type="hidden" name="action" value="delete_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="danger">Remove sync</button></form>
+  <button type="button" class="secondary sync-action-open" onclick="openSyncDetails('{{.ID}}')">Open sync <span aria-hidden="true">→</span></button>
+  <form method="post" action="/action" class="inline"><input type="hidden" name="action" value="run_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="primary" data-job-run-control="{{.ID}}">Sync now</button></form>
+  <button type="button" class="secondary hidden" data-job-cancel="{{.ID}}" onclick="requestStopSync('{{.ID}}',this)">Stop run</button>
+  <span class="sync-action-spacer"></span>
+  <details class="sync-card-more" data-sync-menu="{{.ID}}"><summary aria-label="More actions for {{.Name}}">More <span aria-hidden="true">⋯</span></summary>
+   <div class="sync-card-more-menu" role="group" aria-label="More sync actions">
+    <button type="button" onclick="openSyncDetails('{{.ID}}','files')">Preview file changes</button>
+    {{if or (eq .Provider "bridge") (eq .Provider "nas_bridge")}}<button type="button" onclick="editSync('{{.ID}}')">Edit sync configuration</button>{{end}}
+    <form method="post" action="/action"><input type="hidden" name="action" value="toggle_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit">{{if .Enabled}}Pause automatic checks{{else}}Enable automatic checks{{end}}</button></form>
+    <form method="post" action="/action" onsubmit="return confirm('Remove this sync configuration? Your original files on cloud and NAS are not deleted.')"><input type="hidden" name="action" value="delete_job"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="danger">Remove connection</button></form>
+   </div>
+  </details>
  </div>
 </article>
 {{else}}
