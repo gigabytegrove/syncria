@@ -70,6 +70,28 @@ code{overflow-wrap:anywhere}
 .active-sync-file-state{align-self:center}
 .flow-card-dismiss{margin:0 0 12px auto;display:block;width:max-content;max-width:100%;font-size:12px}
 .flow-card-dismiss[hidden]{display:none}
+
+.sync-title-link{font:inherit;font-weight:inherit;color:inherit;background:none;border:0;padding:0;text-align:left;cursor:pointer}
+.sync-title-link:hover{text-decoration:underline}
+.sync-detail-back{display:flex;justify-content:space-between;gap:12px;margin-bottom:16px}
+.sync-details-shell{min-width:0}
+.sync-detail-live{background:#eff7fc;border:1px solid #d2e6f5;border-radius:10px;padding:12px;font-size:13px;color:#264e6a;margin-bottom:18px;overflow-wrap:anywhere}
+.sync-detail-columns{display:grid;grid-template-columns:minmax(240px,340px) minmax(0,1fr);gap:18px}
+.sync-detail-run-column,.sync-detail-files-column{min-width:0}
+.sync-run-list,.sync-run-files{border:1px solid #dce7ee;border-radius:10px;min-height:75px;max-height:540px;overflow-y:auto}
+.sync-history-run{display:flex;flex-direction:column;text-align:left;align-items:flex-start;width:100%;background:white;border:0;border-bottom:1px solid #e6edf3;padding:12px;cursor:pointer;gap:5px;color:inherit}
+.sync-history-run:hover,.sync-history-run.selected{background:#edf6fd}
+.sync-history-run-status{text-transform:capitalize;font-weight:600;color:#416783}
+.sync-history-run-stats,.sync-history-run-count{font-size:12px;color:#5b7487}
+.sync-history-file{padding:12px;border-bottom:1px solid #e6edf3;display:flex;flex-direction:column;gap:6px;overflow-wrap:anywhere}
+.sync-history-file:last-child{border:0}
+.sync-history-file-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12px}
+.sync-history-file-head strong{text-transform:capitalize}
+.sync-history-file-head span{color:#54738e}
+.sync-history-file-path{font-size:13px;font-weight:600}
+.sync-history-file small{font-size:12px;color:#496d86}
+.sync-detail-pager{display:flex;justify-content:flex-start;margin-top:12px}
+@media(max-width:850px){.sync-detail-columns{grid-template-columns:minmax(0,1fr)}.sync-run-list{max-height:320px}}
 ` + v051Theme + `</style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">
 {{if and .Configured .Logged}}
@@ -144,7 +166,7 @@ code{overflow-wrap:anywhere}
 <article class="relationship-card">
  <div class="flow-card-main">
    <div class="flow-card-emblem">{{if eq .Provider "bridge"}}☁{{else}}⇄{{end}}</div>
-   <div class="flow-card-identity"><span class="mini-overline">{{if eq .Provider "bridge"}}CLOUD / NAS{{else if eq .Provider "nas_bridge"}}NAS / NAS{{else}}FOLDER / FOLDER{{end}}</span><h3>{{.Name}}</h3><p>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} · {{if eq .Direction "one_way"}}One way: cloud → NAS{{else}}Both ways: cloud ↔ NAS{{end}} · {{len .NASDestinations}} NAS destination(s){{else if eq .Provider "nas_bridge"}}{{if eq .Direction "one_way"}}Copy one way{{else}}Keep both ways matched{{end}} · {{len .NASDestinations}} NAS destination(s){{else}}Existing filesystem sync{{end}}</p></div>
+   <div class="flow-card-identity"><span class="mini-overline">{{if eq .Provider "bridge"}}CLOUD / NAS{{else if eq .Provider "nas_bridge"}}NAS / NAS{{else}}FOLDER / FOLDER{{end}}</span><h3><button type="button" class="sync-title-link" onclick="openSyncDetails('{{.ID}}')">{{.Name}}</button></h3><p>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} · {{if eq .Direction "one_way"}}One way: cloud → NAS{{else}}Both ways: cloud ↔ NAS{{end}} · {{len .NASDestinations}} NAS destination(s){{else if eq .Provider "nas_bridge"}}{{if eq .Direction "one_way"}}Copy one way{{else}}Keep both ways matched{{end}} · {{len .NASDestinations}} NAS destination(s){{else}}Existing filesystem sync{{end}}</p></div>
    <div class="flow-card-health">{{if .Enabled}}<span class="flow-state is-on" data-job-enabled="{{.ID}}"><span></span> On</span>{{else}}<span class="flow-state is-off" data-job-enabled="{{.ID}}"><span></span> Paused</span>{{end}}</div>
  </div>
  <div class="flow-card-facts">
@@ -175,6 +197,7 @@ code{overflow-wrap:anywhere}
  </section>
  <details class="sync-run-events hidden" data-job-events="{{.ID}}"><summary>What actually changed in the last run</summary><div class="sync-run-event-list" data-job-events-list="{{.ID}}"></div></details>
  <div class="flow-card-actions">
+ <button type="button" class="secondary" onclick="openSyncDetails('{{.ID}}')">View sync details &amp; run history</button>
  <button type="button" class="secondary" onclick="previewSync('{{.ID}}')">Test run · Preview changes</button>
   <button type="button" class="secondary hidden" data-job-cancel="{{.ID}}" onclick="requestStopSync('{{.ID}}',this)">Stop current run</button>
  {{if or (eq .Provider "bridge") (eq .Provider "nas_bridge")}}<button type="button" class="secondary" onclick="editSync('{{.ID}}')">Edit sync</button>{{end}}
@@ -286,6 +309,17 @@ code{overflow-wrap:anywhere}
 <div class="hidden" id="dropboxAccountAuthorize"><p>Dropbox needs sign-in settings first. The person running Syncria can set them up in Settings.</p>{{if .DropboxClientID}}<a class="primary" href="/oauth/dropbox/start">Sign in with Dropbox →</a>{{else}}<p class="wizard-status bad">Dropbox sign-in is not set up yet.</p><button type="button" class="secondary" onclick="navigate('settings')">Open sign-in settings</button>{{end}}</div><div class="row"><button type="button" class="secondary" onclick="showAccountStep(1)">← Back</button></div></div>
 </section>
 </section>
+<section class="view" id="view-sync-detail">
+ <div class="sync-detail-back"><button type="button" class="secondary" onclick="navigate('sync')">← My Syncs</button><button type="button" class="secondary" onclick="loadSyncRunList()">Refresh history</button></div>
+ <section class="panel sync-details-shell">
+  <div class="section-heading"><div><span class="mini-overline">SYNC DETAILS</span><h2 id="syncDetailTitle">Sync details</h2><p id="syncDetailSubtitle">Runs, files transferred, and why.</p></div></div>
+  <div id="syncDetailLive" class="sync-detail-live">Loading current status…</div>
+  <div class="sync-detail-columns">
+   <div class="sync-detail-run-column"><h3>Run history</h3><p class="muted">Choose a run to see exactly which files were processed.</p><div id="syncRunList" class="sync-run-list"></div><div id="syncRunPager" class="sync-detail-pager"></div></div>
+   <div class="sync-detail-files-column"><h3>File operations</h3><p id="syncRunSummary" class="muted">Select a run.</p><div id="syncRunEvents" class="sync-run-files"></div><div id="syncEventPager" class="sync-detail-pager"></div></div>
+  </div>
+ </section>
+</section>
 <section class="view" id="view-activity">
 <section class="panel live-sync-workspace" aria-label="Active synchronization runs"><div class="section-heading"><div><span class="mini-overline">WORK IN PROGRESS</span><h2>Active syncs</h2><p>Watch what needs copying, what is transferring, and stop a run without restarting Syncria.</p></div><span class="pill">Live</span></div><div id="activeSyncList" class="active-sync-list"><p class="muted">No sync is running right now.</p></div></section>
 <section class="panel live-activity-panel"><div class="section-heading"><div><h2>Live file activity</h2><p>Changes appear automatically as files are copied, replaced, or removed.</p></div><span class="pill">Live</span></div><div id="liveActivityFeed" class="live-activity-feed" aria-live="off"><p class="muted">Waiting for activity…</p></div></section>
@@ -299,13 +333,13 @@ code{overflow-wrap:anywhere}
  <div class="activity-score"><small>DATA TRANSFERRED</small><strong id="activityTransfer">—</strong><span>total</span></div>
 </div>
 <section class="activity-table-shell"><div class="section-heading"><div><span class="mini-overline">Sync results</span><h2>Sync details</h2><p>Numbers come from Syncria's actual transfer records.</p></div></div>
-{{range .Jobs}}<div class="activity-row"><div class="activity-row-head"><div><strong>{{.Name}}</strong><small>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} ↔ NAS{{else if eq .Provider "nas_bridge"}}NAS ↔ NAS{{else}}Existing folder sync{{end}}</small></div><span class="activity-state" data-activity-running="{{.ID}}">Loading results…</span></div>
+{{range .Jobs}}<div class="activity-row"><div class="activity-row-head"><div><strong><button type="button" class="sync-title-link" onclick="openSyncDetails('{{.ID}}')">{{.Name}}</button></strong><small>{{if eq .Provider "bridge"}}{{if eq .CloudProvider "dropbox"}}Dropbox{{else}}Google Drive{{end}} ↔ NAS{{else if eq .Provider "nas_bridge"}}NAS ↔ NAS{{else}}Existing folder sync{{end}}</small></div><span class="activity-state" data-activity-running="{{.ID}}">Loading results…</span></div>
 <div class="activity-row-numbers">
  <div><small>GOOD CHECKS</small><strong data-job-runs="{{.ID}}">{{.SuccessfulRuns}}</strong></div>
  <div><small>ERRORS</small><strong data-job-fails="{{.ID}}">{{.FailedRuns}}</strong></div>
  <div><small>FILES MOVED</small><strong data-job-files="{{.ID}}">—</strong></div>
  <div><small>BYTES MOVED</small><strong data-job-bytes="{{.ID}}">—</strong></div>
-</div><p class="activity-row-detail" data-job-detail="{{.ID}}">Loading most recent result…</p></div>{{else}}<div class="flow-library-empty"><strong>No activity yet</strong><p>Create a sync to see its results here.</p></div>{{end}}</section>
+</div><p class="activity-row-detail" data-job-detail="{{.ID}}">Loading most recent result…</p><button type="button" class="secondary" onclick="openSyncDetails('{{.ID}}')">View individual run history</button></div>{{else}}<div class="flow-library-empty"><strong>No activity yet</strong><p>Create a sync to see its results here.</p></div>{{end}}</section>
 </section>
 <section class="view" id="view-updates">
 <div class="workspace-intro"><div><p>Install updates here. Download, verification, and restart progress appear when an update runs.</p></div></div>
@@ -445,6 +479,111 @@ function previewSync(id){
   output.textContent='Live scan connection interrupted. No files were changed. Try again or check your reverse proxy streaming settings.';
  };
 }
+let selectedSyncID='',selectedSyncRunID='',runPageOffset=0,eventPageOffset=0;
+let lastSyncDashboardJobs=[];
+function makeHistoryNode(parent,tag,className,text){
+ const n=document.createElement(tag);
+ if(className)n.className=className;
+ if(text!==undefined)n.textContent=text;
+ parent.append(n);return n;
+}
+async function fetchSyncHistory(params){
+ const url='/api/sync/history?'+new URLSearchParams(params);
+ const result=await fetch(url,{credentials:'same-origin',cache:'no-store'});
+ if(!result.ok)throw Error('History request failed (HTTP '+result.status+').');
+ return await result.json();
+}
+function syncDurationText(run){
+ if(!run.ended||!run.started)return 'In progress';
+ const duration=Math.max(0,Date.parse(run.ended)-Date.parse(run.started));
+ return (duration/1000).toFixed(1)+'s';
+}
+function formatHistoryDate(value){return value?new Date(value).toLocaleString():'Unknown time'}
+function renderSyncDetailLive(){
+ if(!selectedSyncID)return;
+ const job=lastSyncDashboardJobs.find(j=>j.id===selectedSyncID);
+ const container=$('syncDetailLive');if(!container||!job)return;
+ const p=job.progress||{};
+ const label=job.running?'Running · '+(p.phase==='scanning'?'Checking '+(p.current||'file metadata'):(p.phase||'working'))+(p.phase==='scanning'?' · '+Number(p.processed||0)+' entries':'' ):'Idle'+(job.last_checked?' · Last fast check: '+job.last_checked:'');
+ const direction=job.direction==='one_way'?'One-way (cloud → NAS)':'Bidirectional (cloud ↔ NAS)';
+ const deletePolicy=job.propagate_deletions?'Deletes propagate to matching copies':'Deletes are not propagated';
+ const recovery=job.recovery_enabled?' · 10-minute deletion recovery enabled':' · deletion recovery disabled';
+ const watcher=job.schedule_mode==='changes'?(job.nas_watcher_verified?' · NAS change feed verified; fast checks eligible':' · Full NAS verification required until notifications are validated'):'';
+ container.textContent=label+' · '+(job.successful_runs||0)+' successful / '+(job.failed_runs||0)+' failed runs'+
+  ' · '+direction+' · '+deletePolicy+recovery+watcher+
+  (job.running?' · '+Number(p.uploads||0)+' sent, '+Number(p.downloads||0)+' received':'');
+}
+function openSyncDetails(id){
+ selectedSyncID=id;selectedSyncRunID='';runPageOffset=0;eventPageOffset=0;
+ const job=lastSyncDashboardJobs.find(j=>j.id===id);
+ $('syncDetailTitle').textContent=job?.name||'Sync details';
+ $('syncRunSummary').textContent='Select a run to inspect every file action.';
+ $('syncRunEvents').replaceChildren();
+ $('syncRunList').textContent='Loading run history…';
+ $('syncEventPager').replaceChildren();
+ renderSyncDetailLive();
+ navigate('sync-detail');
+ loadSyncRunList();
+}
+async function loadSyncRunList(more=false){
+ if(!selectedSyncID)return;
+ if(!more)runPageOffset=0;
+ const jobID=selectedSyncID;
+ const list=$('syncRunList'),pager=$('syncRunPager');
+ if(!more){list.replaceChildren();makeHistoryNode(list,'p','muted','Loading run history…')}
+ try{
+  const data=await fetchSyncHistory({id:jobID,offset:runPageOffset});
+  if(jobID!==selectedSyncID)return;
+  if(!more)list.replaceChildren();
+  if(!data.runs.length&&!more)makeHistoryNode(list,'p','muted','No detailed run records yet. Run history begins with this version; earlier runs only retained summary counts and up to 100 recent file events.');
+  for(const run of data.runs||[]){
+   const card=makeHistoryNode(list,'button','sync-history-run');
+   card.type='button';card.dataset.runId=run.id;
+   card.addEventListener('click',()=>loadSyncRun(run.id));
+   makeHistoryNode(card,'strong','sync-history-run-date',formatHistoryDate(run.started));
+   makeHistoryNode(card,'span','sync-history-run-status',run.status||'unknown');
+   makeHistoryNode(card,'small','sync-history-run-stats',Number(run.uploads||0)+' → destination · '+Number(run.downloads||0)+' → source · '+formatBytes(Number(run.upload_bytes||0)+Number(run.download_bytes||0))+' · '+syncDurationText(run));
+   makeHistoryNode(card,'small','sync-history-run-count',Number(run.event_count||0)+' file operations');
+  }
+  runPageOffset+=data.runs.length;
+  pager.replaceChildren();
+  if(data.more){
+   const next=makeHistoryNode(pager,'button','secondary','Older runs');
+   next.type='button';next.addEventListener('click',()=>loadSyncRunList(true));
+  }
+  if(!more&&data.runs.length)loadSyncRun(data.runs[0].id);
+ }catch(error){list.textContent='Unable to load run history: '+error.message;}
+}
+async function loadSyncRun(runID,more=false){
+ if(!selectedSyncID)return;
+ if(!more){selectedSyncRunID=runID;eventPageOffset=0;}
+ const id=selectedSyncID;
+ if(!more){$('syncRunEvents').replaceChildren();$('syncRunSummary').textContent='Loading recorded file operations…'}
+ try{
+  const data=await fetchSyncHistory({id,run:runID,offset:eventPageOffset});
+  if(id!==selectedSyncID||runID!==selectedSyncRunID)return;
+  for(const card of $('syncRunList').querySelectorAll('[data-run-id]'))card.classList.toggle('selected',card.dataset.runId===runID);
+  const r=data.run,container=$('syncRunEvents'),pager=$('syncEventPager');
+  if(!more)container.replaceChildren();
+  $('syncRunSummary').textContent=formatHistoryDate(r.started)+' · '+r.status+' · '+(r.uploads||0)+' destination / '+(r.downloads||0)+' source copies · '+formatBytes(Number(r.upload_bytes||0)+Number(r.download_bytes||0))+' · '+syncDurationText(r)+(r.error?' · '+r.error:'');
+  for(const event of data.events){
+   const item=makeHistoryNode(container,'div','sync-history-file');
+   const head=makeHistoryNode(item,'div','sync-history-file-head');
+   makeHistoryNode(head,'strong','',event.action||'operation');
+   makeHistoryNode(head,'span','',formatHistoryDate(event.at));
+   makeHistoryNode(item,'div','sync-history-file-path',event.path||'');
+   makeHistoryNode(item,'small','',event.from&&event.to?event.from+' → '+event.to:'');
+   if(event.reason)makeHistoryNode(item,'small','sync-history-file-reason',event.reason);
+  }
+  eventPageOffset+=data.events.length;
+  if(!eventPageOffset)makeHistoryNode(container,'p','muted','No files were transferred or changed in this run. Syncria checked metadata without touching unchanged file contents.');
+  pager.replaceChildren();
+  if(data.more){
+   const next=makeHistoryNode(pager,'button','secondary','Load more file operations');
+   next.type='button';next.addEventListener('click',()=>loadSyncRun(runID,true));
+  }
+ }catch(error){$('syncRunSummary').textContent='Unable to load run details: '+error.message;}
+}
 function navigate(view){
  if(!$('view-'+view))return;
  const feedback=$('actionFeedback');if(feedback&&currentView!==view)feedback.remove();
@@ -461,6 +600,7 @@ function navigate(view){
   storage:['Storage devices','MY NAS BOXES'],
   accounts:['Cloud connections','CLOUD ACCOUNTS'],
   activity:['Transfer activity','ACTIVITY'],
+  'sync-detail':['Sync details','SYNC DETAILS'],
   updates:['App updates','UPDATES'],
   settings:['Settings','PREFERENCES']
  };
@@ -1153,40 +1293,39 @@ function renderActiveSyncs(jobs){
   let phase=p.phase||'working';
   set('.active-sync-stage',phase==='scanning'?(p.initial_baseline?'Building initial file index':'Checking for changes'):phase==='stopping'?'Stopping safely…':phase==='transferring'?'Transferring files':phase==='processing'?'Checking changes':phase);
   const scanned=Number(p.processed||0),total=Number(p.total||0);
-  set('.active-sync-scanned',phase==='scanning'?scanned.toLocaleString()+' items discovered':total>0?scanned.toLocaleString()+' / '+total.toLocaleString()+' entries checked':'Preparing file list');
-  set('.active-sync-current',p.current?(phase==='scanning'?'Scanning: ':'Current file: ')+p.current:p.initial_baseline?'One-time cloud/NAS inventory: Syncria is building its persistent local file index. Larger collections may take longer the first time.':'Checking cloud/NAS changes against the local file index…');
+  set('.active-sync-scanned',phase==='scanning'?(p.current||'Location')+': '+scanned.toLocaleString()+' metadata entries':total>0?scanned.toLocaleString()+' / '+total.toLocaleString()+' entries checked':'Preparing file list');
+  set('.active-sync-current',phase==='scanning'?(p.initial_baseline?'Building initial file index: ':'Checking ') +(p.current||'remote metadata')+' · '+Object.entries(p.scan_counts||{}).map(([k,v])=>k+': '+Number(v).toLocaleString()).join(' · '):p.current?'Current transfer: '+p.current:'Checking cloud/NAS changes against the local file index…');
   set('.active-sync-bytes',formatBytes(Number(p.upload_bytes||0)+Number(p.download_bytes||0))+' transferred this run');
-  const counts=p.plan_counts||{};
-  const actionable=Object.entries(counts).filter(([a])=>a!=='unchanged').reduce((sum,[,n])=>sum+Number(n||0),0);
-  set('.active-sync-count',p.plan_counts?actionable.toLocaleString()+' file actions / exceptions':'Building transfer plan');
-  set('.active-sync-plan-label',p.plan_counts?'Files to copy, replace, delete, skip or review ('+actionable.toLocaleString()+')':'Planning transfers after the scans finish');
-  const rows=p.plan||[];
-  const signature=JSON.stringify(rows);
+  const recent=(p.events||[]).slice().reverse();
+  const isTransferring=phase==='transferring'&&!!p.current;
+  set('.active-sync-count',recent.length.toLocaleString()+' recent file operations');
+  set('.active-sync-plan-label','Actual file operations (not a speculative transfer plan)');
+  const signature=JSON.stringify({recent,current:p.current,transferring:isTransferring});
   if(card.dataset.planSignature!==signature){
    card.dataset.planSignature=signature;
    const list=card.querySelector('.active-sync-file-list');list.replaceChildren();
-   if(!rows.length)liveText(list,'p','muted',p.plan_counts?'No file changes planned.':'Waiting for the initial scan to finish…');
-   else for(const row of rows){
-    const item=liveText(list,'div','active-sync-file');item.dataset.filePath=row.path;
-    const main=liveText(item,'div','active-sync-file-main');
-    liveText(main,'strong','active-sync-file-action',row.action||'check');
-    const details=liveText(main,'div','active-sync-file-details');
-    liveText(details,'span','active-sync-file-path',row.path||'');
-    liveText(details,'small','active-sync-file-reason',row.reason||'No reason provided');
-    const initial=row.action==='skip'?'Skipped':row.action==='blocked'||row.action==='review'?'Needs attention':row.bytes?formatBytes(row.bytes)+' · queued':'Queued';
-    const meta=liveText(item,'small','active-sync-file-state',initial);
-    meta.dataset.base=initial;
+   if(isTransferring){
+    const row=liveText(list,'div','active-sync-file is-active');
+    const main=liveText(row,'div','active-sync-file-main');
+    liveText(main,'strong','active-sync-file-action','Transferring');
+    liveText(main,'span','active-sync-file-path',p.current);
+    liveText(row,'small','active-sync-file-state','In progress');
    }
-   if(p.plan_truncated)liveText(list,'p','muted','Showing the first 2,000 actionable files. The full plan is available from Test run · Preview changes.');
-  }
-  const changed=new Set((p.events||[]).filter(e=>/^(copy|delete|resolve|one-way)/i.test(e.action||'')).map(e=>e.path));
-  for(const item of card.querySelectorAll('.active-sync-file')){
-   const state=item.querySelector('.active-sync-file-state');if(!state)continue;
-   const path=item.dataset.filePath;
-   let status=changed.has(path)?'Completed':p.current===path?'Processing now':state.dataset.base||'Queued';
-   if(state.textContent!==status)state.textContent=status;
-   item.classList.toggle('is-active',status==='Processing now');
-   item.classList.toggle('is-done',status==='Completed');
+   for(const event of recent){
+    if(!event.path)continue;
+    const row=liveText(list,'div','active-sync-file is-done');
+    const main=liveText(row,'div','active-sync-file-main');
+    liveText(main,'strong','active-sync-file-action',event.action||'operation');
+    const details=liveText(main,'div','active-sync-file-details');
+    liveText(details,'span','active-sync-file-path',event.path);
+    liveText(details,'small','active-sync-file-reason',(event.from||'')+(event.to?' → '+event.to:''));
+    liveText(row,'small','active-sync-file-state','Recorded');
+   }
+   if(!recent.length&&!isTransferring)liveText(list,'p','muted','No file operations yet. Unchanged files are not listed. Use Test run / Preview for proposed changes.');
+   if(recent.length){
+    const all=liveText(list,'button','secondary','Open complete run history');
+    all.type='button';all.addEventListener('click',()=>openSyncDetails(job.id));
+   }
   }
  }
 }
@@ -1195,6 +1334,8 @@ let dashboardPollBusy=false,dashboardSessionExpired=false;
 function applyLiveStatus(data){
  if(!data||!Array.isArray(data.jobs))return;
  const jobs=data.jobs;
+ lastSyncDashboardJobs=jobs;
+ if(currentView==='sync-detail')renderSyncDetailLive();
  const active=jobs.filter(j=>j.running);
  renderActiveSyncs(jobs);
  const banner=$('liveSystemBar'),detail=$('liveSystemDetail'),dot=$('liveSystemDot');

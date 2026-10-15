@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-var appVersion = "v0.8.0"
+var appVersion = "v0.8.1"
 const folderMime = "application/vnd.google-apps.folder"
 const scope = "https://www.googleapis.com/auth/drive"
 
@@ -117,6 +117,7 @@ type Job struct {
 	Enabled     bool            `json:"enabled"`
 	State       map[string]Item `json:"state"`
 	LastRun     time.Time       `json:"last_run"`
+    LastChecked time.Time `json:"last_checked,omitempty"`
 	LastError   string          `json:"last_error"`
 	LastSummary string          `json:"last_summary"`
     RecentEvents []SyncActionEvent `json:"recent_events,omitempty"`
@@ -159,6 +160,10 @@ type App struct {
     index *syncIndex
     indexBroken bool
     watchers sync.Map
+    watchStateMu sync.Mutex
+    watchState map[string]*nasWatchCoverage
+    queuedRuns sync.Map
+    lastAttempt sync.Map
     runCancels sync.Map // job ID -> context.CancelFunc
     stopRequests sync.Map // job ID -> explicit user-requested stop
 	runs   sync.Map
@@ -684,6 +689,9 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     for k,v:=range j.CloudOriginHashes{job.CloudOriginHashes[k]=v}
 
     a.mu.Unlock()
+    runID,beginErr:=a.index.beginRun(jobID)
+    if beginErr!=nil{return fmt.Errorf("Cannot start durable run history: %w",beginErr)}
+    var journalErr error
     a.setSyncProgress(jobID,func(p *SyncProgress){*p=SyncProgress{Phase:"scanning",Running:true,Started:time.Now(),InitialBaseline:job.SuccessfulRuns==0 || len(job.PairStates)==0}})
     job.progressHook=func(up,down,upBytes,downBytes int64){
       a.setSyncProgress(jobID,func(p *SyncProgress){
@@ -693,12 +701,21 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     }
     job.scanHook=func(endpoint,rel string,count int64){
       a.setSyncProgress(jobID,func(p *SyncProgress){
-        p.Phase="scanning";p.Current=endpoint;p.Processed=count;p.Total=0
+        p.Phase="scanning";p.Current=endpoint;p.Processed=count;p.Total=0;p.ScanDetail=rel
+        if p.ScanCounts==nil{p.ScanCounts=map[string]int64{}}
+        p.ScanCounts[endpoint]=count
       })
     }
     job.operationHook=func(action,rel,from,to string){
+      event:=SyncActionEvent{At:time.Now().UTC(),Action:action,Path:rel,From:from,To:to,Reason:syncOperationReason(&job,action)}
+      if journalErr==nil {
+       if e:=a.index.appendRunEvent(jobID,runID,event);e!=nil{
+        journalErr=fmt.Errorf("Run history could not save file operation: %w",e)
+        runCancel()
+       }
+      }
       a.setSyncProgress(jobID,func(p *SyncProgress){
-        p.Events=append(p.Events,SyncActionEvent{At:time.Now(),Action:action,Path:rel,From:from,To:to})
+        p.Events=append(p.Events,event)
         if len(p.Events)>100{p.Events=p.Events[len(p.Events)-100:]}
       })
     }
@@ -707,6 +724,7 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     }
     job.transferHook=func(rel string){
       a.setSyncProgress(jobID,func(p *SyncProgress){p.Phase="transferring";p.Current=rel})
+      if job.operationHook!=nil{job.operationHook("transfer started",rel,"","")}
     }
     started := time.Now()
     job.LastUploads, job.LastDownloads = 0, 0
@@ -724,6 +742,11 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     default:
       err=fmt.Errorf("Unsupported sync provider: %s",job.Provider)
     }
+    if err!=nil{
+     progress:=a.getSyncProgress(jobID)
+     if progress.Current!=""&&job.operationHook!=nil{job.operationHook("transfer failed",progress.Current,"","")}
+    }
+    if journalErr!=nil{err=journalErr}
     recent:=a.getSyncProgress(jobID).Events
 	a.mu.Lock()
 	if actual := a.job(jobID); actual != nil {
@@ -759,6 +782,12 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
         }
 	}
     a.mu.Unlock()
+    status:="success"
+    if _,stopped:=a.stopRequests.Load(jobID);stopped{status="cancelled"}else if err!=nil{status="failed"}
+    if e:=a.index.finishRun(jobID,runID,status,job.LastSummary,func()string{if err!=nil{return err.Error()};return ""}(),job);e!=nil{
+      if err==nil{err=fmt.Errorf("Run history could not finalize: %w",e)}
+    }
+    if _,stopped:=a.stopRequests.Load(jobID);!stopped&&err==nil&&job.ScheduleMode=="changes"&&(job.Provider=="bridge"||job.Provider=="nas_bridge"){a.validatedNAS(jobID)}
     a.setSyncProgress(jobID,func(p *SyncProgress){
       p.Running=false
       if _,stopped:=a.stopRequests.Load(jobID);stopped {p.Phase="cancelled";p.Error=""} else if err!=nil {p.Phase="failed";p.Error=err.Error()} else {p.Phase="complete"}
@@ -1540,16 +1569,7 @@ func (a *App) scheduler(ctx context.Context) {
 			if j.Enabled && j.ScheduleMode=="changes" {
              if _,loaded:=a.watchers.LoadOrStore(j.ID,true);!loaded{go a.watchChangedJob(ctx,j.ID)}
             }
-            cadence:=j.Interval
-            if j.ScheduleMode=="changes"{cadence=5}
-            if j.Enabled && (j.LastRun.IsZero() || time.Since(j.LastRun) >= time.Duration(cadence)*time.Minute) {
-				id := j.ID
-				go func() {
-					if e := a.syncJob(ctx, id); e != nil && e.Error() != "job already running" {
-						log.Printf("sync job %s: %v", id, e)
-					}
-				}()
-			}
+            if syncCheckDue(j,time.Now()) {a.launchScheduledRun(ctx,j.ID,false)}
 		}
 	}
 }
@@ -1623,6 +1643,7 @@ func main() {
     mux.HandleFunc("/api/browse/nas/create", a.createNASFolder)
     mux.HandleFunc("/api/nas/action", a.directNASAction)
 	mux.HandleFunc("/api/dashboard/status", a.dashboardStatus)
+    mux.HandleFunc("/api/sync/history", a.syncHistoryAPI)
     mux.HandleFunc("/api/live", a.liveStatus)
     mux.HandleFunc("/api/sync/preview", a.previewSyncAPI)
     mux.HandleFunc("/api/sync/config", a.syncEditorConfig)
