@@ -135,3 +135,115 @@ body{background:var(--sd-background)}
  .sync-card-more-menu{right:0;min-width:min(260px,82vw)}
 }
 @media(prefers-reduced-motion:reduce){.relationship-card,.sync-details-tabs button{transition:none!important}}
+
+/* v0.8.3 — Alignment, spacing and recovery interaction polish.
+   Scoped to existing screens to avoid changing global component behavior. */
+#view-accounts .workspace-intro{align-items:center;gap:16px;margin-bottom:24px}
+#view-accounts .workspace-intro>div{flex:1;min-width:0}
+#view-accounts .workspace-intro>.primary{flex-shrink:0;min-height:40px;padding:10px 17px}
+#view-accounts .provider-grid{gap:18px;align-items:stretch}
+#view-accounts .provider-panel{display:flex;flex-direction:column;min-width:0;overflow:hidden;border-radius:12px}
+#view-accounts .provider-top{display:flex;align-items:center;gap:15px;padding:20px 23px;background:#f8fbfd;border-bottom:1px solid var(--sd-line)}
+#view-accounts .provider-top>div{flex:1;min-width:0}
+#view-accounts .provider-top .provider-count{flex:0 0 auto;margin-left:auto;font-size:11px;color:var(--sd-muted);white-space:nowrap}
+#view-accounts .provider-top h3{margin:3px 0 3px;line-height:1.35}
+#view-accounts .provider-top p{line-height:1.5}
+#view-accounts .provider-list{flex:1;padding:10px 22px 8px;min-height:72px}
+#view-accounts .provider-account{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border:0;border-bottom:1px solid #e8eef4;border-radius:0;background:transparent;box-shadow:none}
+#view-accounts .provider-account:last-child{border-bottom:0}
+#view-accounts .provider-account>div:first-child{flex:1;min-width:0}
+#view-accounts .provider-account strong{font-size:13px;line-height:1.45;overflow-wrap:anywhere}
+#view-accounts .provider-account small{font-size:12px;margin-top:3px}
+#view-accounts .provider-buttons{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex:none}
+#view-accounts .provider-buttons .secondary,
+#view-accounts .provider-buttons .danger{min-height:38px;border-radius:8px;padding:8px 14px;white-space:nowrap}
+#view-accounts .provider-buttons form.inline{margin:0;padding:0}
+#view-accounts .provider-empty{padding:18px 0 12px;line-height:1.5}
+#view-accounts .provider-add{width:100%;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 22px;min-height:50px;margin-top:auto;border:0;border-top:1px solid var(--sd-line);border-radius:0;background:#fafcfe;color:#1b638f;font-weight:650;font-size:13px}
+#view-accounts .provider-add:hover{background:#eef6fc}
+#view-accounts .connection-drawer{margin:26px 0 20px;overflow:hidden;min-width:0;border-radius:13px}
+#view-accounts .connection-drawer>.drawer-heading{align-items:center;padding:22px 26px;gap:18px;border-bottom:1px solid var(--sd-line);background:#fafcff}
+#view-accounts .connection-drawer>.drawer-heading>div{flex:1;min-width:0}
+#view-accounts .connection-drawer>.drawer-heading h3{margin:4px 0 5px;color:var(--sd-ink);font-size:19px;line-height:1.4}
+#view-accounts .connection-drawer>.drawer-heading p{margin:0;color:var(--sd-muted);font-size:13px;line-height:1.5}
+#view-accounts .connection-drawer>.drawer-heading button{min-width:86px;min-height:39px;align-self:center;border-radius:8px}
+#view-accounts .connection-drawer>.step-indicator{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:13px 26px;background:#f7fafc;border-bottom:1px solid #e7eef4}
+#view-accounts .connection-drawer>.step-indicator span{display:inline-flex;align-items:center;min-height:31px;padding:6px 12px;border-radius:7px;color:#6b8092;font-size:12px;font-weight:600}
+#view-accounts .connection-drawer>.step-indicator span.active{background:#e6f3fc;color:#176898}
+#view-accounts .connection-drawer>.step{padding:24px 26px 28px}
+#view-accounts .connection-drawer>.step>.field{max-width:680px;margin:0 0 13px;gap:9px}
+#view-accounts .connection-drawer>.step>.field select{display:block;width:100%;min-height:43px;padding:9px 13px}
+#view-accounts .connection-drawer>.step>.muted{font-size:12px;line-height:1.6;max-width:680px;margin:0 0 22px}
+#view-accounts .connection-drawer>.step>.row{display:flex;align-items:center;gap:10px 12px;flex-wrap:wrap;margin-top:16px}
+#view-accounts .connection-drawer>.step>.row button,
+#view-accounts .connection-drawer>.step a.primary{min-height:40px;padding:9px 17px;border-radius:8px}
+#view-accounts .connection-drawer>.step p{max-width:700px;line-height:1.55}
+#view-accounts .connection-drawer .wizard-status{margin:15px 0}
+#view-storage .connection-drawer{margin-top:22px}
+#view-storage .connection-drawer>.drawer-heading{padding:22px 25px}
+#view-storage .connection-drawer .field{gap:8px}
+#view-storage .connection-drawer form{padding:22px 25px}
+#view-storage .connection-drawer button{min-height:39px}
+#view-accounts .primary,#view-accounts .secondary,#view-accounts .danger,
+#view-storage .primary,#view-storage .secondary{align-items:center;justify-content:center}
+.recovery-summary{display:flex;align-items:center;justify-content:space-between;gap:14px 20px;padding:12px 16px;margin:12px 22px 17px;border:1px solid #d7e4ed;background:#f5f9fc;border-radius:10px}
+.recovery-summary-main{display:flex;align-items:center;gap:11px;min-width:0}
+.recovery-summary-main>div{min-width:0}
+.recovery-summary-main strong{display:block;font-size:13px;color:#234962;line-height:1.4}
+.recovery-summary-main small{display:block;margin-top:2px;font-size:12px;color:#617d91;line-height:1.5}
+.recovery-symbol{display:grid;place-items:center;width:37px;height:37px;border-radius:10px;background:#e5f2fa;color:#1d78a7;font-size:22px;flex:none}
+.recovery-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;min-height:22px;border-radius:12px;padding:2px 6px;margin-left:5px;background:#d7eaf8;color:#135b87;font-size:11px;font-variant-numeric:tabular-nums}
+.recovery-summary>.secondary{white-space:nowrap;flex:none;border-radius:8px;min-height:38px;padding:8px 13px}
+.recovery-dialog{position:fixed;inset:0;margin:auto;padding:0;width:min(790px,calc(100vw - 28px));max-width:none;max-height:min(84vh,800px);border:1px solid #cfdde9;border-radius:16px;background:#fff;color:var(--sd-ink);box-shadow:0 24px 90px #102d4757;overflow:hidden}
+.recovery-dialog[open]{display:flex;flex-direction:column}
+.recovery-dialog::backdrop{background:#102c44a6;backdrop-filter:blur(3px)}
+.recovery-dialog-shell{display:flex;flex-direction:column;min-height:0;width:100%}
+.recovery-dialog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;padding:24px 26px 20px;border-bottom:1px solid #e2eaf0}
+.recovery-dialog-header>div{min-width:0;flex:1}
+.recovery-dialog-header h2{margin:4px 0 7px;color:#193c55;font-size:22px;letter-spacing:-.02em}
+.recovery-dialog-header p{margin:0;font-size:13px;line-height:1.55;color:#688195}
+.recovery-dialog-header .recovery-close{min-height:37px;flex:none;border-radius:8px}
+.recovery-dialog-toolbar{display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px 26px;background:#f9fbfd;border-bottom:1px solid #e2ebf2}
+.recovery-dialog-toolbar label{display:grid;gap:7px;flex:1;max-width:440px;color:#415e74;font-size:12px;font-weight:650}
+.recovery-dialog-toolbar input{width:100%;min-height:41px;padding:9px 12px;border-radius:8px;border:1px solid #cddce8;background:#fff}
+.recovery-visible-count{font-size:12px;color:#687f91;padding-bottom:9px;white-space:nowrap}
+.recovery-dialog-items{min-height:60px;overflow:auto;flex:1;padding:4px 26px;overscroll-behavior:contain}
+.recovery-dialog-item{display:flex;align-items:center;justify-content:space-between;gap:12px 20px;padding:15px 0;border-bottom:1px solid #e9eef3}
+.recovery-dialog-item:last-child{border-bottom:none}
+.recovery-dialog-item-copy{min-width:0;flex:1}
+.recovery-dialog-item-copy strong{display:block;font-size:13px;line-height:1.5;color:#203e57;overflow-wrap:anywhere;font-weight:650}
+.recovery-dialog-item-copy small{display:block;margin-top:4px;font-size:11px;color:#708598}
+.recovery-dialog-item form.inline{padding:0;margin:0;flex:none}
+.recovery-dialog-item button{min-height:37px;border-radius:8px;white-space:nowrap}
+.recovery-dialog-empty{padding:30px 20px;text-align:center;color:#6f8597;font-size:13px}
+.recovery-dialog-footer{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:16px 26px;border-top:1px solid #e2ebf2;background:#f8fbfd}
+.recovery-dialog-footer span{font-size:12px;color:#6b7e90;line-height:1.5}
+.recovery-dialog-footer button{flex:none;min-height:37px}
+@media(max-width:700px){
+ #view-accounts .workspace-intro{align-items:stretch;flex-direction:column}
+ #view-accounts .workspace-intro>.primary{align-self:flex-start}
+ #view-accounts .provider-grid{gap:14px}
+ #view-accounts .provider-top{padding:17px}
+ #view-accounts .provider-top .provider-count{align-self:flex-start}
+ #view-accounts .provider-list{padding:6px 17px}
+ #view-accounts .provider-add{padding:14px 17px}
+ #view-accounts .provider-account{align-items:flex-start;flex-wrap:wrap}
+ #view-accounts .provider-buttons{width:100%;justify-content:flex-start}
+ #view-accounts .connection-drawer{margin-top:20px}
+ #view-accounts .connection-drawer>.drawer-heading{padding:18px;align-items:flex-start}
+ #view-accounts .connection-drawer>.drawer-heading button{min-width:75px}
+ #view-accounts .connection-drawer>.step-indicator{padding:11px 18px}
+ #view-accounts .connection-drawer>.step{padding:20px 18px 24px}
+ #view-storage .connection-drawer form{padding:18px}
+ .recovery-summary{margin:12px 17px 17px;align-items:flex-start;flex-direction:column}
+ .recovery-summary>.secondary{align-self:flex-start}
+ .recovery-dialog-header{padding:19px 18px 16px}
+ .recovery-dialog-header h2{font-size:20px}
+ .recovery-dialog-toolbar{padding:13px 18px;align-items:start}
+ .recovery-dialog-toolbar label{max-width:none;flex-basis:100%}
+ .recovery-visible-count{padding:0}
+ .recovery-dialog-items{padding:2px 18px}
+ .recovery-dialog-item{align-items:flex-start;flex-direction:column;gap:10px}
+ .recovery-dialog-footer{padding:14px 18px;align-items:flex-start}
+}
+@media(prefers-reduced-motion:reduce){.recovery-dialog::backdrop{backdrop-filter:none}}
