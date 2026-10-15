@@ -1602,6 +1602,7 @@ func main() {
  indexed,err:=loadSyncIndex(indexPath)
  if err!=nil{log.Fatal("File index unavailable, refusing to start sync: ",err)}
  defer indexed.Close()
+ if a.cfg.FileIndexVersion>=1 {if err=indexed.requireIndexedJobs(a.cfg.Jobs);err!=nil{log.Fatal("Previously indexed data is missing; sync prevented: ",err)}}
  if err=indexed.hydratePairs(a.cfg.Jobs);err!=nil{log.Fatal("File index migration failed: ",err)}
  a.index=indexed
  if err=a.save();err!=nil{log.Fatal("Saving migrated index state failed: ",err)}
