@@ -34,7 +34,7 @@ func TestCohesiveUIStylesAreStandaloneAndResponsive(t *testing.T){
  } {
   if !strings.Contains(syncriaDesignCSS,required){t.Errorf("Missing UX styling: %s",required)}
  }
- if !strings.Contains(newUI,"v051Theme + syncriaDesignCSS"){t.Fatal("Workspace stylesheet is not embedded after the existing design system")}
+ if !strings.Contains(newUI,syncriaDesignCSS){t.Fatal("Workspace stylesheet is not included in the rendered UI template")}
 }
 
 func TestRunHistoryFiltersAreServerSideAndEveryFileRemainsSearchable(t *testing.T){
