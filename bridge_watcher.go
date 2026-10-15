@@ -46,7 +46,7 @@ func (a *App) watchBridgeChanges(ctx context.Context,id string) {
   if err!=nil{log.Printf("Syncria SMB change notification setup: %v",err);continue}
   monitors=append(monitors,struct{share StorageShare;folder string}{share:share,folder:d.Folder})
  }
- a.setNASWatchExpected(id,len(monitors))
+ a.setNASWatchExpected(id,len(watched))
  for _,monitor:=range monitors {go a.monitorSMBChanges(watchCtx,id,monitor.share,monitor.folder,events)}
  if len(monitors)==0 {
   log.Printf("Syncria relationship %s has no NAS folder available for remote events; using periodic reconciliation",id)
