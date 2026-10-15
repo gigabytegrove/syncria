@@ -72,18 +72,19 @@ func (a *App) noRemoteChanges(ctx context.Context,j Job)(bool,error){
 // Prevent scheduler and NAS watchers from creating multiple pending goroutines
 // for the same relationship. syncJob provides a second, atomic running guard
 // for manual starts and other call sites.
-func (a *App) launchScheduledRun(ctx context.Context,id string,fromWatcher bool){
- if ctx.Err()!=nil{return}
- if _,busy:=a.runs.Load(id);busy{return}
- if _,queued:=a.queuedRuns.LoadOrStore(id,true);queued{return}
+func (a *App) reserveScheduledRun(id string)bool{
+ if _,busy:=a.runs.Load(id);busy{return false}
+ if _,queued:=a.queuedRuns.LoadOrStore(id,true);queued{return false}
  now:=time.Now()
- if last,ok:=a.lastAttempt.Load(id);ok{
-  if now.Sub(last.(time.Time))<changeRunCooldown {
-   a.queuedRuns.Delete(id)
-   return
-  }
+ if last,ok:=a.lastAttempt.Load(id);ok&&now.Sub(last.(time.Time))<changeRunCooldown{
+  a.queuedRuns.Delete(id)
+  return false
  }
  a.lastAttempt.Store(id,now)
+ return true
+}
+func (a *App) launchScheduledRun(ctx context.Context,id string,fromWatcher bool){
+ if ctx.Err()!=nil||!a.reserveScheduledRun(id){return}
  go func(){
   defer a.queuedRuns.Delete(id)
   a.mu.Lock()
@@ -92,6 +93,9 @@ func (a *App) launchScheduledRun(ctx context.Context,id string,fromWatcher bool)
   candidate:=*job
   a.mu.Unlock()
   if _,busy:=a.runs.Load(id);busy{return}
+  // Changes caused by Syncria's own just-completed transfer can arrive
+  // after the run. Do not start a fresh complete scan immediately.
+  if fromWatcher&&!candidate.LastRun.IsZero()&&time.Since(candidate.LastRun)<changeRunCooldown{return}
   if !fromWatcher {
    unchanged,err:=a.noRemoteChanges(ctx,candidate)
    if err!=nil{
