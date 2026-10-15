@@ -132,9 +132,16 @@ func applyDriveDelta(snapshot driveTreeSnapshot,changes []driveDeltaChange)(map[
  for _,change:=range changes{
   existingPath,known:=byID[change.FileID]
   old:=next[existingPath]
-  if (known&&old.MimeType==folderMime)||(!change.Removed&&change.File.MimeType==folderMime){
-   return nil,false // folder structure change: full rescan
+  if known&&old.MimeType==folderMime{return nil,false}
+  if !change.Removed&&change.File.MimeType==folderMime{
+   // Ignore unrelated account folders; only a folder in this subtree
+   // requires rebuilding child paths and descendant membership.
+   for _,parent:=range change.File.Parents{if _,inside:=folderIDs[parent];inside{return nil,false}}
+   continue
   }
+  // Removed can also mean loss of access, not necessarily user deletion.
+  // Reinventory before planning deletions on either endpoint.
+  if change.Removed && known{return nil,false}
   if known{delete(next,existingPath);delete(byID,change.FileID)}
   if change.Removed {continue}
   f:=change.File
