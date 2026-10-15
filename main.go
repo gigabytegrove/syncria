@@ -117,6 +117,7 @@ type Job struct {
 	Enabled     bool            `json:"enabled"`
 	State       map[string]Item `json:"state"`
 	LastRun     time.Time       `json:"last_run"`
+    LastChecked time.Time `json:"last_checked,omitempty"`
 	LastError   string          `json:"last_error"`
 	LastSummary string          `json:"last_summary"`
     RecentEvents []SyncActionEvent `json:"recent_events,omitempty"`
@@ -159,6 +160,10 @@ type App struct {
     index *syncIndex
     indexBroken bool
     watchers sync.Map
+    watchStateMu sync.Mutex
+    watchState map[string]*nasWatchCoverage
+    queuedRuns sync.Map
+    lastAttempt sync.Map
     runCancels sync.Map // job ID -> context.CancelFunc
     stopRequests sync.Map // job ID -> explicit user-requested stop
 	runs   sync.Map
@@ -780,6 +785,7 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
     if e:=a.index.finishRun(jobID,runID,status,job.LastSummary,func()string{if err!=nil{return err.Error()};return ""}(),job);e!=nil{
       if err==nil{err=fmt.Errorf("Run history could not finalize: %w",e)}
     }
+    if err==nil&&job.ScheduleMode=="changes"&&(job.Provider=="bridge"||job.Provider=="nas_bridge"){a.validatedNAS(jobID)}
     a.setSyncProgress(jobID,func(p *SyncProgress){
       p.Running=false
       if _,stopped:=a.stopRequests.Load(jobID);stopped {p.Phase="cancelled";p.Error=""} else if err!=nil {p.Phase="failed";p.Error=err.Error()} else {p.Phase="complete"}
@@ -1563,14 +1569,11 @@ func (a *App) scheduler(ctx context.Context) {
             }
             cadence:=j.Interval
             if j.ScheduleMode=="changes"{cadence=5}
-            if j.Enabled && (j.LastRun.IsZero() || time.Since(j.LastRun) >= time.Duration(cadence)*time.Minute) {
-				id := j.ID
-				go func() {
-					if e := a.syncJob(ctx, id); e != nil && e.Error() != "job already running" {
-						log.Printf("sync job %s: %v", id, e)
-					}
-				}()
-			}
+            lastCheck:=j.LastRun
+            if j.LastChecked.After(lastCheck){lastCheck=j.LastChecked}
+            if j.Enabled && (lastCheck.IsZero() || time.Since(lastCheck) >= time.Duration(cadence)*time.Minute) {
+              a.launchScheduledRun(ctx,j.ID,false)
+            }
 		}
 	}
 }
