@@ -152,7 +152,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
      })
     }
     if err!=nil{return err}
-    next[rel]=Item{ID:l.ID,MD5:l.Fingerprint,LocalMD5:r.Fingerprint,Folder:l.Folder}
+    next[rel]=indexedPairItem(l,r)
     if !l.Folder{recordTransfer(j,true,copied);countForward++;if j.operationHook!=nil{j.operationHook("copy",rel,"Primary","Secondary")}}
     continue
    }
@@ -231,8 +231,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     a.clearConflict(j,key,rel)
    }
   }else{
-   changedPrimary:=prior.MD5!=l.Fingerprint|| (prior.ID!=""&&l.ID!=""&&prior.ID!=l.ID)
-   changedSecondary:=prior.LocalMD5!=r.Fingerprint
+   changedPrimary,changedSecondary:=metadataChanged(prior,l,r)
    if changedPrimary&&changedSecondary{
     if oneWay&&j.Provider=="nas_bridge"{return fmt.Errorf("Both files changed at %s; one-way NAS relationship will not overwrite them",rel)}
     if oneWay{
@@ -273,7 +272,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     }
    }
   }
-  next[rel]=Item{ID:l.ID,MD5:l.Fingerprint,LocalMD5:r.Fingerprint}
+  next[rel]=indexedPairItem(l,r)
   j.PairStates[key]=next
   if i%20==0 {if err=a.checkpointBridge(j);err!=nil{return err}}
   if j.itemHook!=nil{j.itemHook(int64(i+1),int64(len(ordered)),"")}
