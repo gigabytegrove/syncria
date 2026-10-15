@@ -133,6 +133,7 @@ type Job struct {
     TotalDownloadBytes int64 `json:"total_download_bytes"`
 }
 type Config struct {
+    FileIndexVersion int `json:"file_index_version,omitempty"`
 	Salt         string    `json:"salt"`
 	PasswordHash string    `json:"password_hash"`
 	Secret       string    `json:"secret"`
@@ -228,6 +229,7 @@ func (a *App) save() error {
  }
  cfg:=a.cfg
  if a.index!=nil {
+  cfg.FileIndexVersion=1
   // The separate DB is authoritative. Keep the user-facing settings file
   // small, even with hundreds of thousands of indexed files.
   cfg.Jobs=append([]Job(nil),a.cfg.Jobs...)
@@ -1593,7 +1595,11 @@ func main() {
    if err=os.WriteFile(backup,oldData,0600);err!=nil{log.Fatal("Index migration backup failed: ",err)}
   }
  }
- indexed,err:=loadSyncIndex(filepath.Join(dir,"syncria-index.db"))
+ indexPath:=filepath.Join(dir,"syncria-index.db")
+ if a.cfg.FileIndexVersion>=1 {
+  if _,err:=os.Stat(indexPath);err!=nil {log.Fatal("Indexed state exists but its database is missing or inaccessible; refusing to rebaseline: ",err)}
+ }
+ indexed,err:=loadSyncIndex(indexPath)
  if err!=nil{log.Fatal("File index unavailable, refusing to start sync: ",err)}
  defer indexed.Close()
  if err=indexed.hydratePairs(a.cfg.Jobs);err!=nil{log.Fatal("File index migration failed: ",err)}
