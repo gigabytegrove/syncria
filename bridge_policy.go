@@ -123,6 +123,7 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
  })
  var countForward,countBack int64
  for i,rel:=range ordered{
+  transfersBefore:=j.LastUploads+j.LastDownloads
   if ignoredSyncPath(rel){continue}
   if err:=ctx.Err();err!=nil{return err}
   if isPending(j,key,rel){continue}
@@ -154,6 +155,8 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     if err!=nil{return err}
     next[rel]=indexedPairItem(l,r)
     if !l.Folder{recordTransfer(j,true,copied);countForward++;if j.operationHook!=nil{j.operationHook("copy",rel,"Primary","Secondary")}}
+    j.PairStates[key]=next
+    if err=a.checkpointBridge(j);err!=nil{return err}
     continue
    }
    surviving:=secondary;survivor:=r
@@ -274,7 +277,11 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
   }
   next[rel]=indexedPairItem(l,r)
   j.PairStates[key]=next
-  if i%20==0 {if err=a.checkpointBridge(j);err!=nil{return err}}
+  // Commit every completed transfer before proceeding; unchanged initial
+  // matches are checkpointed in batches to keep first-time indexing fast.
+  if j.LastUploads+j.LastDownloads!=transfersBefore || i%128==0 {
+   if err=a.checkpointBridge(j);err!=nil{return err}
+  }
   if j.itemHook!=nil{j.itemHook(int64(i+1),int64(len(ordered)),"")}
  }
  j.PairStates[key]=next
