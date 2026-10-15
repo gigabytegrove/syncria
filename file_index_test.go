@@ -116,3 +116,12 @@ func TestBrokenIndexFailsClosed(t *testing.T){
  if err=app.save();err==nil{t.Fatal("A closed index cannot acknowledge a transfer")}
  if !app.indexBroken{t.Fatal("Index failure must block future syncs")}
 }
+
+func TestIndexedVersionCannotSilentlyRebaselineMissingDBRecords(t *testing.T){
+ idx,err:=loadSyncIndex(filepath.Join(t.TempDir(),"index.db"));if err!=nil{t.Fatal(err)}
+ defer idx.Close()
+ jobs:=[]Job{{ID:"previously-synced",Name:"Important Google Drive to NAS relationship"}}
+ if err=idx.requireIndexedJobs(jobs);err==nil{t.Fatal("Missing indexed job must stop startup")}
+ if err=idx.hydratePairs(jobs);err!=nil{t.Fatal(err)}
+ if err=idx.requireIndexedJobs(jobs);err!=nil{t.Fatalf("Valid empty newly migrated relationship should be allowed: %v",err)}
+}
