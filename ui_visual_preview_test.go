@@ -34,7 +34,11 @@ func TestProduceUIBrowserPreview(t *testing.T){
    {ID:"nas-two",Label:"Backup NAS",Protocol:"smb",Server:"192.168.1.30",Export:"Family"},
   },
   Jobs:[]Job{
-   {ID:"photos",Provider:"bridge",CloudProvider:"google_drive",Name:"Family Photos",Enabled:true,Interval:5,ScheduleMode:"interval",SuccessfulRuns:142,TotalUploads:242,TotalDownloads:36,LastSummary:"Everything is up to date",LastRun:time.Now().Add(-12*time.Minute),NASDestinations:[]NASDestination{{ShareID:"nas-one",Folder:"Pictures"}}},
+   {ID:"photos",Provider:"bridge",CloudProvider:"google_drive",Name:"Family Photos",Enabled:true,Interval:5,ScheduleMode:"interval",SuccessfulRuns:142,TotalUploads:242,TotalDownloads:36,LastSummary:"Everything is up to date",LastRun:time.Now().Add(-12*time.Minute),NASDestinations:[]NASDestination{{ShareID:"nas-one",Folder:"Pictures"}},PendingDeletions:[]PendingDeletion{
+    {Pair:"photos-nas-one",Path:"Family Photos/2025/Vacation/Photo-01.jpg",Expires:time.Now().Add(8*time.Minute)},
+    {Pair:"photos-nas-one",Path:"Family Photos/2025/Vacation/Photo-02.jpg",Expires:time.Now().Add(7*time.Minute)},
+    {Pair:"photos-nas-one",Path:"Family Photos/2025/Vacation/Video-03.mov",Expires:time.Now().Add(6*time.Minute)},
+   }},
    {ID:"backup",Provider:"nas_bridge",Name:"NAS Backup",Enabled:false,Interval:30,Direction:"one_way",SuccessfulRuns:29,LastSummary:"Paused by user",NASDestinations:[]NASDestination{{ShareID:"nas-two",Folder:"Documents"}}},
   },
  }
