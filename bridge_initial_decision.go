@@ -7,7 +7,7 @@ import (
 
 // firstRunDecision is the single decision rule for both the read-only plan
 // and the first real synchronization. It does not inspect checkpoint history.
-// Actual execution must compare bytes before applying this direction.
+// Execution reads file bytes only if a metadata-based decision requires a transfer.
 type firstRunDecision struct {
  Direction string
  Method string
@@ -17,7 +17,7 @@ type firstRunDecision struct {
 // Cloud-to-NAS relationships have historically persisted ConflictPolicy:
 // "manual" even though the user did not select it. First-run decisions use
 // a SEPARATE optional preference, defaulting to "newer" for existing jobs.
-// This does not change the ongoing manual conflict rule.
+// Ongoing cloud conflicts use newer timestamps; first-run preference remains independent.
 func firstRunPolicy(j *Job, ongoingPolicy string) string {
  if j.Provider=="bridge" {
   if validNASPolicy(j.InitialConflictPolicy){return j.InitialConflictPolicy}
@@ -36,12 +36,12 @@ func decideFirstRun(j *Job,key,rel string,l,r bridgeEntry,oneWay bool,ongoingPol
   return firstRunDecision{Reason:"One-way NAS relationship: existing different destination files require review; source-side changes do not upload backward."}
  }
  if oneWay {
-  return firstRunDecision{Direction:"primary",Method:conflictPrimary,Reason:"One-way relationship: source wins; content is checked first, and NAS changes are never uploaded to the source."}
+  return firstRunDecision{Direction:"primary",Method:conflictPrimary,Reason:"One-way relationship: source wins; unchanged files are never opened, and NAS edits are not uploaded to the source."}
  }
  if override:=j.ConflictOverrides[key+"|"+rel];override!=""{
   switch override {
   case "primary","secondary":
-   return firstRunDecision{Direction:override,Method:override,Reason:"Explicit file-level conflict selection; contents will be compared before any replacement."}
+   return firstRunDecision{Direction:override,Method:override,Reason:"Explicit file-level conflict selection; replacement data is streamed only if required."}
   case conflictKeepBoth:
    return firstRunDecision{Direction:"primary",Method:conflictKeepBoth,Reason:"Explicit choice to preserve both versions."}
   }
@@ -68,7 +68,7 @@ func decideFirstRun(j *Job,key,rel string,l,r bridgeEntry,oneWay bool,ongoingPol
   direction:="primary"
   if gap<0{direction="secondary"}
   return firstRunDecision{Direction:direction,Method:conflictNewer,
-   Reason:fmt.Sprintf("First run: newer modification timestamp wins (primary %s; secondary %s). Content is compared before execution; identical copies are not overwritten.",fileModifiedText(l.Modified),fileModifiedText(r.Modified))}
+   Reason:fmt.Sprintf("First run: newer modification timestamp wins (primary %s; secondary %s). Metadata is compared without reading file bodies; matching metadata is skipped.",fileModifiedText(l.Modified),fileModifiedText(r.Modified))}
  case conflictManual:
   return firstRunDecision{Reason:fmt.Sprintf("Manual conflict policy: primary %s; secondary %s. Choose the version to keep.",fileModifiedText(l.Modified),fileModifiedText(r.Modified))}
  default:
