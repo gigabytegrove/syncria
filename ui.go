@@ -368,6 +368,7 @@ code{overflow-wrap:anywhere}
    </div>
    <div class="sync-detail-section"><h3>Current status</h3><div id="syncDetailLive" class="sync-detail-live" aria-live="polite">Loading live status…</div><p class="sync-detail-note" id="syncDetailWatchNote">Synchronization checks use saved file metadata and change detection where supported.</p></div>
    <div class="sync-detail-section"><div class="sync-run-history-heading"><h3>Latest run</h3><button type="button" class="secondary" onclick="showSyncDetailTab('history')">Browse every run →</button></div><div id="syncDetailLastRun" class="sync-detail-empty"><strong>No detailed run loaded yet</strong><p>The most recent result will appear here. Older versions recorded totals rather than full file-by-file history.</p></div></div>
+   <div class="sync-detail-section hidden" id="syncDetailRecoveryBar"><div class="sync-run-history-heading"><h3>Recently deleted files</h3><button type="button" class="secondary" onclick="openRecoveryDialog(selectedSyncID)">Review &amp; restore <span id="syncDetailRecoveryCount"></span> →</button></div><p class="sync-detail-note">Recover eligible files before their undo window expires.</p></div>
    <div class="sync-detail-section"><h3>What happens to your files</h3><div class="sync-detail-pairs">
     <div class="sync-detail-pair"><small>Transfer direction</small><strong id="syncDetailDirection">—</strong></div>
     <div class="sync-detail-pair"><small>Deletion behavior</small><strong id="syncDetailDeletion">—</strong></div>
@@ -573,6 +574,8 @@ let recoveryDialogReturnFocus=null;
 function openRecoveryDialog(id){
  const dialog=document.getElementById('recovery-'+id);
  if(!dialog||typeof dialog.showModal!=='function')return;
+ // A native dialog must not remain beneath a hidden SPA view.
+ if(dialog.parentElement!==document.body)document.body.append(dialog);
  recoveryDialogReturnFocus=document.activeElement;
  if(dialog.open)return;
  const input=document.getElementById('recovery-search-'+id);
@@ -747,6 +750,11 @@ function renderSyncDetailLive(){
  const deletion=job.propagate_deletions?'Deletions propagate to previously synchronized copies':'Deletions are not shared';
  const recovery=job.recovery_enabled?'10-minute deletion undo enabled':'Deletion undo disabled';
  const schedule=job.schedule_mode==='changes'?'On changes · five-minute checks':'Every configured interval';
+ const recovered=document.querySelector('[data-recovery-summary="'+CSS.escape(selectedSyncID)+'"]');
+ const recoveryBar=$('syncDetailRecoveryBar');
+ if(recoveryBar)recoveryBar.classList.toggle('hidden',!recovered);
+ const recoveries=$('syncDetailRecoveryCount');
+ if(recoveries)recoveries.textContent=recovered?.querySelector('.recovery-count')?.textContent?.trim()||'';
  const watcher=job.schedule_mode==='changes'?(job.nas_watcher_verified?'NAS watcher verified; fast checks eligible':'NAS watcher unverified; a full metadata check may be required'):'Periodic scheduled checks';
  const recent=job.last_checked?'Last quick check '+job.last_checked:'No quick check recorded';
  const line=job.running?(p.phase==='scanning'?'Reading '+(p.current||'metadata')+' · '+Number(p.processed||0).toLocaleString()+' entries':p.phase==='transferring'?'Transferring '+(p.current||'file'):p.phase||'Working')+' · '+formatBytes(Number(p.upload_bytes||0)+Number(p.download_bytes||0))+' moved this run':recent+' · '+watcher;
