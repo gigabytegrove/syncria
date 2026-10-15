@@ -204,6 +204,29 @@ func (a *App) remoteTreeIndexed(ctx context.Context,account,root string,onScan f
  return files,nil
 }
 
+// Preview may reuse an existing Drive index and request a read-only delta,
+// but must never advance its persisted cursor or write any checkpoint.
+// A later live sync will replay those changes from the previous cursor.
+func (a *App) remoteTreePreviewIndexed(ctx context.Context,account,root string,onScan func(string,int64))(map[string]driveFile,error){
+ if a.index==nil{return a.remoteTreeProgress(ctx,account,root,onScan)}
+ snapshot,exists,err:=a.index.getDriveTree(account,root)
+ if err!=nil{return nil,err}
+ if !exists||time.Since(snapshot.FullScanAt)>=24*time.Hour{
+  return a.remoteTreeProgress(ctx,account,root,onScan)
+ }
+ changes,_,err:=a.driveChanges(ctx,account,snapshot.Cursor)
+ if err!=nil{
+  if strings.Contains(err.Error(),"HTTP 410")||strings.Contains(err.Error(),"full scan required"){
+   return a.remoteTreeProgress(ctx,account,root,onScan)
+  }
+  return nil,err
+ }
+ files,safe:=applyDriveDelta(snapshot,changes)
+ if !safe{return a.remoteTreeProgress(ctx,account,root,onScan)}
+ if onScan!=nil{onScan("Drive read-only index",int64(len(changes)))}
+ return files,nil
+}
+
 // Sorted filenames help tests ensure deterministic collision handling.
 func sortedDrivePaths(files map[string]driveFile)[]string{
  names:=make([]string,0,len(files));for n:=range files{names=append(names,n)};sort.Strings(names);return names
