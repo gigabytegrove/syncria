@@ -77,6 +77,7 @@ func (b *bridgeDriveEndpoint) Scan(ctx context.Context)(map[string]bridgeEntry,e
  b.files=files
  out:=make(map[string]bridgeEntry,len(files))
  for rel,f:=range files{
+  if ignoredSyncPath(rel){continue}
   size,_:=strconv.ParseInt(f.Size,10,64)
   if f.MimeType==folderMime{b.folders[rel]=f.ID;out[rel]=bridgeEntry{ID:f.ID,Folder:true};continue}
   if strings.HasPrefix(f.MimeType,"application/vnd.google-apps.") {
