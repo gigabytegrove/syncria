@@ -68,7 +68,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          existing="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${REL}" --jq '.object.sha' 2>/dev/null || true)"
+          existing="$(git ls-remote --tags origin "refs/tags/${REL}" | awk '{print $1}')"
+          echo "Published ref: ${existing:-<none>}; source commit: $GITHUB_SHA"
           if [[ -n "$existing" && "$existing" != "$GITHUB_SHA" ]]; then
             echo "::error::Alpha tag already exists at a different commit; refusing to overwrite release"
             exit 1
