@@ -604,7 +604,7 @@ code{overflow-wrap:anywhere}
    <h3>Name the computer</h3>
    <p>Enter the friendly name you'll see in My Computers. The command will detect Windows/Linux and the CPU architecture automatically.</p>
    <label class="field">Computer name<input id="computerPairLabel" autocomplete="off" placeholder="Office desktop" maxlength="80" required></label>
-   <p class="muted">Syncria generates a private, single-use 20-minute invitation. No IP address, pairing key, certificate fingerprint, or manual download is needed.</p>
+   <p class="muted">Syncria generates a single-use 20-minute invitation. No IP address, pairing key, certificate fingerprint, or manual download is needed. LAN HTTP and HTTPS are both supported.</p>
   </div>
   <div id="computerStep2" class="computer-setup-step hidden">
    <h3>Copy one command onto that computer</h3>
@@ -1152,8 +1152,8 @@ async function computerSetupNext(){
  if(computerSetupStep!==1)return;
  const label=$('computerPairLabel').value.trim();
  if(!label){$('computerPairMessage').textContent='Name this computer before continuing.';return;}
- if(location.protocol!=='https:'){
-  $('computerPairMessage').textContent='One-command enrollment requires Syncria to be opened using trusted HTTPS (not HTTP).';return;
+ if(location.protocol!=='https:'&&location.protocol!=='http:'){
+  $('computerPairMessage').textContent='Open Syncria over HTTP on your private LAN or over HTTPS to enroll an agent.';return;
  }
  $('computerStepNext').disabled=true;
  $('computerPairMessage').textContent='Creating a secure, single-use invitation…';
@@ -1171,6 +1171,9 @@ async function computerSetupNext(){
   $('computerLinuxCommand').textContent=computerBootstrapCommands.linux;
   $('computerInviteExpiry').textContent='Expires '+new Date(issued.expires_at).toLocaleTimeString()+' · Single use';
   computerSetupShow(2);
+  if(location.protocol==='http:'){
+   $('computerPairMessage').textContent='LAN HTTP mode: installation and initial pairing traffic are unencrypted. Use this on a trusted private network only. Direct file transfers remain encrypted with pinned HTTPS.';
+  }
   $('computerEnrollState').textContent='Waiting for agent installation and secure connection…';
   $('computerEnrollDetail').textContent='Agent address and pairing credentials will be detected and verified automatically.';
   if(computerEnrollmentPoll)clearInterval(computerEnrollmentPoll);
@@ -1182,10 +1185,24 @@ function computerSetupBack(){closeComputerOnboard();openComputerOnboard();}
 async function copyComputerBootstrap(which){
  const code=computerBootstrapCommands[which];
  if(!code)return;
- try{
-  await navigator.clipboard.writeText(code);
-  $('computerPairMessage').textContent=(which==='ps'?'PowerShell':which==='cmd'?'CMD':'Linux')+' command copied. Run it on the computer you are adding.';
- }catch(error){$('computerPairMessage').textContent='Clipboard unavailable. Select the command text and copy it manually.';}
+ let copied=false;
+ if(navigator.clipboard&&window.isSecureContext){
+  try{await navigator.clipboard.writeText(code);copied=true;}catch(error){}
+ }
+ // Navigator Clipboard requires a secure context in many browsers. The
+ // legacy selection-copy path keeps HTTP LAN installations usable.
+ if(!copied){
+  const field=document.createElement('textarea');
+  field.value=code;field.readOnly=true;field.setAttribute('aria-label','Syncria setup command');
+  field.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:0';
+  document.body.append(field);
+  field.focus();field.select();field.setSelectionRange(0,field.value.length);
+  try{copied=document.execCommand('copy');}catch(error){}
+  field.remove();
+ }
+ $('computerPairMessage').textContent=copied?
+  (which==='ps'?'PowerShell':which==='cmd'?'CMD':'Linux')+' command copied. Run it on the computer you are adding.':
+  'Automatic clipboard copy was blocked by the browser. Select the command above and copy it normally.';
 }
 async function checkComputerEnrollment(){
  if(!computerEnrollmentCode||computerSetupStep!==2)return;
