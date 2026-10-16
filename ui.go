@@ -135,6 +135,65 @@ code{overflow-wrap:anywhere}
 .channel-choice-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:16px}
 .channel-choice-footer p{margin:0}
 @media(max-width:760px){.channel-choice-grid{grid-template-columns:minmax(0,1fr)}.channel-choice{min-height:0}}
+
+/* Standalone direct-connections workspaces */
+.computer-overview-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.computer-overview-stat{background:#fff;border:1px solid #dae6ef;border-radius:13px;padding:17px;min-width:0}
+.computer-overview-stat>*{display:block}
+.computer-overview-stat small{font-size:10px;letter-spacing:.10em;font-weight:750;color:#698097}
+.computer-overview-stat strong{font-size:28px;line-height:1.45;color:#173a5a}
+.computer-overview-stat span{color:#607b90;font-size:12px}
+.computer-card-grid{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:14px;gap:14px}
+.computer-device-card{display:grid;gap:14px;padding:18px;border:1px solid #dde8f0;border-radius:14px;min-width:0;background:#fff}
+.computer-device-heading{display:flex;align-items:center;gap:13px;min-width:0}
+.computer-device-icon{display:grid;place-items:center;width:47px;height:47px;flex:none;border-radius:11px;background:#eaf5fc;color:#23658b;font-size:22px}
+.computer-device-name{min-width:0;flex:1}.computer-device-name strong{display:block;overflow-wrap:anywhere;font-size:16px}.computer-device-name small{display:block;overflow-wrap:anywhere;color:#738a9e;font-size:12px;margin-top:3px}
+.computer-device-status{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:100px;font-size:11px;font-weight:700;background:#e9f7f0;color:#146d47;white-space:nowrap}
+.computer-device-status.offline{background:#fff3ef;color:#a94734}
+.computer-device-meta{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:12px;color:#58768a}
+.computer-device-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid #e8f0f5;padding-top:12px}
+.computer-device-actions .secondary,.computer-device-actions .primary{font-size:12px}
+.computer-device-detail{font-size:12px;color:#56758b;overflow-wrap:anywhere}.computer-device-detail summary{cursor:pointer;font-weight:600}
+.computer-device-detail ul{margin:10px 0 0;padding-left:19px}.computer-device-detail li{margin:4px 0}
+.computer-empty-dashboard{text-align:center;padding:48px 18px;grid-column:1/-1;background:#f9fcff;border:1px dashed #b8d5e9;border-radius:14px}
+.computer-empty-dashboard>*{display:block;margin:0 auto 12px}.computer-empty-dashboard p{max-width:440px;color:#647f93}
+.computer-intro-bottom{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;padding:20px 23px;border:1px solid #d8e5ef;border-radius:13px;background:#eff7fd;margin-top:18px}
+.computer-intro-bottom p{margin:5px 0 0;font-size:12px;color:#55768a}
+.computer-onboard-dialog{width:min(660px,calc(100% - 25px));max-height:88vh;border:1px solid #cbdde9;border-radius:16px;background:#fff;color:#183850;padding:0;box-shadow:0 24px 90px #07274144}
+.computer-onboard-dialog::backdrop{background:#0c2a4166}
+.computer-onboard-header,.computer-onboard-footer{padding:19px 23px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.computer-onboard-header h2{margin:4px 0;font-size:22px}
+.computer-onboard-header p{margin:4px 0;color:#638094;font-size:13px}
+.computer-onboard-footer{border-top:1px solid #e3ebf2}
+.computer-setup-progress{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:0 23px 14px}
+.computer-setup-progress span{font-size:11px;padding:10px 7px;text-align:center;border-radius:7px;background:#f2f7fa;color:#6b8194}
+.computer-setup-progress span.active{background:#d8edff;color:#185985;font-weight:700}
+.computer-onboard-body{padding:22px 23px;overflow-y:auto;max-height:52vh;border-top:1px solid #e6eef5}
+.computer-setup-step h3{margin:0 0 7px;font-size:18px}.computer-setup-step>p{margin:0 0 16px;color:#5d7b91;font-size:13px}
+.computer-platform-choice{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:15px}
+.computer-platform-choice label{display:grid;gap:4px;padding:15px;border:1px solid #d8e6ef;border-radius:11px;cursor:pointer}
+.computer-platform-choice label:has(input:checked){background:#ecf7ff;border-color:#65a9d9}
+.computer-platform-choice input{accent-color:#2179b0}
+.computer-platform-choice small{font-size:12px;color:#6f879a}
+.computer-agent-instructions{display:grid;gap:10px;background:#f1f7fb;padding:14px;border-radius:11px;margin-bottom:13px}
+.computer-agent-instructions code{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.6}
+.computer-agent-instructions button{justify-self:start}
+.computer-setup-message{min-height:18px;color:#3d6681;font-size:12px;margin:12px 0 0}
+.computer-pane-heading{display:flex;align-items:center;gap:10px;margin-bottom:15px}.computer-pane-heading h3{margin:3px 0}.computer-pane-heading small{font-size:10px;letter-spacing:.12em;color:#718ba0;font-weight:800}
+.computer-direction-symbol{font-size:23px;width:37px;height:37px;display:grid;place-items:center;border-radius:9px;background:#e0f0fa;color:#21648e}
+.computer-transfer-safe{font-size:11px;color:#246c5c;font-weight:700}
+.computer-job-panel{margin-top:18px}
+.computer-job-panel select{width:auto;min-width:160px;padding:9px;border:1px solid #d8e6f1;border-radius:7px}
+.computer-transfer-record{padding:17px;gap:10px}
+.computer-transfer-record-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.computer-transfer-state{font-size:11px;font-weight:700;text-transform:capitalize;padding:5px 10px;border-radius:100px;background:#ecf2f6;color:#4b687c}
+.computer-transfer-state.completed{background:#e6f8ef;color:#25774e}.computer-transfer-state.failed,.computer-transfer-state.interrupted,.computer-transfer-state.canceled{background:#fff1ec;color:#a44b34}
+.computer-transfer-record-path{font-size:12px;color:#57758a;overflow-wrap:anywhere}
+.computer-transfer-record progress{height:10px;width:100%;border-radius:10px;accent-color:#237bab}
+.computer-transfer-record-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.computer-transfer-record-actions button{font-size:12px}
+@media(max-width:950px){.computer-overview-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.computer-card-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:530px){.computer-overview-stats,.computer-platform-choice{grid-template-columns:minmax(0,1fr)}.computer-onboard-header,.computer-onboard-footer{padding:14px}.computer-setup-progress{padding:0 14px 10px}.computer-onboard-body{padding:14px}}
 </style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">
 {{if and .Configured .Logged}}
@@ -149,6 +208,7 @@ code{overflow-wrap:anywhere}
     <div class="nav-group"><p class="nav-section-label">CONNECTIONS</p><nav class="nav" aria-label="Connections">
       <button type="button" data-view="storage" class="" aria-label="My NAS Boxes"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="8" rx="2"/><rect x="3" y="13" width="18" height="8" rx="2"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6"/></svg></span><span class="nav-copy"><strong>My NAS Boxes</strong><small>Network storage</small></span></button>
       <button type="button" data-view="computers" aria-label="My Computers"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></span><span class="nav-copy"><strong>My Computers</strong><small>Direct file transfers</small></span></button>
+      <button type="button" data-view="computer-transfers" aria-label="Computer Transfers"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h16m0 0-4-4m4 4-4 4M21 16H5m0 0 4-4m-4 4 4 4"/></svg></span><span class="nav-copy"><strong>Computer Transfers</strong><small>Direct copies and moves</small></span></button>
       <button type="button" data-view="accounts" class="" aria-label="Cloud Accounts"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16.5a4 4 0 0 1 1-7.7 7.5 7.5 0 0 1 14.4 1.2A4.5 4.5 0 0 1 18 19H6.5"/><path d="M8 16h8m-4-4v8"/></svg></span><span class="nav-copy"><strong>Cloud Accounts</strong><small>Google & Dropbox</small></span></button>
     </nav></div>
     <div class="nav-group"><p class="nav-section-label">SYSTEM</p><nav class="nav" aria-label="System">
@@ -513,27 +573,74 @@ code{overflow-wrap:anywhere}
 </section>
 
 <section class="view" id="view-computers">
- <div class="workspace-intro"><div><span class="mini-overline">DIRECT CONNECTIONS</span><h2>Computers on your network</h2><p>Browse and transfer files between Windows and Linux computers without SMB or NFS. The files travel directly between the computers, not through Syncria's server.</p></div><button type="button" class="secondary" onclick="loadComputers()">Refresh computers</button></div>
- <div class="computer-layout">
-  <section class="panel"><div class="section-heading"><div><h2>Connected computers</h2><p>Syncria verifies each agent's pairing key and TLS certificate before connecting.</p></div></div><div id="computerDeviceList" class="computer-device-list"><p class="muted">Open this page to check connected computers.</p></div></section>
-  <section class="panel"><div class="section-heading"><div><h2>Add a computer</h2><p>Run the Syncria executable on the computer you're sharing. Use a dedicated folder and agent identity directory.</p></div></div>
-   <div class="computer-help"><strong>Windows (PowerShell)</strong><code>.\syncria-windows-amd64.exe -agent -listen 0.0.0.0:9765 -agent-data "C:\SyncriaAgent" -agent-name "My PC" -agent-root "Files=C:\Users\Public\Documents"</code><strong>Linux</strong><code>./syncria-linux-amd64 -agent -listen 0.0.0.0:9765 -agent-data "$HOME/.config/syncria-agent" -agent-name "My PC" -agent-root "Files=$HOME/Documents"</code><small>Allow inbound TCP 9765 from your trusted LAN. The agent displays its pairing key and TLS SHA-256 fingerprint on first start. Keep both private. For additional folders, repeat <code>-agent-root Name=/path</code>. Running this as a normal user limits access to that user's files.</small></div>
+ <div class="workspace-intro"><div><span class="mini-overline">MY COMPUTERS</span><h2>Your connected devices</h2><p>Add computers once, monitor secure connections, and choose where you want to send files. File transfers have their own workspace.</p></div><div class="row"><button type="button" class="secondary" onclick="loadComputers()">Refresh status</button><button type="button" class="primary" onclick="openComputerOnboard()">+ Add computer</button></div></div>
+ <div class="computer-overview-stats" aria-label="Computer connection overview">
+  <div class="computer-overview-stat"><small>CONNECTED</small><strong id="computerCount">0</strong><span>saved computers</span></div>
+  <div class="computer-overview-stat"><small>ONLINE</small><strong id="computerOnlineCount">0</strong><span>ready to send and receive</span></div>
+  <div class="computer-overview-stat"><small>NEEDS ATTENTION</small><strong id="computerOfflineCount">0</strong><span>currently unreachable</span></div>
+  <div class="computer-overview-stat"><small>SHARED FOLDERS</small><strong id="computerFolderCount">0</strong><span>on connected computers</span></div>
+ </div>
+ <section class="panel"><div class="section-heading"><div><span class="mini-overline">CONNECTED DEVICES</span><h2>My Computers</h2><p>Live connection status and permitted folders. Only folders shared by an agent can be accessed.</p></div><button class="secondary" type="button" onclick="navigate('computer-transfers')">Open Computer Transfers →</button></div>
+  <div id="computerDeviceList" class="computer-device-list computer-card-grid"><p class="muted">Checking your computers…</p></div>
+ </section>
+ <section class="computer-intro-bottom"><div><strong>Need to send a file?</strong><p>Use the dedicated Computer Transfers workspace to browse source and destination devices, see the queue, and track completed jobs.</p></div><button type="button" class="primary" onclick="navigate('computer-transfers')">Go to Computer Transfers →</button></section>
+</section>
+
+<dialog id="computerOnboard" class="computer-onboard-dialog" aria-labelledby="computerOnboardTitle">
+ <div class="computer-onboard-header"><div><span class="mini-overline">NEW DIRECT CONNECTION</span><h2 id="computerOnboardTitle">Add a computer</h2><p>Three quick steps. Your files stay on their original computers.</p></div><button class="secondary" type="button" onclick="closeComputerOnboard()" aria-label="Close setup">✕</button></div>
+ <div class="computer-setup-progress" aria-label="Computer onboarding steps"><span data-computer-step="1">1 · Device</span><span data-computer-step="2">2 · Run agent</span><span data-computer-step="3">3 · Secure pairing</span></div>
+ <div class="computer-onboard-body">
+  <div id="computerStep1" class="computer-setup-step"><h3>Which computer are you adding?</h3><p>Install the small Syncria agent on the machine containing the files you want to share.</p>
+   <div class="computer-platform-choice"><label><input type="radio" name="computerPlatform" value="windows" checked onchange="updateComputerSetupPlatform()"><strong>Windows</strong><small>Desktop or laptop</small></label><label><input type="radio" name="computerPlatform" value="linux" onchange="updateComputerSetupPlatform()"><strong>Linux</strong><small>Desktop, mini PC, or server</small></label></div>
+   <label class="field">Give this computer a name<input id="computerPairLabel" autocomplete="off" placeholder="Office desktop" maxlength="80" required></label>
+  </div>
+  <div id="computerStep2" class="computer-setup-step hidden"><h3>Start the agent on that computer</h3><p>Download the native agent, run it in a terminal, and allow the agent port on your trusted LAN only. It displays the pairing key and certificate fingerprint needed in the next step.</p>
+   <div class="computer-agent-instructions"><strong id="computerAgentPlatformLabel">Windows · PowerShell</strong><code id="computerAgentCommand"></code><button type="button" class="secondary" onclick="copyComputerAgentCommand()">Copy command</button></div>
+   <p class="muted">Change the example shared folder to the actual folder you want accessible. The agent runs with the permissions of the account that starts it. Multiple folders can be shared by repeating <code>-agent-root</code>.</p>
+   <a id="computerAgentDownload" href="https://github.com/gigabytegrove/syncria/releases" target="_blank" rel="noopener noreferrer">Download agent executable ↗</a>
+  </div>
+  <div id="computerStep3" class="computer-setup-step hidden"><h3>Pair securely</h3><p>Enter the address and the credentials shown by the running agent. Syncria verifies its TLS certificate and tests the connection before saving anything.</p>
    <form id="computerPairForm" onsubmit="event.preventDefault();pairComputer()" class="computer-pair-form">
-    <label class="field">Computer name<input id="computerPairLabel" autocomplete="off" placeholder="Living room desktop" required maxlength="80"></label>
     <label class="field">HTTPS address<input id="computerPairURL" autocomplete="off" placeholder="https://192.168.1.42:9765" required></label>
     <label class="field">Pairing key<input id="computerPairKey" type="password" autocomplete="off" required></label>
-    <label class="field">TLS SHA-256 fingerprint<input id="computerPairFingerprint" autocomplete="off" placeholder="64 hexadecimal characters" required></label>
-    <button id="computerPairButton" type="submit" class="primary">Connect computer</button><p id="computerPairMessage" class="muted" role="status"></p>
+    <label class="field">TLS SHA-256 certificate fingerprint<input id="computerPairFingerprint" autocomplete="off" placeholder="64 hexadecimal characters" required></label>
+    <button id="computerPairButton" type="submit" class="primary">Verify and add computer</button>
    </form>
-  </section>
+  </div>
+  <p id="computerPairMessage" class="computer-setup-message" role="status"></p>
  </div>
- <section class="panel computer-transfer-workspace"><div class="section-heading"><div><h2>Transfer between computers</h2><p>Choose a file on the left and a folder on the right. A move deletes the original only after the destination verifies the complete file.</p></div></div>
+ <div class="computer-onboard-footer"><button type="button" class="secondary" id="computerStepBack" onclick="computerSetupBack()">Back</button><button type="button" class="primary" id="computerStepNext" onclick="computerSetupNext()">Continue →</button></div>
+</dialog>
+
+<section class="view" id="view-computer-transfers">
+ <div class="workspace-intro"><div><span class="mini-overline">DIRECT FILE OPERATIONS</span><h2>Computer Transfers</h2><p>Transfer directly between paired devices without SMB/NFS and without uploading files to Syncria. Each transfer runs in its own isolated worker process.</p></div><div class="row"><button type="button" class="secondary" onclick="navigate('computers')">Manage computers</button><button type="button" class="secondary" onclick="refreshComputerTransfers()">Refresh queue</button></div></div>
+ <div class="computer-overview-stats computer-transfer-stats">
+  <div class="computer-overview-stat"><small>RUNNING</small><strong id="computerTransferActive">0</strong><span>worker processes</span></div>
+  <div class="computer-overview-stat"><small>WAITING</small><strong id="computerTransferQueued">0</strong><span>queued operations</span></div>
+  <div class="computer-overview-stat"><small>FINISHED</small><strong id="computerTransferFinished">0</strong><span>saved transfer records</span></div>
+  <div class="computer-overview-stat"><small>CONCURRENCY</small><strong id="computerTransferCapacity">3</strong><span>simultaneous transfers</span></div>
+ </div>
+ <section class="panel computer-transfer-workspace"><div class="section-heading"><div><span class="mini-overline">NEW TRANSFER</span><h2>Select file and destination</h2><p>Browse a shared source folder, select a file, and open a destination folder. Existing destination files will never be overwritten.</p></div><span class="computer-transfer-safe">Encrypted · Direct · Verified</span></div>
   <div class="computer-explorer">
-   <div class="computer-explorer-pane"><h3>From this computer</h3><label class="field">Computer<select id="computerSourceID" onchange="computerSideChanged('source')"><option value="">Select source</option></select></label><label class="field">Shared folder<select id="computerSourceRoot" onchange="computerRootChanged('source')"><option value="">Choose folder</option></select></label><div class="computer-path"><button type="button" class="secondary" onclick="computerUp('source')">↑ Up</button><span id="computerSourcePath">Choose a computer</span></div><div class="computer-file-list" id="computerSourceFiles" role="list"><p class="muted">Select a source computer.</p></div></div>
-   <div class="computer-explorer-pane"><h3>To this computer</h3><label class="field">Computer<select id="computerDestinationID" onchange="computerSideChanged('destination')"><option value="">Select destination</option></select></label><label class="field">Shared folder<select id="computerDestinationRoot" onchange="computerRootChanged('destination')"><option value="">Choose folder</option></select></label><div class="computer-path"><button type="button" class="secondary" onclick="computerUp('destination')">↑ Up</button><span id="computerDestinationPath">Choose a computer</span></div><div class="computer-file-list" id="computerDestinationFiles" role="list"><p class="muted">Select a destination computer.</p></div></div>
-  </div><div class="computer-transfer-actions"><div><strong id="computerSelectedFile">No file selected</strong><small id="computerTransferMessage">Destination files are never silently overwritten.</small></div><div class="row"><button type="button" class="secondary" onclick="startComputerTransfer(false)">Copy file →</button><button type="button" class="primary" onclick="startComputerTransfer(true)">Move file →</button></div></div>
+   <div class="computer-explorer-pane"><div class="computer-pane-heading"><span class="computer-direction-symbol">↗</span><div><small>FROM</small><h3>Source computer</h3></div></div>
+    <label class="field">Computer<select id="computerSourceID" onchange="computerSideChanged('source')"><option value="">Select source</option></select></label>
+    <label class="field">Shared folder<select id="computerSourceRoot" onchange="computerRootChanged('source')"><option value="">Choose folder</option></select></label>
+    <div class="computer-path"><button type="button" class="secondary" onclick="computerUp('source')">↑ Up</button><span id="computerSourcePath">Choose a computer</span></div>
+    <div class="computer-file-list" id="computerSourceFiles" role="list"><p class="muted">Choose a source computer.</p></div>
+   </div>
+   <div class="computer-explorer-pane"><div class="computer-pane-heading"><span class="computer-direction-symbol">↙</span><div><small>TO</small><h3>Destination computer</h3></div></div>
+    <label class="field">Computer<select id="computerDestinationID" onchange="computerSideChanged('destination')"><option value="">Select destination</option></select></label>
+    <label class="field">Shared folder<select id="computerDestinationRoot" onchange="computerRootChanged('destination')"><option value="">Choose folder</option></select></label>
+    <div class="computer-path"><button type="button" class="secondary" onclick="computerUp('destination')">↑ Up</button><span id="computerDestinationPath">Choose a computer</span></div>
+    <div class="computer-file-list" id="computerDestinationFiles" role="list"><p class="muted">Choose a destination computer.</p></div>
+   </div>
+  </div>
+  <div class="computer-transfer-actions"><div><strong id="computerSelectedFile">No file selected</strong><small id="computerTransferMessage">Copy preserves the source; Move deletes it only after the received file is verified.</small></div><div class="row"><button type="button" class="secondary" onclick="startComputerTransfer(false)">Copy file →</button><button type="button" class="primary" onclick="startComputerTransfer(true)">Move file →</button></div></div>
  </section>
- <section class="panel"><div class="section-heading"><div><h2>Recent direct transfers</h2><p>Actual copy/move operations and their results; a failed move never silently removes the source.</p></div><button type="button" class="secondary" onclick="refreshComputerTransfers()">Refresh transfers</button></div><div id="computerTransferList" class="computer-transfer-list"><p class="muted">No transfers started in this session.</p></div></section>
+ <section class="panel computer-job-panel">
+  <div class="section-heading"><div><span class="mini-overline">TRANSFER MANAGER</span><h2>Queue and history</h2><p>Jobs continue if you close this page. Results survive Syncria restarts; interrupted jobs require an explicit retry.</p></div><select id="computerTransferFilter" aria-label="Filter transfer jobs" onchange="renderComputerTransfers()"><option value="all">All transfers</option><option value="active">Running and queued</option><option value="completed">Completed</option><option value="failed">Failed / canceled</option></select></div>
+  <div id="computerTransferList" class="computer-transfer-list"><p class="muted">No transfer jobs yet.</p></div>
+ </section>
 </section>
 <section class="view" id="view-settings"><div class="workspace-intro"><div><p>Manage account credentials and connection settings. These usually only need to be configured once.</p></div></div><section class="panel"><h2>Google sign-in settings (advanced)</h2><p>For an administrator: create a Google Cloud web sign-in app, enable the Google Drive API, and add the address shown below as its redirect URL:</p><div class="selected"><code>{{.Callback}}</code></div><form method="post" action="/action"><input type="hidden" name="action" value="oauth_settings"><label class="field">Google app ID (Client ID)<input name="client_id" value="{{.ClientID}}" required></label><label class="field">Google app secret<input name="client_secret" type="password" placeholder="Leave blank to keep existing secret"></label><label class="field">Your Syncria web address<input name="base_url" value="{{.BaseURL}}" required></label><button class="primary">Save Google sign-in settings</button></form></section><section class="panel"><h2>Dropbox sign-in settings (advanced)</h2>
 <p>For an administrator: add this return address to your Dropbox developer app:</p><div class="selected"><code>{{.DropboxCallback}}</code></div>
