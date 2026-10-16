@@ -122,6 +122,19 @@ code{overflow-wrap:anywhere}
 .computer-transfer-record{padding:12px;border:1px solid #e0eaf1;border-radius:10px;background:#fff;display:grid;gap:5px}
 .computer-transfer-record strong{overflow-wrap:anywhere;font-size:13px}.computer-transfer-record small{font-size:12px;color:#57738a}
 @media(max-width:950px){.computer-layout,.computer-explorer{grid-template-columns:minmax(0,1fr)}.computer-file-list{height:250px}}
+
+.update-channel-panel{margin-bottom:18px}
+.channel-choice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
+.channel-choice{display:flex;align-items:flex-start;gap:11px;padding:16px;border:1px solid #d7e5f0;border-radius:12px;background:#f8fbfe;cursor:pointer;min-width:0;min-height:110px}
+.channel-choice:has(input:checked){border-color:#4397cf;background:#edf7ff;box-shadow:0 0 0 1px #4397cf inset}
+.channel-choice:focus-within{outline:2px solid #4397cf;outline-offset:2px}
+.channel-choice input{margin-top:4px;flex:none;accent-color:#1275ad}
+.channel-choice span,.channel-choice strong,.channel-choice small{display:block}
+.channel-choice strong{font-size:14px;margin-bottom:6px}
+.channel-choice small{font-size:12px;color:#59758a;line-height:1.45}
+.channel-choice-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:16px}
+.channel-choice-footer p{margin:0}
+@media(max-width:760px){.channel-choice-grid{grid-template-columns:minmax(0,1fr)}.channel-choice{min-height:0}}
 </style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">
 {{if and .Configured .Logged}}
@@ -466,6 +479,15 @@ code{overflow-wrap:anywhere}
 <section class="view" id="view-updates">
 <div class="workspace-intro"><div><p>Install updates here. Download, verification, and restart progress appear when an update runs.</p></div></div>
 <div class="update-console">
+<section class="panel update-channel-panel" aria-labelledby="updateChannelHeading">
+ <div class="section-heading"><div><span class="mini-overline">Release preferences</span><h2 id="updateChannelHeading">Update channel</h2><p>Choose which releases Syncria is allowed to install. Your choice is saved on this server.</p></div></div>
+ <div class="channel-choice-grid" id="updateChannelChoices" role="radiogroup" aria-label="Syncria release channel">
+ <label class="channel-choice"><input type="radio" name="syncriaUpdateChannel" value="stable" checked><span><strong>Stable</strong><small>Recommended for everyday use. Tested production releases only.</small></span></label>
+ <label class="channel-choice"><input type="radio" name="syncriaUpdateChannel" value="beta"><span><strong>Beta</strong><small>Stable plus release candidates and beta previews.</small></span></label>
+ <label class="channel-choice"><input type="radio" name="syncriaUpdateChannel" value="alpha"><span><strong>Alpha</strong><small>All channels, including experimental builds. Expect more frequent changes.</small></span></label>
+ </div>
+ <div class="channel-choice-footer"><p id="updateChannelMessage" class="muted" role="status">Loading saved channel…</p><button type="button" class="primary" id="saveUpdateChannelButton" onclick="saveUpdateChannel()">Save channel</button></div>
+</section>
 <section class="panel update-primary" id="updateStatusCard" data-update-state="checking" aria-live="polite">
  <div class="update-status-header"><span class="update-status-icon" id="updateStatusIcon" aria-hidden="true">↻</span><div class="update-status-text"><span class="mini-overline">Application status</span><h2 id="updateStatusHeadline">Checking for updates…</h2><p id="updateMessage">Checking the latest verified release for this device.</p></div><button class="secondary" type="button" onclick="checkUpdate(true)">Check for updates</button></div>
  <div class="update-version-line"><div><small>INSTALLED VERSION</small><strong id="installedVersion">{{.Version}}</strong></div><span class="update-version-arrow" aria-hidden="true">→</span><div><small>LATEST RELEASE</small><strong id="updateAvailableVersion">Checking…</strong></div></div>
@@ -1134,7 +1156,7 @@ function navigate(view){
  $('pageTitle').textContent=page[0];
  const breadcrumb=$('pageBreadcrumb');if(breadcrumb)breadcrumb.textContent=page[1];
  history.replaceState(null,'',view==='sync-detail'&&selectedSyncID?'#sync-detail/'+encodeURIComponent(selectedSyncID)+'/'+selectedSyncDetailTab:'#'+view);
- if(view==='updates')checkUpdate();
+ if(view==='updates'){loadUpdateChannel();checkUpdate();}
  if(view==='computers'){loadComputers();refreshComputerTransfers();}
 }
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.view)));
@@ -1384,6 +1406,45 @@ async function verifyConnectedAccount(id,button){
  catch(e){button.textContent='Could not connect';button.title='Check the account sign-in or try again. Details: '+e.message;}
  finally{button.disabled=false;}
 }
+
+let selectedUpdateChannel='stable';
+let updateChannelSaving=false;
+function updateChannelSelection(){
+ const chosen=document.querySelector('input[name="syncriaUpdateChannel"]:checked');
+ return chosen?chosen.value:'stable';
+}
+function setUpdateChannelUI(channel){
+ selectedUpdateChannel=channel;
+ const input=document.querySelector('input[name="syncriaUpdateChannel"][value="'+channel+'"]');
+ if(input)input.checked=true;
+ const msg=$('updateChannelMessage');
+ if(msg)msg.textContent='Currently receiving '+channel[0].toUpperCase()+channel.slice(1)+' releases.';
+}
+async function loadUpdateChannel(){
+ try{
+  const resp=await fetch('/api/update/channel',{credentials:'same-origin',cache:'no-store'});
+  if(!resp.ok)throw Error('Channel lookup returned HTTP '+resp.status);
+  const data=await resp.json();
+  setUpdateChannelUI(data.channel||'stable');
+ }catch(e){const msg=$('updateChannelMessage');if(msg)msg.textContent='Could not load saved channel: '+e.message;}
+}
+async function saveUpdateChannel(){
+ if(updateChannelSaving||updateRunning||updateSubmitting)return;
+ const channel=updateChannelSelection();
+ const btn=$('saveUpdateChannelButton');
+ const msg=$('updateChannelMessage');
+ updateChannelSaving=true;if(btn)btn.disabled=true;
+ if(msg)msg.textContent='Saving '+channel+' channel…';
+ try{
+  const resp=await fetch('/api/update/channel',{method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'Content-Type':'application/json'},body:JSON.stringify({channel})});
+  if(!resp.ok)throw Error((await resp.text()).trim()||'HTTP '+resp.status);
+  const result=await resp.json();
+  setUpdateChannelUI(result.channel);
+  await checkUpdate(true);
+ }catch(e){if(msg)msg.textContent='Could not change update channel: '+e.message;}
+ finally{updateChannelSaving=false;if(btn)btn.disabled=false;}
+}
 let updatePollingBusy=false,updateSubmitting=false,updateRunning=false,updateInstallAvailable=false;
 let lastUpdatePhase='idle',lastUpdateLog='',lastConfirmedUpdateStatus='';
 let manualUploadInProgress=false;
@@ -1605,6 +1666,7 @@ async function checkUpdate(force=false){
   if(!res.ok)throw Error('Release check HTTP '+res.status);
   const result=await res.json();
   if(result.error)throw Error(result.error);
+  if(result.channel&&result.channel!==selectedUpdateChannel)setUpdateChannelUI(result.channel);
   $('latestVersion').textContent=result.latest||'No published release';
   $('updateAvailableVersion').textContent=result.latest||'None';
   const notes=$('updateReleaseNotes');
@@ -1618,7 +1680,7 @@ async function checkUpdate(force=false){
   if(card)card.dataset.updateState=state;
   if(headline)headline.textContent=state==='available'?'Update available':state==='pending'?'Update is being prepared':'Syncria is up to date';
   if(icon)icon.textContent=state==='available'?'↓':state==='pending'?'…':'✓';
-  $('updateMessage').textContent=state==='available'?'Syncria '+(result.latest||'')+' is ready to install on this device.':state==='pending'?(result.message||'The release files are not ready yet.'):'You’re running the latest published release.';
+  $('updateMessage').textContent=state==='available'?'Syncria '+(result.latest||'')+' is ready to install on this device.':state==='pending'?(result.message||'The release files are not ready yet.') :'You’re running the latest release available to this channel.';
   if(button)button.textContent=state==='available'?'Download and install '+(result.latest||'update'):'No update available';
   updateInstallAvailable=!!result.available;
   if($('updateNavIndicator'))$('updateNavIndicator').classList.toggle('hidden',!result.available);
