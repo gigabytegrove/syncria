@@ -1250,14 +1250,14 @@ function computerUpdateRoots(side){
 }
 function computerSideChanged(side){
  const s=computerSides[side],prefix=computerSidePrefix(side);
- s.id=$(prefix+'ID').value;s.root='';s.path='';s.selected=null;s.seq++;
+ s.id=$(prefix+'ID').value;s.root='';s.path='';s.selected=null;if(side==='source')s.selectedFiles=[];s.seq++;
  computerUpdateRoots(side);
  $(prefix+'Files').replaceChildren();$(prefix+'Path').textContent=s.id?'Choose a shared folder':'Choose a computer';
  if(side==='source')$('computerSelectedFile').textContent='No file selected';
 }
 function computerRootChanged(side){
  const s=computerSides[side],prefix=computerSidePrefix(side);
- s.root=$(prefix+'Root').value;s.path='';s.selected=null;s.seq++;
+ s.root=$(prefix+'Root').value;s.path='';s.selected=null;if(side==='source')s.selectedFiles=[];s.seq++;
  if(side==='source')$('computerSelectedFile').textContent='No file selected';
  if(s.root)browseComputer(side,'');
  else{$(prefix+'Files').replaceChildren();$(prefix+'Path').textContent='Choose a shared folder'}
@@ -1271,20 +1271,32 @@ async function browseComputer(side,relative){
   const data=await computerJSON('/api/computers/browse?'+query);
   if(seq!==s.seq)return;
   s.path=data.path||'';s.parent=data.parent||'';
-  if(side==='source'){s.selected=null;$('computerSelectedFile').textContent='No file selected'}
+  if(side==='source'){s.selected=null;s.selectedFiles=[];$('computerSelectedFile').textContent='No file selected'}
   $(prefix+'Path').textContent=s.root+(s.path?' / '+s.path:' /');
   list.replaceChildren();
+  const filter=$('computer'+(side==='source'?'Source':'Destination')+'Filter');
+  if(filter)filter.value='';
   if(!(data.entries||[]).length){const p=document.createElement('p');p.className='muted';p.textContent='This folder is empty.';list.append(p)}
   for(const file of data.entries||[]){
    const row=document.createElement('button');row.type='button';row.className='computer-file';
    const name=document.createElement('strong');name.textContent=(file.directory?'📁 ':'📄 ')+file.name;
    const size=document.createElement('small');size.textContent=file.directory?'Open folder':formatBytes(file.size);
    row.append(name,size);
+   row.dataset.filename=file.name.toLowerCase();
    if(file.directory)row.addEventListener('click',()=>browseComputer(side,s.path?s.path+'/'+file.name:file.name));
    else if(side==='source')row.addEventListener('click',()=>{
-    list.querySelectorAll('.computer-file').forEach(node=>node.classList.remove('is-selected'));
-    row.classList.add('is-selected');s.selected=file;
-    $('computerSelectedFile').textContent=file.name+' ('+formatBytes(file.size)+')';
+    if(s.selectedFiles.some(item=>item.name===file.name)){
+     s.selectedFiles=s.selectedFiles.filter(item=>item.name!==file.name);
+     row.classList.remove('is-selected');
+    }else{
+     if(s.selectedFiles.length>=100){$('computerTransferMessage').textContent='Select up to 100 files in one batch.';return}
+     s.selectedFiles.push(file);
+     row.classList.add('is-selected');
+    }
+    s.selected=s.selectedFiles[0]||null;
+    const count=s.selectedFiles.length;
+    const total=s.selectedFiles.reduce((n,item)=>n+Number(item.size||0),0);
+    $('computerSelectedFile').textContent=count?count+' file'+(count===1?'':'s')+' selected · '+formatBytes(total):'No files selected';
    });
    else{row.disabled=true;row.title='Choose a destination folder, not a file'}
    list.append(row);
