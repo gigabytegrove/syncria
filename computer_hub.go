@@ -187,7 +187,7 @@ func runComputerTransfer(src,dst ComputerRecord,sr,dr,sourcePath,destinationPath
  defer func(){<-computerTransferSlots}()
  t.Status="preparing";updateComputerTransfer(t)
  defer func(){if v:=recover();v!=nil{t.Status="failed";t.Error="Unexpected transfer failure";t.Finished=time.Now();updateComputerTransfer(t)}}()
- ctx,cancel:=context.WithCancel(context.Background());defer cancel()
+ ctx,cancel:=context.WithTimeout(context.Background(),24*time.Hour);defer cancel()
  sourceClient,e:=pinnedComputerClient(src.Fingerprint)
  if e!=nil {t.Status="failed";t.Error=e.Error();t.Finished=time.Now();updateComputerTransfer(t);return}
  var grant struct{Ticket string `json:"ticket"`;Size int64 `json:"size"`}
