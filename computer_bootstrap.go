@@ -67,7 +67,8 @@ $Actual = (Get-FileHash -Path $Stage -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($Actual -ne $Expected) { Remove-Item -Force $Stage; throw 'Agent SHA256 does not match the release manifest' }
 Move-Item -Force $Stage $Binary
 # Token is only needed for first enrollment, and is erased by the agent on success.
-@{hub=$Hub;code=$Code} | ConvertTo-Json | Set-Content -Path (Join-Path $Identity 'pending-enrollment.json') -Encoding UTF8
+$EnrollmentJSON = @{hub=$Hub;code=$Code} | ConvertTo-Json -Compress
+[System.IO.File]::WriteAllText((Join-Path $Identity 'pending-enrollment.json'), $EnrollmentJSON, [System.Text.UTF8Encoding]::new($false))
 $DQ = [char]34
 $Arguments = '-agent -listen 0.0.0.0:9765 -agent-data ' + $DQ + $Identity + $DQ + ' -agent-name ' + $DQ + $env:COMPUTERNAME + $DQ + ' -agent-root ' + $DQ + 'Files=' + $Shared + $DQ
 $Startup = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup\Syncria Agent.lnk'
@@ -85,7 +86,16 @@ try {
   New-NetFirewallRule -DisplayName $RuleName -Direction Inbound -Action Allow -Protocol TCP -LocalPort 9765 -RemoteAddress LocalSubnet -ErrorAction Stop | Out-Null
  }
  Write-Host 'Windows Firewall access limited to the local subnet.'
-} catch { Write-Warning 'Could not set the Windows LAN firewall rule. If pairing fails, run this installer in an elevated PowerShell window.' }
+} catch {
+ Write-Host 'Windows firewall configuration requires administrator approval.'
+ try {
+  $FirewallCommand = "if (-not (Get-NetFirewallRule -DisplayName 'Syncria Agent LAN TCP 9765' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName 'Syncria Agent LAN TCP 9765' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 9765 -RemoteAddress LocalSubnet -ErrorAction Stop | Out-Null }"
+  $Quote = [char]34
+  $ElevatedArgs = '-NoProfile -ExecutionPolicy Bypass -Command ' + $Quote + $FirewallCommand + $Quote
+  $Elevated = Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $ElevatedArgs -Wait -PassThru
+  if ($Elevated.ExitCode -ne 0) { throw 'Elevation did not add the LAN firewall rule' }
+ } catch { Write-Warning 'LAN firewall access may be blocked; run the installer with administrator privileges to allow TCP 9765 from the local subnet.' }
+}
 Start-Process -FilePath $Binary -ArgumentList $Arguments -WorkingDirectory $Dir -WindowStyle Hidden
 Write-Host 'Syncria agent installed and launched. It will pair automatically within seconds.'
 Write-Host "Shared folder: $Shared"
