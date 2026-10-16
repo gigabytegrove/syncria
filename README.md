@@ -6,9 +6,9 @@
 
 **Keep your files together, wherever you save them.**
 
-**Interface (v0.8.6-alpha.4 preview):** Syncria uses a quieter, locally bundled Tailwind CSS design with straightforward navigation, forms, progress, and storage management. No browser CDN or external UI service is needed.
+**Interface (v0.8.6-alpha.5 preview):** Syncria uses a quieter, locally bundled Tailwind CSS design with straightforward navigation, forms, progress, and storage management. No browser CDN or external UI service is needed.
 
-> **Development status:** v0.8.6-alpha.4 is an **opt-in experimental alpha** with Stable/Beta/Alpha update-channel selection and native Windows/Linux Connected Computer agents. The published stable release remains v0.8.5. See [alpha release notes](docs/RELEASE-v0.8.6-alpha.4.md) and [agent setup](docs/CONNECTED-COMPUTERS.md).
+> **Development status:** v0.8.6-alpha.5 is an **opt-in experimental alpha** with Stable/Beta/Alpha update-channel selection and native Windows/Linux Connected Computer agents. The published stable release remains v0.8.5. See [alpha release notes](docs/RELEASE-v0.8.6-alpha.5.md) and [agent setup](docs/CONNECTED-COMPUTERS.md).
 >
 > Existing v0.8.5 installations do not automatically discover alpha releases. To opt into this build, use App Updates → Advanced options → Manual installation with this alpha release's platform binary and SHA256SUMS, then select **Alpha** on the new App Updates page. Never deploy the alpha without a data-volume backup.
 
@@ -82,11 +82,11 @@ The preview is a read-only estimate based on the current scan. During a first cl
 
 ## Connected Computers (experimental alpha)
 
-The `v0.8.6-alpha.4` preview adds one-command self-hosted agent installation, secure automatic pairing, and **My Computers** for guided pairing, connection health, and shared-folder inventory. **Computer Transfers** is a completely separate workspace with dual file explorers, searchable folders, 100-file batches, a queue (three concurrent transfers), measured progress, cancellation, retry, and persistent transfer records.
+The `v0.8.6-alpha.5` preview adds one-command self-hosted agent installation over LAN HTTP or HTTPS, secure automatic pairing, and **My Computers** for guided pairing, connection health, and shared-folder inventory. **Computer Transfers** is a completely separate workspace with dual file explorers, searchable folders, 100-file batches, a queue (three concurrent transfers), measured progress, cancellation, retry, and persistent transfer records.
 
 Each direct transfer runs in its own OS process supervised by Syncria. Data moves **directly between the two HTTPS-native agents**, not through the hub or SMB/NFS. Interrupted transfers are flagged for inspection rather than automatically replayed. Copy and move never overwrite an existing destination, and a move deletes the original only after verification.
 
-See [Connected Computers](docs/CONNECTED-COMPUTERS.md) for setup and [the alpha.2 release notes](docs/RELEASE-v0.8.6-alpha.4.md) for safety and limitations. Stable production users remain on v0.8.5.
+See [Connected Computers](docs/CONNECTED-COMPUTERS.md) for setup and [the alpha.2 release notes](docs/RELEASE-v0.8.6-alpha.5.md) for safety and limitations. Stable production users remain on v0.8.5.
 
 ## Updating Syncria
 
