@@ -29,6 +29,7 @@ type UpdateProgress struct {
  Events []UpdateEvent `json:"events,omitempty"`
  Phase string `json:"phase"`
  Operation string `json:"operation,omitempty"`
+ Channel string `json:"channel,omitempty"`
  From string `json:"from,omitempty"`
  Target string `json:"target,omitempty"`
  Message string `json:"message,omitempty"`
@@ -96,8 +97,11 @@ func (a *App) beginUpdate(operation string) error {
  busy:=false
  a.runs.Range(func(_, _ any)bool{busy=true;return false})
  if busy{return errors.New("an active sync must finish before updating")}
+ a.mu.Lock()
+ channel:=normalizeUpdateChannel(a.cfg.UpdateChannel)
+ a.mu.Unlock()
  now:=time.Now().UTC()
- p:=UpdateProgress{Phase:"checking",Operation:operation,From:appVersion,Message:"Checking release metadata",Percent:-1,Active:true,StartedAt:now,
+ p:=UpdateProgress{Phase:"checking",Operation:operation,Channel:channel,From:appVersion,Message:"Checking release metadata",Percent:-1,Active:true,StartedAt:now,
  Events:[]UpdateEvent{{At:now,Phase:"checking",Detail:"Checking release metadata from GitHub Releases"}}}
  if operation=="rollback"{
   p.Phase="staging";p.Message="Restoring the saved previous executable";p.Percent=-1
@@ -241,13 +245,17 @@ func (a *App) runUpdate(operation string) {
   a.updateEvent("staging","Previous executable restored; requesting supervisor restart")
  }else{
   a.setUpdateProgress("checking","Reading published release metadata from GitHub","",-1,-1,-1,"")
-  rel,err:=latestRelease(ctx)
+  a.updateMu.Lock()
+  channel:=normalizeUpdateChannel(a.updateProgress.Channel)
+  a.updateMu.Unlock()
+  rel,err:=latestReleaseForChannel(ctx,channel)
   if err!=nil{a.finishUpdate("failed","Release lookup failed",err.Error());return}
-  if !newerVersion(rel.Tag,appVersion){
+  if !updateVersionNewer(rel.Tag,appVersion){
    a.finishUpdate("complete","Syncria "+appVersion+" is already the latest published version","")
    return
   }
-  a.setUpdateProgress("manifest","Release "+rel.Tag+" found; obtaining SHA256SUMS",rel.Tag,-1,0,0,"")
+  if err:=verifyReleaseAssets(rel);err!=nil{a.finishUpdate("failed","Release artifacts are incomplete",err.Error());return}
+  a.setUpdateProgress("manifest","Release "+rel.Tag+" found on "+channel+"; obtaining SHA256SUMS",rel.Tag,-1,0,0,"")
   a.updateEvent("manifest","Platform executable: "+assetName())
   a.updateAsset(assetName())
   _,err=updateBinaryWithProgress(ctx,dir,rel,func(phase string,bytes,total int64){
