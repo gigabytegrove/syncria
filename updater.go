@@ -154,7 +154,8 @@ type parsedUpdateVersion struct {
 }
 func parseUpdateVersion(tag string)(parsedUpdateVersion,bool){
  var v parsedUpdateVersion
- if strings.HasPrefix(tag,"alpha-"){tag=strings.TrimPrefix(tag,"alpha-")} else if strings.HasPrefix(tag,"beta-"){tag=strings.TrimPrefix(tag,"beta-")}
+ prefix:=""
+ if strings.HasPrefix(tag,"alpha-"){prefix="alpha";tag=strings.TrimPrefix(tag,"alpha-")} else if strings.HasPrefix(tag,"beta-"){prefix="beta";tag=strings.TrimPrefix(tag,"beta-")}
  tag=strings.TrimPrefix(tag,"v")
  parts:=strings.SplitN(tag,"-",2)
  nums:=strings.Split(parts[0],".")
@@ -165,10 +166,12 @@ func parseUpdateVersion(tag string)(parsedUpdateVersion,bool){
   z,e:=strconv.Atoi(n);if e!=nil{return v,false}
   switch i{case 0:v.Major=z;case 1:v.Minor=z;case 2:v.Patch=z}
  }
- if len(parts)==1{return v,true}
+ if len(parts)==1{return v,prefix==""}
  pre:=strings.Split(parts[1],".")
  if len(pre)!=2||pre[1]==""||len(pre[1])>8{return v,false}
  if pre[0]!="alpha"&&pre[0]!="beta"&&pre[0]!="rc"{return v,false}
+ if prefix=="alpha"&&pre[0]!="alpha"{return v,false}
+ if prefix=="beta"&&pre[0]!="beta"&&pre[0]!="rc"{return v,false}
  if len(pre[1])>1&&pre[1][0]=='0'{return v,false}
  for _,c:=range pre[1]{if c<'0'||c>'9'{return v,false}}
  sequence,e:=strconv.Atoi(pre[1]);if e!=nil{return v,false}
