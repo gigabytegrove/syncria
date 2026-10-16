@@ -24,6 +24,7 @@ import (
  "path"
  "path/filepath"
  "sort"
+ "strconv"
  "strings"
  "sync"
  "time"
@@ -307,6 +308,9 @@ func createAgentIdentity(dir string)(string,string,string,error){
  return ident.Secret,certFile,hex.EncodeToString(fingerprint[:]),nil
 }
 func runComputerAgent(listen,dataDir,name string,folders []string)error{
+ return runComputerAgentWithEnrollment(listen,dataDir,name,folders,"","")
+}
+func runComputerAgentWithEnrollment(listen,dataDir,name string,folders []string,hub,code string)error{
  if len(folders)==0{return errors.New("specify at least one -agent-root Name=/absolute/path")}
  if dataDir==""{return errors.New("specify -agent-data to save the TLS identity and pairing key")}
  roots:=map[string]string{}
@@ -340,8 +344,16 @@ func runComputerAgent(listen,dataDir,name string,folders []string)error{
  mux.HandleFunc("/v1/delete",agent.authorize(agent.serveDelete))
  // No CORS, no wildcard file access, HTTPS-only transport with certificate pinning.
  log.Printf("Syncria Computer Agent listening at https://%s",listen)
- log.Printf("Pairing key: %s",secret)
- log.Printf("TLS SHA-256 fingerprint: %s",fingerprint)
+ if hub=="" {
+  log.Printf("Pairing key: %s",secret)
+  log.Printf("TLS SHA-256 fingerprint: %s",fingerprint)
+ } else {
+  if err:=computerEnrollmentHubURL(hub);err!=nil{return err}
+  if len(code)!=64{return errors.New("missing or invalid one-time enrollment code")}
+  _,portText,err:=net.SplitHostPort(listen);if err!=nil{return err}
+  port,err:=strconv.Atoi(portText);if err!=nil||port<1024||port>65535{return errors.New("invalid agent enrollment listen port")}
+  go announceComputerToHub(hub,code,secret,fingerprint,port)
+ }
  log.Printf("Shared folders: %d; no SMB/NFS required",len(roots))
  return (&http.Server{Addr:listen,Handler:mux,ReadHeaderTimeout:10*time.Second,IdleTimeout:60*time.Second,MaxHeaderBytes:1<<20}).ListenAndServeTLS(certFile,filepath.Join(dataDir,"agent.key"))
 }
