@@ -1,6 +1,6 @@
 # Syncria connected computers — direct file transfers
 
-This feature is part of the opt-in **v0.8.6-alpha.4** preview ([release notes](RELEASE-v0.8.6-alpha.4.md)) and under ongoing review in [PR #19](https://github.com/gigabytegrove/syncria/pull/19). **Production Stable remains v0.8.5.** The cross-platform Syncria executable also runs as a native computer agent.
+This feature is part of the opt-in **v0.8.6-alpha.5** preview ([release notes](RELEASE-v0.8.6-alpha.5.md)) and under ongoing review in [PR #19](https://github.com/gigabytegrove/syncria/pull/19). **Production Stable remains v0.8.5.** The cross-platform Syncria executable also runs as a native computer agent.
 
 ## What the first implementation does
 
