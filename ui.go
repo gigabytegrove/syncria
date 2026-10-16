@@ -1800,6 +1800,11 @@ function setUpdateProgressBar(phase,current,total){
   label.textContent=phase==='failed'?'Failed':'Measured progress only';
  }
 }
+// GitHub prerelease tags use an alpha-/beta- safety prefix that is not
+// part of the running binary version.
+function runtimeVersionOfRelease(tag){
+ return String(tag||'').replace(/^(?:alpha|beta)-(?=v[0-9]+\.[0-9]+\.[0-9]+-)/,'');
+}
 // Only navigate after the new process confirms the expected version.
 function finishVerifiedUpdate(version){
  if(!version || sessionStorage.getItem('syncria-update-refreshing')===version)return;
@@ -1811,11 +1816,11 @@ function renderUpdateProgress(p){
  if(!p||!p.phase)return;
  const phase=p.phase;
  const expectedVersion=sessionStorage.getItem('syncria-update-expected');
- if(expectedVersion&&p.current===expectedVersion&&phase!=='failed'&&!p.active){
-  finishVerifiedUpdate(expectedVersion);
+ if(expectedVersion&&p.current===runtimeVersionOfRelease(expectedVersion)&&phase!=='failed'&&!p.active){
+  finishVerifiedUpdate(p.current);
   return;
  }
- if(phase==='complete'&&p.current&&(p.operation==='rollback'||p.operation==='manual'||p.target===p.current)){
+ if(phase==='complete'&&p.current&&(p.operation==='rollback'||p.operation==='manual'||runtimeVersionOfRelease(p.target)===p.current)){
   finishVerifiedUpdate(p.current);
   return;
  }
@@ -1901,7 +1906,7 @@ async function pollUpdateProgress(){
   const payload=await response.json();
   lastConfirmedUpdateStatus=payload.updated_at||'';
   const expected=sessionStorage.getItem('syncria-update-expected');
-  if(expected&&payload.current===expected&&payload.phase!=='failed'&&!payload.active){finishVerifiedUpdate(expected);return;}
+  if(expected&&payload.current===runtimeVersionOfRelease(expected)&&payload.phase!=='failed'&&!payload.active){finishVerifiedUpdate(payload.current);return;}
   renderUpdateProgress(payload);
  }catch(error){
   if(updateRunning||currentView==='updates'){
