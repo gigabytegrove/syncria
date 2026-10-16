@@ -225,6 +225,9 @@ func (a *App) computerTransfersAPI(w http.ResponseWriter,r *http.Request){
    err:=agentGET(ctx,dst,"/v1/progress?id="+url.QueryEscape(records[i].ID),&progress)
    cancel()
    if err==nil&&progress.Bytes>=records[i].Bytes{
+    if progress.Bytes>records[i].Bytes || (progress.Total>0&&records[i].Total==0){
+     a.setComputerTransferStatus(records[i].ID,computerWorkerEvent{Bytes:progress.Bytes,Total:progress.Total})
+    }
     records[i].Bytes=progress.Bytes
     if records[i].Total==0{records[i].Total=progress.Total}
    }
