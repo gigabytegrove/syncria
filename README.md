@@ -6,11 +6,11 @@
 
 **Keep your files together, wherever you save them.**
 
-**Interface (v0.8.6-alpha.6 preview):** Syncria uses a quieter, locally bundled Tailwind CSS design with straightforward navigation, forms, progress, and storage management. No browser CDN or external UI service is needed.
+**Interface (v0.8.6-beta.1 Beta):** Syncria uses a quieter, locally bundled Tailwind CSS design with straightforward navigation, forms, progress, and storage management. No browser CDN or external UI service is needed.
 
-> **Development status:** v0.8.6-alpha.6 is an **opt-in experimental alpha** with Stable/Beta/Alpha update-channel selection and native Windows/Linux Connected Computer agents. The published stable release remains v0.8.5. See [alpha release notes](docs/RELEASE-v0.8.6-alpha.6.md) and [agent setup](docs/CONNECTED-COMPUTERS.md).
+> **Development status:** v0.8.6-beta.1 is an **opt-in Beta preview** with Stable/Beta/Alpha update-channel selection and native Windows/Linux Connected Computer agents. The published stable release remains v0.8.5. See [alpha release notes](docs/RELEASE-v0.8.6-beta.1.md) and [agent setup](docs/CONNECTED-COMPUTERS.md).
 >
-> Existing v0.8.5 installations do not automatically discover alpha releases. To opt into this build, use App Updates → Advanced options → Manual installation with this alpha release's platform binary and SHA256SUMS, then select **Alpha** on the new App Updates page. Never deploy the alpha without a data-volume backup.
+> Existing v0.8.5 installations do not automatically discover Beta prereleases. To opt into this build, use App Updates → Advanced options → Manual installation with this Beta release's platform binary and SHA256SUMS, then select **Beta** on the new App Updates page. Back up the persistent data volume before installing a Beta.
 
 Syncria helps you keep folders matched between Google Drive, Dropbox, and storage boxes on your home or work network. Those storage boxes are called **NAS devices**.
 
@@ -80,13 +80,13 @@ The preview is a read-only estimate based on the current scan. During a first cl
 
 **FreeFileSync interoperability:** Syncria intentionally excludes the exact filename `sync.ffs_db` (case-insensitive) from all connected storage types and from legacy sync checkpoints. A prior failure message remains labeled as the last failed run until a newer sync completes. This file is FreeFileSync's private comparison database, and Google Drive can hold multiple copies with that name. Existing copies are left untouched in their original location. Other filenames, including other `.ffs_db` files, are not silently excluded. Drive sibling files with the same name are represented on NAS using distinct, stable names derived from their Drive IDs. Existing Drive files are not renamed.
 
-## Connected Computers (experimental alpha)
+## Connected Computers (Beta preview)
 
-The `v0.8.6-alpha.6` preview adds one-command self-hosted agent installation over LAN HTTP or HTTPS, secure automatic pairing, and **My Computers** for guided pairing, connection health, and shared-folder inventory. **Computer Transfers** is a completely separate workspace with dual file explorers, searchable folders, 100-file batches, a queue (three concurrent transfers), measured progress, cancellation, retry, and persistent transfer records.
+The `v0.8.6-beta.1` preview adds one-command self-hosted agent installation over LAN HTTP or HTTPS, secure automatic pairing, and **My Computers** for guided pairing, connection health, and shared-folder inventory. **Computer Transfers** is a completely separate workspace with dual file explorers, searchable folders, 100-file batches, a queue (three concurrent transfers), measured progress, cancellation, retry, and persistent transfer records.
 
 Each direct transfer runs in its own OS process supervised by Syncria. Data moves **directly between the two HTTPS-native agents**, not through the hub or SMB/NFS. Interrupted transfers are flagged for inspection rather than automatically replayed. Copy and move never overwrite an existing destination, and a move deletes the original only after verification.
 
-See [Connected Computers](docs/CONNECTED-COMPUTERS.md) for setup and [the alpha.2 release notes](docs/RELEASE-v0.8.6-alpha.6.md) for safety and limitations. Stable production users remain on v0.8.5.
+See [Connected Computers](docs/CONNECTED-COMPUTERS.md) for setup and [the Beta release notes](docs/RELEASE-v0.8.6-beta.1.md) for safety and limitations. Stable production users remain on v0.8.5.
 
 ## Updating Syncria
 
