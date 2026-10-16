@@ -1110,16 +1110,59 @@ async function computerJSON(url,options){
  if(!response.ok)throw Error((await response.text()).trim()||'HTTP '+response.status);
  return response.json();
 }
+let computerSetupStep=1;
+function openComputerOnboard(){
+ computerSetupStep=1;computerSetupShow(1);
+ const dialog=$('computerOnboard');
+ if(!dialog.open)dialog.showModal();
+}
+function closeComputerOnboard(){
+ const dialog=$('computerOnboard');
+ if(dialog.open)dialog.close();
+}
+function computerSetupShow(step){
+ computerSetupStep=step;
+ for(let i=1;i<=3;i++){
+  $('computerStep'+i).classList.toggle('hidden',i!==step);
+  document.querySelector('[data-computer-step="'+i+'"]')?.classList.toggle('active',i===step);
+ }
+ $('computerStepBack').disabled=step===1;
+ $('computerStepNext').classList.toggle('hidden',step===3);
+ $('computerPairMessage').textContent='';
+ if(step===2)updateComputerSetupPlatform();
+}
+function computerSetupNext(){
+ if(computerSetupStep===1&&!$('computerPairLabel').value.trim()){
+  $('computerPairMessage').textContent='Name this computer before continuing.';return;
+ }
+ computerSetupShow(Math.min(3,computerSetupStep+1));
+}
+function computerSetupBack(){computerSetupShow(Math.max(1,computerSetupStep-1))}
+function updateComputerSetupPlatform(){
+ const platform=document.querySelector('input[name="computerPlatform"]:checked')?.value||'windows';
+ const win=platform==='windows';
+ $('computerAgentPlatformLabel').textContent=win?'Windows · PowerShell':'Linux · terminal';
+ $('computerAgentCommand').textContent=win?".\\syncria-windows-amd64.exe -agent -listen 0.0.0.0:9765 -agent-data \"C:\\SyncriaAgent\" -agent-name \"My PC\" -agent-root \"Files=C:\\Users\\Public\\Documents\"":"./syncria-linux-amd64 -agent -listen 0.0.0.0:9765 -agent-data \"$HOME/.config/syncria-agent\" -agent-name \"My PC\" -agent-root \"Files=$HOME/Documents\"";
+ $('computerAgentDownload').href='https://github.com/gigabytegrove/syncria/releases/tag/alpha-v0.8.6-alpha.2';
+ $('computerAgentDownload').textContent=win?'Download Windows agent ↗':'Download Linux agent ↗';
+}
+async function copyComputerAgentCommand(){
+ const value=$('computerAgentCommand').textContent;
+ try{await navigator.clipboard.writeText(value);$('computerPairMessage').textContent='Agent command copied.'}
+ catch(e){$('computerPairMessage').textContent='Copy is unavailable in this browser. Select and copy the command above.'}
+}
 async function pairComputer(){
  const button=$('computerPairButton'),message=$('computerPairMessage');
- button.disabled=true;message.textContent='Verifying encrypted connection…';
+ button.disabled=true;message.textContent='Verifying encryption, pairing key, and shared folders…';
  try{
   await computerJSON('/api/computers/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
    label:$('computerPairLabel').value,url:$('computerPairURL').value,key:$('computerPairKey').value,fingerprint:$('computerPairFingerprint').value
   })});
-  $('computerPairForm').reset();message.textContent='Computer connected successfully.';
-  await loadComputers();
- }catch(error){message.textContent=error.message}
+  $('computerPairForm').reset();
+  $('computerPairLabel').value='';
+  closeComputerOnboard();
+  navigate('computers');
+ }catch(error){message.textContent='Pairing failed: '+error.message}
  finally{button.disabled=false}
 }
 function computerOption(select,value,label){
@@ -1127,18 +1170,48 @@ function computerOption(select,value,label){
 }
 async function loadComputers(){
  let data;
- try{data=await computerJSON('/api/computers')}catch(error){$('computerDeviceList').textContent=error.message;return}
+ try{data=await computerJSON('/api/computers')}catch(error){$('computerDeviceList').textContent='Could not check computers: '+error.message;return}
  computerCache=data.computers||[];
+ $('computerCount').textContent=computerCache.length;
+ $('computerOnlineCount').textContent=computerCache.filter(c=>c.online).length;
+ $('computerOfflineCount').textContent=computerCache.filter(c=>!c.online).length;
+ $('computerFolderCount').textContent=computerCache.reduce((n,c)=>n+(c.roots||[]).length,0);
  const list=$('computerDeviceList');list.replaceChildren();
- if(!computerCache.length){const p=document.createElement('p');p.className='muted';p.textContent='No computers connected yet. Add one using the form.';list.append(p)}
+ if(!computerCache.length){
+  const card=document.createElement('div');card.className='computer-empty-dashboard';
+  const symbol=document.createElement('span');symbol.textContent='▣';symbol.style.fontSize='32px';
+  const title=document.createElement('strong');title.textContent='No computers connected yet';
+  const note=document.createElement('p');note.textContent='Add a Windows or Linux computer, choose the folders it can share, and securely pair its agent. Files stay on the computer.';
+  const add=document.createElement('button');add.type='button';add.className='primary';add.textContent='+ Add your first computer';add.onclick=openComputerOnboard;
+  card.append(symbol,title,note,add);list.append(card);
+ }
  for(const c of computerCache){
-  const row=document.createElement('div');row.className='computer-device';
-  const desc=document.createElement('div'),name=document.createElement('strong'),meta=document.createElement('small'),status=document.createElement('small');
-  name.textContent=c.label;meta.textContent=c.url+' · '+(c.roots||[]).length+' shared folders';
-  status.textContent=c.online?'● Connected':'● Offline'+(c.error?' — '+c.error:'');
-  status.className=c.online?'computer-online':'computer-offline';
-  desc.append(name,meta,status);row.append(desc);
-  const remove=document.createElement('button');remove.type='button';remove.className='secondary';remove.textContent='Remove';remove.addEventListener('click',()=>removeComputer(c));row.append(remove);list.append(row);
+  const card=document.createElement('article');card.className='computer-device-card';
+  const heading=document.createElement('div');heading.className='computer-device-heading';
+  const glyph=document.createElement('div');glyph.className='computer-device-icon';glyph.textContent='▣';
+  const identity=document.createElement('div');identity.className='computer-device-name';
+  const name=document.createElement('strong');name.textContent=c.label;
+  const address=document.createElement('small');address.textContent=c.url;
+  identity.append(name,address);
+  const state=document.createElement('span');state.className='computer-device-status'+(c.online?'':' offline');
+  state.textContent=c.online?'● Online':'● Offline';
+  heading.append(glyph,identity,state);
+  const meta=document.createElement('div');meta.className='computer-device-meta';
+  meta.textContent=c.online?(c.roots||[]).length+' shared folders · Encrypted connection':(c.error||'Computer is unreachable');
+  const details=document.createElement('details');details.className='computer-device-detail';
+  const summary=document.createElement('summary');summary.textContent='Connection details and shared folders';
+  const body=document.createElement('ul');
+  for(const root of c.roots||[]){const item=document.createElement('li');item.textContent=root.name;body.append(item)}
+  if(!body.children.length){const item=document.createElement('li');item.textContent='Folder list unavailable while offline';body.append(item)}
+  details.append(summary,body);
+  const actions=document.createElement('div');actions.className='computer-device-actions';
+  const send=document.createElement('button');send.type='button';send.className='primary';
+  send.textContent='Transfer files →';send.disabled=!c.online;
+  send.onclick=()=>startTransferWithComputer(c.id);
+  const refresh=document.createElement('button');refresh.type='button';refresh.className='secondary';refresh.textContent='Check status';refresh.onclick=loadComputers;
+  const remove=document.createElement('button');remove.type='button';remove.className='secondary';remove.textContent='Disconnect';remove.onclick=()=>removeComputer(c);
+  actions.append(send,refresh,remove);
+  card.append(heading,meta,details,actions);list.append(card);
  }
  for(const side of ['source','destination']){
   const sel=$('computer'+(side==='source'?'Source':'Destination')+'ID'),old=sel.value;
@@ -1149,8 +1222,16 @@ async function loadComputers(){
   else if(sel.value)computerUpdateRoots(side);
  }
 }
+async function startTransferWithComputer(id){
+ navigate('computer-transfers');
+ if(!computerCache.length)await loadComputers();
+ const s=$('computerSourceID');
+ s.value=id;computerSideChanged('source');
+ const roots=computerCache.find(c=>c.id===id)?.roots||[];
+ if(roots.length){$('computerSourceRoot').value=roots[0].name;computerRootChanged('source')}
+}
 async function removeComputer(c){
- if(!confirm('Remove '+c.label+' from Syncria? No files on the computer will be deleted.'))return;
+ if(!confirm('Disconnect '+c.label+' from Syncria? Files and the agent remain untouched. Active transfers must finish or be canceled first.'))return;
  try{await computerJSON('/api/computers/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:c.id})});await loadComputers()}
  catch(error){alert(error.message)}
 }
@@ -1221,22 +1302,88 @@ async function startComputerTransfer(move){
    source_id:from.id,destination_id:to.id,source_root:from.root,destination_root:to.root,
    source_path:sourcePath,destination_path:destPath,move
   })});
-  message.textContent='Transfer queued. Progress appears below.';
+  message.textContent='Transfer queued in the isolated worker system. Live progress is tracked below.';
   await refreshComputerTransfers();
  }catch(error){message.textContent='Transfer could not start: '+error.message}
 }
+let computerTransferRecords=[];
+let computerTransferRefreshing=false;
 async function refreshComputerTransfers(){
- let data;try{data=await computerJSON('/api/computers/transfers')}catch(error){$('computerTransferList').textContent=error.message;return}
+ if(computerTransferRefreshing)return;
+ computerTransferRefreshing=true;
+ try{
+  const data=await computerJSON('/api/computers/transfers');
+  computerTransferRecords=data.transfers||[];
+  $('computerTransferActive').textContent=data.active||0;
+  $('computerTransferQueued').textContent=data.queued||0;
+  $('computerTransferFinished').textContent=data.finished||0;
+  $('computerTransferCapacity').textContent=data.max_concurrent||3;
+  renderComputerTransfers();
+ }catch(error){$('computerTransferList').textContent='Could not load transfer queue: '+error.message}
+ finally{computerTransferRefreshing=false}
+}
+function renderComputerTransfers(){
+ const filter=$('computerTransferFilter').value;
+ const visible=computerTransferRecords.filter(t=>{
+  if(filter==='active')return !['completed','failed','canceled','interrupted'].includes(t.status);
+  if(filter==='completed')return t.status==='completed';
+  if(filter==='failed')return ['failed','canceled','interrupted'].includes(t.status);
+  return true;
+ });
  const list=$('computerTransferList');list.replaceChildren();
- if(!data.transfers?.length){const p=document.createElement('p');p.className='muted';p.textContent='No direct transfers yet.';list.append(p);return}
- for(const t of data.transfers){
-  const row=document.createElement('div');row.className='computer-transfer-record';
-  const name=document.createElement('strong');name.textContent=(t.move?'Move':'Copy')+': '+t.file+' — '+t.source+' → '+t.destination;
-  const info=document.createElement('small');info.textContent=t.status+(t.bytes?' · '+formatBytes(t.bytes):'')+(t.error?' · '+t.error:'');
-  row.append(name,info);list.append(row);
+ if(!visible.length){
+  const p=document.createElement('p');p.className='muted';
+  p.textContent=filter==='all'?'No computer transfers yet. Choose a source file and destination above.':'No jobs match this filter.';
+  list.append(p);return;
+ }
+ for(const t of visible){
+  const record=document.createElement('article');record.className='computer-transfer-record';
+  const head=document.createElement('div');head.className='computer-transfer-record-top';
+  const name=document.createElement('strong');name.textContent=(t.move?'Move':'Copy')+' · '+t.file.split('/').pop();
+  const status=document.createElement('span');status.className='computer-transfer-state '+t.status;status.textContent=t.status;
+  head.append(name,status);
+  const places=document.createElement('div');places.className='computer-transfer-record-path';
+  places.textContent=t.source+' / '+t.source_root+' / '+t.file+'  →  '+t.destination+' / '+t.destination_root+' / '+t.target;
+  const when=document.createElement('small');
+  when.textContent='Started '+new Date(t.started).toLocaleString()+(t.finished?' · Finished '+new Date(t.finished).toLocaleString():'');
+  const bytes=document.createElement('small');
+  const done=Number(t.bytes||0),total=Number(t.total||0);
+  bytes.textContent=done?formatBytes(done)+(total?' / '+formatBytes(total):''):total?'0 / '+formatBytes(total):'Waiting for file size';
+  record.append(head,places,when,bytes);
+  if(total>0){
+   const bar=document.createElement('progress');bar.max=total;bar.value=Math.min(total,done);bar.setAttribute('aria-label','Actual received bytes');
+   record.append(bar);
+  }else if(t.status==='transferring'){
+   const bar=document.createElement('progress');bar.setAttribute('aria-label','Transfer is running');record.append(bar);
+  }
+  if(t.error){
+   const error=document.createElement('p');error.className='computer-transfer-error';
+   error.textContent=t.error;record.append(error);
+  }
+  const actions=document.createElement('div');actions.className='computer-transfer-record-actions';
+  function addAction(label,action,className){
+   const button=document.createElement('button');button.type='button';button.className=className;
+   button.textContent=label;button.onclick=()=>changeComputerTransfer(t,action);actions.append(button);
+  }
+  if(!['completed','failed','canceled','interrupted'].includes(t.status))addAction('Cancel transfer','cancel','secondary');
+  if(['failed','canceled','interrupted'].includes(t.status))addAction('Retry safely','retry','primary');
+  if(['completed','failed','canceled','interrupted'].includes(t.status))addAction('Clear record','clear','secondary');
+  if(actions.children.length)record.append(actions);
+  list.append(record);
  }
 }
-setInterval(()=>{if(document.getElementById('view-computers')?.classList.contains('active'))refreshComputerTransfers()},2500);
+async function changeComputerTransfer(job,action){
+ let warning='';
+ if(action==='cancel')warning='Cancel this transfer? A destination copy that already completed may remain.';
+ if(action==='retry')warning='Retry '+job.file+'? Syncria never overwrites an existing destination; inspect both computers first if a prior attempt partially completed.';
+ if(action==='clear')warning='Remove this transfer record from history? This does not remove any files.';
+ if(!confirm(warning))return;
+ try{
+  await computerJSON('/api/computers/transfers/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:job.id,action})});
+  await refreshComputerTransfers();
+ }catch(error){alert('Transfer action failed: '+error.message)}
+}
+setInterval(()=>{if(document.getElementById('view-computer-transfers')?.classList.contains('active'))refreshComputerTransfers()},2500);
 
 function navigate(view){
  if(!$('view-'+view))return;
@@ -1253,6 +1400,7 @@ function navigate(view){
   sync:['Your syncs','MY SYNCS'],
   storage:['Storage devices','MY NAS BOXES'],
   computers:['My computers','DIRECT CONNECTIONS'],
+  'computer-transfers':['Computer transfers','DIRECT TRANSFERS'],
   accounts:['Cloud connections','CLOUD ACCOUNTS'],
   activity:['Transfer activity','ACTIVITY'],
   'sync-detail':['Sync details','SYNC DETAILS'],
@@ -1264,7 +1412,8 @@ function navigate(view){
  const breadcrumb=$('pageBreadcrumb');if(breadcrumb)breadcrumb.textContent=page[1];
  history.replaceState(null,'',view==='sync-detail'&&selectedSyncID?'#sync-detail/'+encodeURIComponent(selectedSyncID)+'/'+selectedSyncDetailTab:'#'+view);
  if(view==='updates'){loadUpdateChannel();checkUpdate();}
- if(view==='computers'){loadComputers();refreshComputerTransfers();}
+ if(view==='computers')loadComputers();
+ if(view==='computer-transfers'){loadComputers();refreshComputerTransfers();}
 }
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.view)));
 let syncReviewed=false,syncStep=1,selectedNASTargetID='';
