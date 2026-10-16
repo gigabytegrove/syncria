@@ -8,6 +8,8 @@ import (
  "log"
  "net"
  "net/http"
+ "os"
+ "path/filepath"
  "net/url"
  "strconv"
  "strings"
@@ -42,7 +44,7 @@ func agentLANAddresses(hub string)[]string{
  }
  return addresses
 }
-func announceComputerToHub(hub,code,secret,fingerprint string,port int){
+func announceComputerToHub(hub,code,secret,fingerprint string,port int,dataDir string){
  endpoint:=strings.TrimSuffix(hub,"/")+"/api/computers/enroll"
  client:=&http.Client{Timeout:27*time.Second}
  for attempt:=0;attempt<6;attempt++{
@@ -61,6 +63,7 @@ func announceComputerToHub(hub,code,secret,fingerprint string,port int){
   if response.StatusCode==http.StatusCreated{
    var result struct{Address string `json:"address"`}
    _=json.Unmarshal(message,&result)
+   _ = os.Remove(filepath.Join(dataDir,"pending-enrollment.json"))
    log.Printf("Syncria agent securely paired at %s",result.Address)
    return
   }
