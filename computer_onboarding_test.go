@@ -94,3 +94,74 @@ func TestAgentDistributionSafetyAllowlist(t *testing.T){
  if safeComputerAddress("8.8.8.8")||safeComputerAddress("0.0.0.0")||safeComputerAddress("example.com"){t.Fatal("external or invalid computer endpoint accepted")}
  if !safeComputerAddress("192.168.0.55")||!safeComputerAddress("127.0.0.1"){t.Fatal("LAN address unexpectedly rejected")}
 }
+
+func TestComputerLANHTTPEnrollmentAndPublicHostRejected(t *testing.T){
+ for _,hub:=range []string{
+  "http://192.168.0.19:9764",
+  "http://10.1.2.3:8000",
+  "http://172.16.5.22",
+  "http://127.0.0.1:9764",
+  "http://[::1]:9764",
+  "http://syncria.local:9764",
+  "http://nas1.lan",
+  "http://syncria",
+  "http://syncria.home.arpa:9764",
+  "https://public.example:443",
+ }{
+  if err:=computerEnrollmentHubURL(hub);err!=nil{t.Errorf("legitimate LAN HTTP / normal HTTPS hub %s rejected: %v",hub,err)}
+ }
+ for _,hub:=range []string{
+  "http://8.8.8.8:9764",
+  "http://198.51.100.30:9764",
+  "http://syncria.example:9764",
+  "ftp://192.168.0.19",
+  "http://192.168.0.19/path",
+  "http://username:secret@192.168.0.19",
+  "http://192.168.0.19:70000",
+  "http://192.168.0.19/?key=bad",
+ }{
+  if err:=computerEnrollmentHubURL(hub);err==nil{t.Errorf("invalid or public HTTP hub %s accepted",hub)}
+ }
+}
+func TestLocalHTTPBootstrapFromSameLANHost(t *testing.T){
+ app,cookie:=inviteFixture(t)
+ req:=httptest.NewRequest("POST","http://192.168.0.19:9764/api/computers/invite",strings.NewReader(`{"label":"Living Room"}`))
+ req.AddCookie(cookie)
+ invited:=httptest.NewRecorder()
+ app.computerInviteAPI(invited,req)
+ if invited.Code!=http.StatusCreated{t.Fatalf("HTTP LAN invitation failed: %d %s",invited.Code,invited.Body.String())}
+ var issued struct{Code string `json:"code"`}
+ if err:=json.Unmarshal(invited.Body.Bytes(),&issued);err!=nil{t.Fatal(err)}
+ for _,platform:=range []string{"windows","linux"}{
+  uri:="http://192.168.0.19:9764/api/computers/bootstrap?code="+issued.Code+
+   "&platform="+platform+"&hub=http%3A%2F%2F192.168.0.19%3A9764"
+  resp:=httptest.NewRecorder()
+  app.computerBootstrapAPI(resp,httptest.NewRequest("GET",uri,nil))
+  if resp.Code!=http.StatusOK{t.Fatalf("%s HTTP LAN bootstrap returned %d: %s",platform,resp.Code,resp.Body.String())}
+  body:=resp.Body.String()
+  if !strings.Contains(body,"http://192.168.0.19:9764")||!strings.Contains(body,issued.Code)||
+   !strings.Contains(body,"SHA256SUMS"){
+   t.Fatalf("HTTP LAN %s installer missing proper server and checksum",platform)
+  }
+ }
+ // An invitation issued for an HTTP host must never generate a bootstrap script
+ // that is redirected to a third-party origin.
+ mismatched:=httptest.NewRecorder()
+ app.computerBootstrapAPI(mismatched,httptest.NewRequest("GET",
+  "http://192.168.0.19:9764/api/computers/bootstrap?code="+issued.Code+
+  "&platform=linux&hub=http%3A%2F%2F192.168.0.55%3A9764",nil))
+ if mismatched.Code!=http.StatusBadRequest{t.Fatalf("cross-host HTTP script generated: %d",mismatched.Code)}
+}
+func TestBrowserLANHTTPDoesNotBlockOnboarding(t *testing.T){
+ if strings.Contains(newUI,"One-command enrollment requires Syncria to be opened using trusted HTTPS"){
+  t.Fatal("old mandatory HTTPS LAN enrollment restriction was reintroduced")
+ }
+ for _,part:=range []string{
+  "location.protocol==='http:'",
+  "document.execCommand('copy')",
+  "private network only",
+  "Direct file transfers remain encrypted",
+ }{
+  if !strings.Contains(newUI,part){t.Errorf("HTTP LAN wizard missing %q",part)}
+ }
+}
