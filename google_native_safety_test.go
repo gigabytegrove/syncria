@@ -10,7 +10,7 @@ func TestUnsupportedGoogleNativeItemsCannotBeTransferredOrDeleted(t *testing.T){
  if !strings.Contains(plan.Rows[0].Reason,"preserved"){t.Fatal("Missing safety explanation")}
 }
 func TestUpdateVerifiedReload(t *testing.T){
- for _,part:=range []string{"function finishVerifiedUpdate(version)","syncria-update-expected","window.location.replace(","p.current===expectedVersion"}{
+ for _,part:=range []string{"function finishVerifiedUpdate(version)","syncria-update-expected","window.location.replace(","p.current===runtimeVersionOfRelease(expectedVersion)"}{
   if !strings.Contains(newUI,part){t.Errorf("Missing automatic verified version handoff %q",part)}
  }
  if strings.Contains(newUI,`id="updateReloadButton"`){t.Fatal("Obsolete manual View updated button still displayed")}
