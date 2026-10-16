@@ -147,6 +147,7 @@ type Config struct {
 	Accounts     []Account `json:"accounts"`
 	Jobs         []Job     `json:"jobs"`
 	Shares       []StorageShare `json:"shares,omitempty"`
+	Computers []ComputerRecord `json:"computers,omitempty"`
 }
 type App struct {
     // Serialize remote writers, including a shared designated cloud NAS
@@ -1620,7 +1621,13 @@ func restartSyncria(dataDir string){
 func main() {
 	listen := flag.String("listen", "127.0.0.1:9764", "Web UI listen address (use reverse proxy for external access)")
 	dataDir := flag.String("data", "", "Configuration/data directory")
+	agentMode := flag.Bool("agent", false, "Run a native computer agent instead of the Syncria hub")
+	agentData := flag.String("agent-data", "", "Persistent agent identity directory")
+	agentName := flag.String("agent-name", "", "Computer name shown in Syncria")
+	var agentRoots agentRootsFlag
+	flag.Var(&agentRoots, "agent-root", "Shared folder Name=/absolute/path (repeatable)")
 	flag.Parse()
+	if *agentMode { if err := runComputerAgent(*listen,*agentData,*agentName,agentRoots);err!=nil{log.Fatal(err)};return }
 	dir := *dataDir
 	if dir == "" {
 		if u, e := os.UserConfigDir(); e == nil {
@@ -1667,6 +1674,11 @@ func main() {
     if os.Getenv("SYNCRIA_ENABLE_MOUNTS")=="1" {go a.restoreShares()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.home)
+	mux.HandleFunc("/api/computers",a.computersAPI)
+	mux.HandleFunc("/api/computers/register",a.computerRegisterAPI)
+	mux.HandleFunc("/api/computers/remove",a.computerRemoveAPI)
+	mux.HandleFunc("/api/computers/browse",a.computerBrowseAPI)
+	mux.HandleFunc("/api/computers/transfers",a.computerTransfersAPI)
 	mux.HandleFunc("/assets/syncria-logo.svg", serveBrandLogo)
 	mux.HandleFunc("/api/browse/drive", a.browseDrive)
 	mux.HandleFunc("/api/update/status", a.updateStatus)
