@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+import urllib.error
 import uuid
 
 binary = pathlib.Path(sys.argv[1]).resolve()
@@ -45,6 +46,9 @@ with tempfile.TemporaryDirectory(prefix="syncria-worker-smoke-") as work:
                     ) as response:
                         if response.status == 401:
                             break
+                except urllib.error.HTTPError as error:
+                    if error.code == 401:
+                        break  # Live agent: unauthenticated probe is correctly denied.
                 except Exception:
                     pass
             time.sleep(0.1)
