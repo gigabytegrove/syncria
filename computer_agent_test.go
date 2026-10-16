@@ -42,21 +42,24 @@ func TestComputerAgentPathsRejectTraversal(t *testing.T){
   if _,e:=agentRelative(p);e!=nil{t.Errorf("valid agent path rejected: %q: %v",p,e)}
  }
 }
+func testRunComputerTransfer(t *testing.T,src,dst ComputerRecord,sourceRoot,destRoot,sourcePath,destPath string,move bool)error{
+ t.Helper()
+ job:=computerTransfer{ID:newID(),SourceID:src.ID,DestinationID:dst.ID,File:sourcePath,Target:destPath,SourceRoot:sourceRoot,DestinationRoot:destRoot,Started:time.Now(),Move:move}
+ task:=computerTransferTask{Job:job,Source:src,Destination:dst}
+ var events []computerWorkerEvent
+ err:=executeComputerTransfer(context.Background(),task,func(e computerWorkerEvent){events=append(events,e)})
+ if len(events)==0{t.Fatal("worker produced no progress events")}
+ return err
+}
 func TestAgentDirectPeerCopyAndMove(t *testing.T){
  src,dst:=newAgentTestFixture(t,"source"),newAgentTestFixture(t,"destination")
  file:=filepath.Join(src.folder,"sample.txt")
  if e:=os.WriteFile(file,[]byte("Syncria peer-to-peer transfer works"),0600);e!=nil{t.Fatal(e)}
- transfer:=computerTransfer{ID:newID(),File:"sample.txt",Started:time.Now(),Move:false}
- runComputerTransfer(src.record,dst.record,"Files","Files","sample.txt","nested/sample.txt",transfer)
- computerTransferLock.Lock();result:=computerTransfers[transfer.ID];computerTransferLock.Unlock()
- if result.Status!="completed"{t.Fatalf("copy failed: %+v",result)}
+ if err:=testRunComputerTransfer(t,src.record,dst.record,"Files","Files","sample.txt","nested/sample.txt",false);err!=nil{t.Fatalf("copy failed: %v",err)}
  contents,e:=os.ReadFile(filepath.Join(dst.folder,"nested","sample.txt"))
  if e!=nil||string(contents)!="Syncria peer-to-peer transfer works"{t.Fatalf("destination bytes mismatched: %q %v",contents,e)}
  if _,e=os.Stat(file);e!=nil{t.Fatalf("copy removed source: %v",e)}
- move:=computerTransfer{ID:newID(),File:"sample.txt",Started:time.Now(),Move:true}
- runComputerTransfer(src.record,dst.record,"Files","Files","sample.txt","sample-moved.txt",move)
- computerTransferLock.Lock();afterMove:=computerTransfers[move.ID];computerTransferLock.Unlock()
- if afterMove.Status!="completed"{t.Fatalf("move failed: %+v",afterMove)}
+ if err:=testRunComputerTransfer(t,src.record,dst.record,"Files","Files","sample.txt","sample-moved.txt",true);err!=nil{t.Fatalf("move failed: %v",err)}
  if _,e=os.Stat(file);!os.IsNotExist(e){t.Fatalf("source was not removed after verified move: %v",e)}
  if bytes,e:=os.ReadFile(filepath.Join(dst.folder,"sample-moved.txt"));e!=nil||string(bytes)!="Syncria peer-to-peer transfer works"{t.Fatalf("moved bytes invalid: %q %v",bytes,e)}
 }
@@ -64,10 +67,7 @@ func TestComputerTransferNeverOverwrites(t *testing.T){
  src,dst:=newAgentTestFixture(t,"source"),newAgentTestFixture(t,"destination")
  if e:=os.WriteFile(filepath.Join(src.folder,"a.txt"),[]byte("new"),0600);e!=nil{t.Fatal(e)}
  if e:=os.WriteFile(filepath.Join(dst.folder,"a.txt"),[]byte("existing"),0600);e!=nil{t.Fatal(e)}
- transfer:=computerTransfer{ID:newID(),File:"a.txt",Started:time.Now(),Move:true}
- runComputerTransfer(src.record,dst.record,"Files","Files","a.txt","a.txt",transfer)
- computerTransferLock.Lock();result:=computerTransfers[transfer.ID];computerTransferLock.Unlock()
- if result.Status!="failed"{t.Fatalf("overwrite unexpectedly permitted: %+v",result)}
+ if err:=testRunComputerTransfer(t,src.record,dst.record,"Files","Files","a.txt","a.txt",true);err==nil{t.Fatal("overwrite unexpectedly permitted")}
  dest,e:=os.ReadFile(filepath.Join(dst.folder,"a.txt"));if e!=nil||string(dest)!="existing"{t.Fatal("destination modified",e)}
  source,e:=os.ReadFile(filepath.Join(src.folder,"a.txt"));if e!=nil||string(source)!="new"{t.Fatal("source removed",e)}
 }
