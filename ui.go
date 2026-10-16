@@ -194,6 +194,10 @@ code{overflow-wrap:anywhere}
 .computer-transfer-record-actions button{font-size:12px}
 @media(max-width:950px){.computer-overview-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.computer-card-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:530px){.computer-overview-stats,.computer-platform-choice{grid-template-columns:minmax(0,1fr)}.computer-onboard-header,.computer-onboard-footer{padding:14px}.computer-setup-progress{padding:0 14px 10px}.computer-onboard-body{padding:14px}}
+.computer-file-filter-label{display:grid;gap:6px;margin:5px 0 9px;font-size:11px;color:#647f91;font-weight:700}
+.computer-file-filter-label input{width:100%;padding:9px 11px;border:1px solid #dbe7f0;border-radius:8px}
+.computer-file[hidden]{display:none!important}
+.computer-transfer-error{color:#a04b3a;font-size:12px;padding:9px 12px;border-left:3px solid #bc6d54;background:#fff5f1;margin:0;overflow-wrap:anywhere}
 </style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">
 {{if and .Configured .Logged}}
@@ -626,13 +630,13 @@ code{overflow-wrap:anywhere}
     <label class="field">Computer<select id="computerSourceID" onchange="computerSideChanged('source')"><option value="">Select source</option></select></label>
     <label class="field">Shared folder<select id="computerSourceRoot" onchange="computerRootChanged('source')"><option value="">Choose folder</option></select></label>
     <div class="computer-path"><button type="button" class="secondary" onclick="computerUp('source')">↑ Up</button><span id="computerSourcePath">Choose a computer</span></div>
-    <div class="computer-file-list" id="computerSourceFiles" role="list"><p class="muted">Choose a source computer.</p></div>
+    <label class="computer-file-filter-label">Find files in this folder<input id="computerSourceFilter" type="search" placeholder="Filter filenames…" oninput="filterComputerFiles('source')"></label><div class="computer-file-list" id="computerSourceFiles" role="list"><p class="muted">Choose a source computer.</p></div>
    </div>
    <div class="computer-explorer-pane"><div class="computer-pane-heading"><span class="computer-direction-symbol">↙</span><div><small>TO</small><h3>Destination computer</h3></div></div>
     <label class="field">Computer<select id="computerDestinationID" onchange="computerSideChanged('destination')"><option value="">Select destination</option></select></label>
     <label class="field">Shared folder<select id="computerDestinationRoot" onchange="computerRootChanged('destination')"><option value="">Choose folder</option></select></label>
     <div class="computer-path"><button type="button" class="secondary" onclick="computerUp('destination')">↑ Up</button><span id="computerDestinationPath">Choose a computer</span></div>
-    <div class="computer-file-list" id="computerDestinationFiles" role="list"><p class="muted">Choose a destination computer.</p></div>
+    <label class="computer-file-filter-label">Find files in this folder<input id="computerDestinationFilter" type="search" placeholder="Filter filenames…" oninput="filterComputerFiles('destination')"></label><div class="computer-file-list" id="computerDestinationFiles" role="list"><p class="muted">Choose a destination computer.</p></div>
    </div>
   </div>
   <div class="computer-transfer-actions"><div><strong id="computerSelectedFile">No file selected</strong><small id="computerTransferMessage">Copy preserves the source; Move deletes it only after the received file is verified.</small></div><div class="row"><button type="button" class="secondary" onclick="startComputerTransfer(false)">Copy file →</button><button type="button" class="primary" onclick="startComputerTransfer(true)">Move file →</button></div></div>
@@ -1104,7 +1108,7 @@ async function loadSyncRun(runID,more=false){
 }
 
 let computerCache=[];
-const computerSides={source:{id:'',root:'',path:'',parent:'',selected:null,seq:0},destination:{id:'',root:'',path:'',parent:'',selected:null,seq:0}};
+const computerSides={source:{id:'',root:'',path:'',parent:'',selected:null,selectedFiles:[],seq:0},destination:{id:'',root:'',path:'',parent:'',selected:null,seq:0}};
 async function computerJSON(url,options){
  const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options});
  if(!response.ok)throw Error((await response.text()).trim()||'HTTP '+response.status);
