@@ -1,0 +1,57 @@
+name: Verify Connected Computers (preview builds)
+
+on:
+  pull_request:
+    paths:
+      - 'computer_*.go'
+      - 'main.go'
+      - 'ui.go'
+      - 'docs/CONNECTED-COMPUTERS.md'
+      - '.github/workflows/verify-computer-agents.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  computer-agents:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+      - name: Compile and verify Syncria UI
+        run: |
+          npm install --no-audit --no-fund
+          npm run build:css
+      - name: Agent integration, race and static checks
+        run: |
+          go mod tidy
+          go test -count=1 -run 'TestComputer' ./...
+          go test -race -count=1 ./...
+          go vet ./...
+      - name: Preview binaries for native agents
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
+            os="${target%/*}"
+            arch="${target#*/}"
+            suffix=""
+            if [ "$os" = windows ]; then suffix=".exe"; fi
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath               -ldflags="-s -w -X main.appVersion=v0.8.6-dev"               -o "dist/syncria-${os}-${arch}${suffix}" .
+          done
+          (cd dist && sha256sum syncria-* > SHA256SUMS)
+          (cd dist && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: syncria-computer-agent-preview
+          path: dist/
+          retention-days: 7
