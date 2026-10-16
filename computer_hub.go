@@ -2,10 +2,8 @@ package main
 
 import (
  "context"
- "crypto/sha256"
  "encoding/hex"
  "encoding/json"
- "errors"
  "fmt"
  "io"
  "net/http"
@@ -34,6 +32,7 @@ type computerTransfer struct {
  ID string `json:"id"`
  Source string `json:"source"`
  Destination string `json:"destination"`
+ DestinationID string `json:"-"`
  File string `json:"file"`
  Target string `json:"target"`
  Move bool `json:"move"`
@@ -43,6 +42,7 @@ type computerTransfer struct {
  Started time.Time `json:"started"`
  Finished time.Time `json:"finished,omitempty"`
 }
+var computerTransferSlots=make(chan struct{},3)
 var computerTransferLock sync.Mutex
 var computerTransfers=map[string]computerTransfer{}
 
@@ -142,6 +142,16 @@ func (a *App) computerTransfersAPI(w http.ResponseWriter,r *http.Request){
   // Browser displays newest-first.
   for i:=0;i<len(result);i++{for j:=i+1;j<len(result);j++{if result[j].Started.After(result[i].Started){result[i],result[j]=result[j],result[i]}}}
   if len(result)>100{result=result[:100]}
+  // Poll only active receiving agents; bytes reflect what that agent actually wrote.
+  for i:=range result{
+   if result[i].Status!="transferring"{continue}
+   receiver,ok:=a.computerByID(result[i].DestinationID);if !ok{continue}
+   ctx,cancel:=context.WithTimeout(r.Context(),1500*time.Millisecond)
+   var p agentTransferProgress
+   e:=agentGET(ctx,receiver,"/v1/progress?id="+url.QueryEscape(result[i].ID),&p)
+   cancel()
+   if e==nil&&p.Bytes>=0&&p.Bytes>=result[i].Bytes{result[i].Bytes=p.Bytes}
+  }
   computerJSON(w,200,map[string]any{"transfers":result});return
  }
  if !localPost(r){computerError(w,405,"Same-origin POST required");return}
@@ -158,7 +168,7 @@ func (a *App) computerTransfersAPI(w http.ResponseWriter,r *http.Request){
  if body.SourcePath==""||body.DestinationPath==""{computerError(w,400,"Select a file and destination folder");return}
  if _,e:=agentRelative(body.SourcePath);e!=nil{computerError(w,400,e.Error());return}
  if _,e:=agentRelative(body.DestinationPath);e!=nil{computerError(w,400,e.Error());return}
- transfer:=computerTransfer{ID:newID(),Source:source.Label,Destination:dest.Label,File:body.SourcePath,Target:body.DestinationPath,Move:body.Move,Status:"preparing",Started:time.Now()}
+ transfer:=computerTransfer{ID:newID(),Source:source.Label,Destination:dest.Label,DestinationID:dest.ID,File:body.SourcePath,Target:body.DestinationPath,Move:body.Move,Status:"queued",Started:time.Now()}
  computerTransferLock.Lock()
  if len(computerTransfers)>500{
   for id,j:=range computerTransfers{if j.Status=="completed"||j.Status=="failed"{delete(computerTransfers,id)}}
@@ -172,6 +182,9 @@ func updateComputerTransfer(t computerTransfer){
  computerTransferLock.Lock();computerTransfers[t.ID]=t;computerTransferLock.Unlock()
 }
 func runComputerTransfer(src,dst ComputerRecord,sr,dr,sourcePath,destinationPath string,t computerTransfer){
+ computerTransferSlots<-struct{}{}
+ defer func(){<-computerTransferSlots}()
+ t.Status="preparing";updateComputerTransfer(t)
  defer func(){if v:=recover();v!=nil{t.Status="failed";t.Error="Unexpected transfer failure";t.Finished=time.Now();updateComputerTransfer(t)}}()
  ctx,cancel:=context.WithCancel(context.Background());defer cancel()
  sourceClient,e:=pinnedComputerClient(src.Fingerprint)
@@ -184,7 +197,7 @@ func runComputerTransfer(src,dst ComputerRecord,sr,dr,sourcePath,destinationPath
  if e!=nil{t.Status="failed";t.Error=e.Error();t.Finished=time.Now();updateComputerTransfer(t);return}
  var result struct{Size int64 `json:"size"`;SHA256 string `json:"sha256"`}
  e=agentJSONPost(ctx,destClient,dst.URL+"/v1/pull",dst.Key,map[string]any{
-  "root":dr,"path":destinationPath,"source_url":src.URL,"fingerprint":src.Fingerprint,"ticket":grant.Ticket,"size":grant.Size,
+  "root":dr,"path":destinationPath,"source_url":src.URL,"fingerprint":src.Fingerprint,"ticket":grant.Ticket,"size":grant.Size,"transfer_id":t.ID,
  },&result)
  if e!=nil{t.Status="failed";t.Error="Destination: "+e.Error();t.Finished=time.Now();updateComputerTransfer(t);return}
  if result.Size!=grant.Size||len(result.SHA256)!=64{
@@ -199,5 +212,3 @@ func runComputerTransfer(src,dst ComputerRecord,sr,dr,sourcePath,destinationPath
  }
  t.Status="completed";t.Finished=time.Now();updateComputerTransfer(t)
 }
-var _ = sha256.Size
-var _ = errors.New
