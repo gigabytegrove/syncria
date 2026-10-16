@@ -6,7 +6,11 @@
 
 **Keep your files together, wherever you save them.**
 
-**Interface (v0.8.5):** Syncria uses a quieter, locally bundled Tailwind CSS design with straightforward navigation, forms, progress, and storage management. No browser CDN or external UI service is needed.
+**Interface (v0.8.6-alpha.1 preview):** Syncria uses a quieter, locally bundled Tailwind CSS design with straightforward navigation, forms, progress, and storage management. No browser CDN or external UI service is needed.
+
+> **Development status:** v0.8.6-alpha.1 is an **opt-in experimental alpha** with Stable/Beta/Alpha update-channel selection and native Windows/Linux Connected Computer agents. The published stable release remains v0.8.5. See [alpha release notes](docs/RELEASE-v0.8.6-alpha.1.md) and [agent setup](docs/CONNECTED-COMPUTERS.md).
+>
+> Existing v0.8.5 installations do not automatically discover alpha releases. To opt into this build, use App Updates → Advanced options → Manual installation with this alpha release's platform binary and SHA256SUMS, then select **Alpha** on the new App Updates page. Never deploy the alpha without a data-volume backup.
 
 Syncria helps you keep folders matched between Google Drive, Dropbox, and storage boxes on your home or work network. Those storage boxes are called **NAS devices**.
 
