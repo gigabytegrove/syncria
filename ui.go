@@ -615,7 +615,7 @@ code{overflow-wrap:anywhere}
     <div class="computer-agent-instructions"><div class="computer-command-heading"><strong>Linux terminal</strong><button type="button" class="secondary" onclick="copyComputerBootstrap('linux')">Copy Linux</button></div><code id="computerLinuxCommand">Preparing one-time command…</code></div>
    </div>
    <div class="computer-bootstrap-status"><span class="computer-bootstrap-pulse">●</span><strong id="computerEnrollState">Waiting for the new computer to connect…</strong><p id="computerEnrollDetail">Syncria checks the agent's secure connection automatically.</p><small id="computerInviteExpiry">Invitation expires after 20 minutes.</small></div>
-   <p class="muted">An empty <strong>Syncria Shared</strong> folder will be created in that user's home directory. Other folders are not shared. The server must be accessible from the computer over trusted HTTPS; allow agent TCP 9765 from your LAN.</p>
+   <p class="muted">An empty <strong>Syncria Shared</strong> folder will be created in that user's home directory. Other folders are not shared. The server can use HTTP on a trusted private LAN or HTTPS. Make sure the new computer can reach Syncria, and permit agent TCP 9765 from your LAN.</p>
   </div>
   <div id="computerStep3" class="computer-setup-step hidden">
    <h3>Computer securely connected</h3><p>The agent has been installed and Syncria verified its pairing key, TLS certificate fingerprint, and reachable LAN address.</p>
