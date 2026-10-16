@@ -12,27 +12,23 @@ This feature is part of the opt-in **v0.8.6-alpha.5** preview ([release notes](R
 
 Current limitations: **whole-directory copying, automatic agent-to-agent sync relationships, shared agent folder mounts, resumable interrupted downloads, WAN relay and unattended agent upgrades are not included.** Real byte progress and durable per-file transfer history are included in alpha.2. Transfers use machine-to-machine HTTPS; both agents must be able to connect to one another and the Syncria hub must connect to both.
 
-## Agent setup
+## Agent setup — one command
 
-First, download a Syncria executable from a release containing this feature (not v0.8.5). The native agent is the **same executable** as the server. It does not require SMB sharing, a Windows file-sharing account, a database, or another Docker container.
+On your Syncria server, open **My Computers → Add computer** and enter a computer name. Syncria generates a **single-use, 20-minute invitation** and three setup commands:
 
-Windows (PowerShell, in the directory containing the executable):
+- **Windows PowerShell:** copy the PowerShell command.
+- **Windows CMD:** copy the CMD command (it launches the PowerShell installer).
+- **Linux terminal:** copy the Linux command.
 
-```powershell
-.\syncria-windows-amd64.exe -agent -listen 0.0.0.0:9765 -agent-data "C:\SyncriaAgent" -agent-name "Desktop" -agent-root "Documents=C:\Users\Public\Documents"
-```
+Run that command on the computer being added. It detects the CPU architecture, downloads the platform-specific executable and checksum manifest **from your own Syncria server**, verifies the download, creates an initially empty `Syncria Shared` folder, installs the agent under the user's account, and configures startup where supported. The native agent automatically discovers local IP addresses and generates a pairing key and TLS certificate. Syncria validates those credentials and the HTTPS certificate fingerprint before adding the computer.
 
-Linux:
+**Both HTTP on a trusted private LAN and HTTPS are supported for the Syncria web dashboard and initial enrollment.** For example, `http://192.168.0.19:9764` works without setting up SSL. Public hosts must use HTTPS. If using HTTP, the installer and initial pairing travel unencrypted on your LAN. The checksum downloaded over that same HTTP connection **does not authenticate the binary against an active network attacker**; use HTTPS on untrusted networks. All actual Syncria-to-agent and agent-to-agent file transfers remain certificate-pinned HTTPS regardless of the dashboard scheme.
 
-```bash
-./syncria-linux-amd64 -agent -listen 0.0.0.0:9765 -agent-data "$HOME/.config/syncria-agent" -agent-name "Laptop" -agent-root "Documents=$HOME/Documents"
-```
+The agent listens on TCP 9765. Ensure your Syncria server can reach that port and, for direct transfers, that the destination computer can reach the source. Restrict any firewall rule to your trusted LAN/VPN. Agent credentials are stored in its private identity directory and should be protected. Windows agent startup is per-user at sign-in; Linux uses a systemd user service if available, with a foreground-independent fallback if not.
 
-To share multiple folders, repeat `-agent-root Name=/absolute/path`, using an absolute path and unique label for each root.
+### Advanced: manual agent setup
 
-The first start generates an independent pairing key, a self-signed TLS certificate and its SHA-256 fingerprint. **Protect the agent identity directory as you would a password.** Do not expose the agent port to the public Internet, and restrict the TCP 9765 firewall rule to your trusted LAN or VPN. For all normal use, run the agent as an unprivileged user that has access only to the intended folders.
-
-In **My Computers → + Add computer**, name the computer and copy the Windows PowerShell/CMD or Linux one-liner onto that computer. Syncria serves the SHA-256-verified agent installer and binary itself, chooses the correct CPU build, configures startup and an empty `Syncria Shared` folder, and pairs the agent automatically. Manual IP addresses, pairing keys, and TLS fingerprints are not needed. Enrollment invites expire after 20 minutes and can be used only once. Enter a friendly name, HTTPS address (for example `https://192.168.1.42:9765`), the pairing key and certificate fingerprint printed by the agent. Syncria tests the connection and rejects invalid keys or fingerprints.
+For troubleshooting only, the same published native executable supports manual mode with `-agent`, `-agent-data`, `-agent-name`, `-listen` and one or more `-agent-root Name=/absolute/path` options. For normal use, prefer the one-command setup so you do not need to enter IP addresses or paste keys and certificate fingerprints manually.
 
 To transfer files, open the separate **Computer Transfers** workspace. Select a source computer and shared folder on the left, choose up to 100 individual files, then select a destination computer and folder on the right. **Copy file** or **Move file** creates independent queued jobs per file. Monitor actual bytes, cancel work, filter history, or retry failures without overwriting files.
 
