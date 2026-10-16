@@ -39,7 +39,14 @@ type agentTransferProgress struct { Bytes int64 `json:"bytes"`; Total int64 `jso
 type computerAgent struct { name,secret string; roots map[string]string; mu sync.Mutex; tickets map[string]agentTicket; progress map[string]agentTransferProgress }
 type agentProgressWriter struct { dst io.Writer; onWrite func(int) }
 func (w agentProgressWriter) Write(b []byte)(int,error){n,e:=w.dst.Write(b);if n>0{w.onWrite(n)};return n,e}
-func (a *computerAgent) progressSet(id string,p agentTransferProgress){a.mu.Lock();if a.progress==nil{a.progress=map[string]agentTransferProgress{}};a.progress[id]=p;a.mu.Unlock()}
+func (a *computerAgent) progressSet(id string,p agentTransferProgress){
+ a.mu.Lock();defer a.mu.Unlock()
+ if a.progress==nil{a.progress=map[string]agentTransferProgress{}}
+ if len(a.progress)>1024{
+  for old,entry:=range a.progress{if entry.Status!="transferring"{delete(a.progress,old)}}
+ }
+ a.progress[id]=p
+}
 func (a *computerAgent) serveProgress(w http.ResponseWriter,r *http.Request){
  if r.Method!="GET"{computerError(w,405,"GET required");return}
  a.mu.Lock();p,ok:=a.progress[r.URL.Query().Get("id")];a.mu.Unlock()
@@ -310,6 +317,14 @@ func runComputerAgent(listen,dataDir,name string,folders []string)error{
   full,e:=filepath.Abs(v);if e!=nil{return e}
   info,e:=os.Lstat(full);if e!=nil||!info.IsDir()||info.Mode()&os.ModeSymlink!=0{return fmt.Errorf("agent shared directory is unavailable: %s",k)}
   roots[k]=full
+ }
+ // Never allow the agent identity and private key to be shared as user files.
+ identityPath,e:=filepath.Abs(dataDir);if e!=nil{return e}
+ for label,folder:=range roots{
+  relative,err:=filepath.Rel(folder,identityPath)
+  if err==nil&&(relative=="."||(!strings.HasPrefix(relative,".."+string(filepath.Separator))&&relative!="..")){
+   return fmt.Errorf("agent identity directory must not be inside shared folder %q",label)
+  }
  }
  secret,certFile,fingerprint,e:=createAgentIdentity(dataDir);if e!=nil{return e}
  if name==""{name,_=os.Hostname()}
