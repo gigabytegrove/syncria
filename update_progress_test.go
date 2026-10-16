@@ -63,3 +63,37 @@ func TestSyncUIShowsProgressAndFourWizardSteps(t *testing.T){
   if !strings.Contains(newUI,part){t.Errorf("missing %s",part)}
  }
 }
+
+func TestAlphaPrefixedReleaseRestartConfirmsInstalledBinary(t *testing.T){
+ if runtime.GOOS=="windows"{t.Skip("in-app updater runs inside Linux")}
+ if got:=releaseTagAppVersion("alpha-"+appVersion);got!=appVersion{
+  t.Fatalf("alpha channel release tag was not normalized: %q vs %q",got,appVersion)
+ }
+ if got:=releaseTagAppVersion("beta-v0.8.6-beta.2");got!="v0.8.6-beta.2"{
+  t.Fatalf("beta channel release tag was not normalized: %q",got)
+ }
+ if got:=releaseTagAppVersion("v0.8.5");got!="v0.8.5"{
+  t.Fatalf("stable tag changed: %q",got)
+ }
+ if got:=releaseTagAppVersion("alpha-v0.8.6");got!=""{
+  t.Fatalf("malformed tag accepted: %q",got)
+ }
+ app:=&App{file:filepath.Join(t.TempDir(),"state.json")}
+ p:=UpdateProgress{Phase:"restarting",Operation:"install",From:"v0.8.5",Target:"alpha-"+appVersion,Active:true,Percent:97}
+ app.updateMu.Lock()
+ err:=app.writeUpdateProgressLocked(p)
+ app.updateMu.Unlock()
+ if err!=nil{t.Fatal(err)}
+ app.reconcileUpdateOnStartup()
+ state:=app.updateProgressSnapshot()
+ if state.Phase!="complete"||state.Active||state.Percent!=100{
+  t.Fatalf("valid alpha restart was reported failed instead of completed: %+v",state)
+ }
+ if _,err:=os.Stat(app.updateProgressPath());!os.IsNotExist(err){
+  t.Fatalf("completed alpha update left stale status file: %v",err)
+ }
+ if !strings.Contains(newUI,"runtimeVersionOfRelease(expectedVersion)")||
+  !strings.Contains(newUI,"runtimeVersionOfRelease(p.target)") {
+  t.Fatal("browser version confirmation still compares channel-prefixed tags to executable versions")
+ }
+}
