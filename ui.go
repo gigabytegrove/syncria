@@ -1303,24 +1303,41 @@ async function browseComputer(side,relative){
   }
  }catch(error){if(seq===s.seq){list.textContent=error.message;$(prefix+'Path').textContent='Unable to browse shared folder'}}
 }
+
+function filterComputerFiles(side){
+ const prefix='computer'+(side==='source'?'Source':'Destination');
+ const search=$(prefix+'Filter').value.trim().toLowerCase();
+ for(const row of $(prefix+'Files').querySelectorAll('.computer-file'))row.hidden=!row.dataset.filename.includes(search);
+}
 async function startComputerTransfer(move){
  const from=computerSides.source,to=computerSides.destination;
  const message=$('computerTransferMessage');
- if(!from.selected||!from.id||!from.root||!to.id||!to.root){message.textContent='Choose a source file and destination shared folder.';return}
- if(from.id===to.id){message.textContent='Select two different computers.';return}
- const file=from.selected.name;
- const sourcePath=from.path?from.path+'/'+file:file;
- const destPath=to.path?to.path+'/'+file:file;
- if(!confirm((move?'Move':'Copy')+' '+file+' from '+computerCache.find(c=>c.id===from.id)?.label+' to '+computerCache.find(c=>c.id===to.id)?.label+'? Existing destination files will not be overwritten.'))return;
- message.textContent='Submitting secure direct transfer…';
- try{
-  await computerJSON('/api/computers/transfers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-   source_id:from.id,destination_id:to.id,source_root:from.root,destination_root:to.root,
-   source_path:sourcePath,destination_path:destPath,move
-  })});
-  message.textContent='Transfer queued in the isolated worker system. Live progress is tracked below.';
-  await refreshComputerTransfers();
- }catch(error){message.textContent='Transfer could not start: '+error.message}
+ const files=from.selectedFiles||[];
+ if(!files.length||!from.id||!from.root||!to.id||!to.root){
+  message.textContent='Choose one or more source files and a destination shared folder.';return;
+ }
+ if(from.id===to.id){message.textContent='Select two different computers.';return;}
+ const total=files.reduce((n,item)=>n+Number(item.size||0),0);
+ if(!confirm((move?'Move':'Copy')+' '+files.length+' file(s) ('+formatBytes(total)+') from '+
+  computerCache.find(c=>c.id===from.id)?.label+' to '+computerCache.find(c=>c.id===to.id)?.label+
+  '? Each file is independently verified. Existing destination files are never overwritten.'))return;
+ let accepted=0;
+ const errors=[];
+ for(const file of files){
+  const sourcePath=from.path?from.path+'/'+file.name:file.name;
+  const destPath=to.path?to.path+'/'+file.name:file.name;
+  message.textContent='Queueing '+(accepted+errors.length+1)+' of '+files.length+' files…';
+  try{
+   await computerJSON('/api/computers/transfers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    source_id:from.id,destination_id:to.id,source_root:from.root,destination_root:to.root,
+    source_path:sourcePath,destination_path:destPath,move
+   })});
+   accepted++;
+  }catch(error){errors.push(file.name+': '+error.message);}
+ }
+ message.textContent=accepted+' file'+(accepted===1?'':'s')+' queued in isolated workers.'+
+  (errors.length?' '+errors.length+' rejected: '+errors.slice(0,3).join('; '):'');
+ await refreshComputerTransfers();
 }
 let computerTransferRecords=[];
 let computerTransferRefreshing=false;
