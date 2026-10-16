@@ -27,6 +27,7 @@ func newAgentTestFixture(t *testing.T,alias string)agentTestFixture{
  mux.HandleFunc("/v1/grant",agent.authorize(agent.serveGrant))
  mux.HandleFunc("/v1/download",agent.serveDownload)
  mux.HandleFunc("/v1/pull",agent.authorize(agent.servePull))
+ mux.HandleFunc("/v1/progress",agent.authorize(agent.serveProgress))
  mux.HandleFunc("/v1/delete",agent.authorize(agent.serveDelete))
  server:=httptest.NewTLSServer(mux)
  t.Cleanup(server.Close)
@@ -112,4 +113,21 @@ func TestComputerHubRegistrationAndNoSecretLeak(t *testing.T){
  if !strings.Contains(response.Body.String(),"\"online\":true"){t.Fatal("registered agent not online",response.Body.String())}
  if strings.Contains(response.Body.String(),src.record.Key){t.Fatal("list API disclosed pairing key")}
  persisted,e:=os.ReadFile(state);if e!=nil||!strings.Contains(string(persisted),src.record.Key){t.Fatal("agent credential was not persisted securely",e)}
+}
+
+func TestComputerAgentIdentityIsPersistent(t *testing.T){
+ dir:=filepath.Join(t.TempDir(),"credentials")
+ secret1,certificate1,pin1,e:=createAgentIdentity(dir)
+ if e!=nil{t.Fatal(e)}
+ secret2,certificate2,pin2,e:=createAgentIdentity(dir)
+ if e!=nil{t.Fatal(e)}
+ if secret1==""||len(pin1)!=64||secret1!=secret2||pin1!=pin2||certificate1!=certificate2{t.Fatal("agent identity was not persistent")}
+ for _,file:=range []string{"identity.json","agent.crt","agent.key"}{
+  if _,e:=os.Stat(filepath.Join(dir,file));e!=nil{t.Fatal("agent identity file missing",file,e)}
+ }
+}
+func TestComputerAgentIdentityMustNotBeShared(t *testing.T){
+ root:=t.TempDir()
+ e:=runComputerAgent("127.0.0.1:0",filepath.Join(root,"keys"),"test",[]string{"Shared="+root})
+ if e==nil||!strings.Contains(e.Error(),"identity directory"){t.Fatalf("agent accepted public identity directory: %v",e)}
 }
