@@ -7,6 +7,8 @@ on:
     paths:
       - '.github/workflows/publish-alpha.yml'
       - 'scripts/verify-direct-worker.py'
+      - 'google_native_safety_test.go'
+      - 'update_progress_test.go'
   workflow_dispatch:
 
 permissions:
