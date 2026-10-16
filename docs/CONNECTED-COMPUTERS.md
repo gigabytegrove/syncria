@@ -1,6 +1,6 @@
 # Syncria connected computers — direct file transfers
 
-This feature is part of the opt-in **v0.8.6-alpha.6** preview ([release notes](RELEASE-v0.8.6-alpha.6.md)) and under ongoing review in [PR #19](https://github.com/gigabytegrove/syncria/pull/19). **Production Stable remains v0.8.5.** The cross-platform Syncria executable also runs as a native computer agent.
+This feature is part of the opt-in **v0.8.6-beta.1 Beta** ([release notes](RELEASE-v0.8.6-beta.1.md)) and under ongoing review in [PR #19](https://github.com/gigabytegrove/syncria/pull/19). **Production Stable remains v0.8.5.** The cross-platform Syncria executable also runs as a native computer agent.
 
 ## What the first implementation does
 
@@ -10,7 +10,7 @@ This feature is part of the opt-in **v0.8.6-alpha.6** preview ([release notes](R
 - Show each copy/move operation and its result. A move verifies the received bytes before asking the source agent to remove the original.
 - Never overwrite an existing destination file. A copy that lands successfully remains on the destination if final source deletion fails.
 
-Current limitations: **whole-directory copying, automatic agent-to-agent sync relationships, shared agent folder mounts, resumable interrupted downloads, WAN relay and unattended agent upgrades are not included.** Real byte progress and durable per-file transfer history are included in alpha.2. Transfers use machine-to-machine HTTPS; both agents must be able to connect to one another and the Syncria hub must connect to both.
+Current limitations: **whole-directory copying, automatic agent-to-agent sync relationships, shared agent folder mounts, resumable interrupted downloads, WAN relay and unattended agent upgrades are not included.** Real byte progress and durable per-file transfer history are included in Beta. Transfers use machine-to-machine HTTPS; both agents must be able to connect to one another and the Syncria hub must connect to both.
 
 ## Agent setup — one command
 
