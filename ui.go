@@ -198,6 +198,12 @@ code{overflow-wrap:anywhere}
 .computer-file-filter-label input{width:100%;padding:9px 11px;border:1px solid #dbe7f0;border-radius:8px}
 .computer-file[hidden]{display:none!important}
 .computer-transfer-error{color:#a04b3a;font-size:12px;padding:9px 12px;border-left:3px solid #bc6d54;background:#fff5f1;margin:0;overflow-wrap:anywhere}
+.computer-command-collection{display:grid;gap:12px}
+.computer-command-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.computer-agent-instructions code{user-select:all;overflow-wrap:anywhere;white-space:pre-wrap}
+.computer-bootstrap-status{margin:16px 0;padding:16px;border:1px solid #c7e6da;border-radius:12px;background:#eefaf5}
+.computer-bootstrap-status strong{font-size:13px}.computer-bootstrap-status p,.computer-bootstrap-status small{display:block;color:#59778c;font-size:12px;margin:8px 0 0}
+.computer-bootstrap-pulse{color:#19855d;margin-right:8px}
 </style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">
 {{if and .Configured .Logged}}
@@ -591,29 +597,33 @@ code{overflow-wrap:anywhere}
 </section>
 
 <dialog id="computerOnboard" class="computer-onboard-dialog" aria-labelledby="computerOnboardTitle">
- <div class="computer-onboard-header"><div><span class="mini-overline">NEW DIRECT CONNECTION</span><h2 id="computerOnboardTitle">Add a computer</h2><p>Three quick steps. Your files stay on their original computers.</p></div><button class="secondary" type="button" onclick="closeComputerOnboard()" aria-label="Close setup">✕</button></div>
- <div class="computer-setup-progress" aria-label="Computer onboarding steps"><span data-computer-step="1">1 · Device</span><span data-computer-step="2">2 · Run agent</span><span data-computer-step="3">3 · Secure pairing</span></div>
+ <div class="computer-onboard-header"><div><span class="mini-overline">ONE-COMMAND SETUP</span><h2 id="computerOnboardTitle">Add a computer</h2><p>Syncria installs, configures, and pairs the native agent for you.</p></div><button class="secondary" type="button" onclick="closeComputerOnboard()" aria-label="Close setup">✕</button></div>
+ <div class="computer-setup-progress" aria-label="Computer onboarding steps"><span data-computer-step="1">1 · Name computer</span><span data-computer-step="2">2 · Copy & run command</span><span data-computer-step="3">3 · Connected automatically</span></div>
  <div class="computer-onboard-body">
-  <div id="computerStep1" class="computer-setup-step"><h3>Which computer are you adding?</h3><p>Install the small Syncria agent on the machine containing the files you want to share.</p>
-   <div class="computer-platform-choice"><label><input type="radio" name="computerPlatform" value="windows" checked onchange="updateComputerSetupPlatform()"><strong>Windows</strong><small>Desktop or laptop</small></label><label><input type="radio" name="computerPlatform" value="linux" onchange="updateComputerSetupPlatform()"><strong>Linux</strong><small>Desktop, mini PC, or server</small></label></div>
-   <label class="field">Give this computer a name<input id="computerPairLabel" autocomplete="off" placeholder="Office desktop" maxlength="80" required></label>
+  <div id="computerStep1" class="computer-setup-step">
+   <h3>Name the computer</h3>
+   <p>Enter the friendly name you'll see in My Computers. The command will detect Windows/Linux and the CPU architecture automatically.</p>
+   <label class="field">Computer name<input id="computerPairLabel" autocomplete="off" placeholder="Office desktop" maxlength="80" required></label>
+   <p class="muted">Syncria generates a private, single-use 20-minute invitation. No IP address, pairing key, certificate fingerprint, or manual download is needed.</p>
   </div>
-  <div id="computerStep2" class="computer-setup-step hidden"><h3>Start the agent on that computer</h3><p>Download the native agent, run it in a terminal, and allow the agent port on your trusted LAN only. It displays the pairing key and certificate fingerprint needed in the next step.</p>
-   <div class="computer-agent-instructions"><strong id="computerAgentPlatformLabel">Windows · PowerShell</strong><code id="computerAgentCommand"></code><button type="button" class="secondary" onclick="copyComputerAgentCommand()">Copy command</button></div>
-   <p class="muted">Change the example shared folder to the actual folder you want accessible. The agent runs with the permissions of the account that starts it. Multiple folders can be shared by repeating <code>-agent-root</code>.</p>
-   <a id="computerAgentDownload" href="https://github.com/gigabytegrove/syncria/releases" target="_blank" rel="noopener noreferrer">Download agent executable ↗</a>
+  <div id="computerStep2" class="computer-setup-step hidden">
+   <h3>Copy one command onto that computer</h3>
+   <p>Open your preferred terminal on that computer and run one of the commands below. The installer downloads the matching agent <strong>from your Syncria server</strong>, verifies SHA-256, configures it, launches it, and pairs automatically.</p>
+   <div class="computer-command-collection">
+    <div class="computer-agent-instructions"><div class="computer-command-heading"><strong>Windows PowerShell</strong><button type="button" class="secondary" onclick="copyComputerBootstrap('ps')">Copy PowerShell</button></div><code id="computerPSCommand">Preparing one-time command…</code></div>
+    <div class="computer-agent-instructions"><div class="computer-command-heading"><strong>Windows CMD</strong><button type="button" class="secondary" onclick="copyComputerBootstrap('cmd')">Copy CMD</button></div><code id="computerCMDCommand">Preparing one-time command…</code></div>
+    <div class="computer-agent-instructions"><div class="computer-command-heading"><strong>Linux terminal</strong><button type="button" class="secondary" onclick="copyComputerBootstrap('linux')">Copy Linux</button></div><code id="computerLinuxCommand">Preparing one-time command…</code></div>
+   </div>
+   <div class="computer-bootstrap-status"><span class="computer-bootstrap-pulse">●</span><strong id="computerEnrollState">Waiting for the new computer to connect…</strong><p id="computerEnrollDetail">Syncria checks the agent's secure connection automatically.</p><small id="computerInviteExpiry">Invitation expires after 20 minutes.</small></div>
+   <p class="muted">An empty <strong>Syncria Shared</strong> folder will be created in that user's home directory. Other folders are not shared. The server must be accessible from the computer over trusted HTTPS; allow agent TCP 9765 from your LAN.</p>
   </div>
-  <div id="computerStep3" class="computer-setup-step hidden"><h3>Pair securely</h3><p>Enter the address and the credentials shown by the running agent. Syncria verifies its TLS certificate and tests the connection before saving anything.</p>
-   <form id="computerPairForm" onsubmit="event.preventDefault();pairComputer()" class="computer-pair-form">
-    <label class="field">HTTPS address<input id="computerPairURL" autocomplete="off" placeholder="https://192.168.1.42:9765" required></label>
-    <label class="field">Pairing key<input id="computerPairKey" type="password" autocomplete="off" required></label>
-    <label class="field">TLS SHA-256 certificate fingerprint<input id="computerPairFingerprint" autocomplete="off" placeholder="64 hexadecimal characters" required></label>
-    <button id="computerPairButton" type="submit" class="primary">Verify and add computer</button>
-   </form>
+  <div id="computerStep3" class="computer-setup-step hidden">
+   <h3>Computer securely connected</h3><p>The agent has been installed and Syncria verified its pairing key, TLS certificate fingerprint, and reachable LAN address.</p>
+   <button type="button" class="primary" onclick="closeComputerOnboard();navigate('computers')">View in My Computers →</button>
   </div>
   <p id="computerPairMessage" class="computer-setup-message" role="status"></p>
  </div>
- <div class="computer-onboard-footer"><button type="button" class="secondary" id="computerStepBack" onclick="computerSetupBack()">Back</button><button type="button" class="primary" id="computerStepNext" onclick="computerSetupNext()">Continue →</button></div>
+ <div class="computer-onboard-footer"><button type="button" class="secondary" id="computerStepBack" onclick="computerSetupBack()">Back</button><button type="button" class="primary" id="computerStepNext" onclick="computerSetupNext()">Generate install commands →</button></div>
 </dialog>
 
 <section class="view" id="view-computer-transfers">
