@@ -35,7 +35,17 @@ func (f *agentRootsFlag) Set(s string) error { *f=append(*f,s);return nil }
 type agentFile struct { Name string `json:"name"`; Directory bool `json:"directory"`; Size int64 `json:"size"`; Modified time.Time `json:"modified"` }
 type agentRootInfo struct { Name string `json:"name"`; Path string `json:"-"` }
 type agentTicket struct { Root,Relative string; Size int64; Modified time.Time; Expires time.Time }
-type computerAgent struct { name,secret string; roots map[string]string; mu sync.Mutex; tickets map[string]agentTicket }
+type agentTransferProgress struct { Bytes int64 `json:"bytes"`; Total int64 `json:"total"`; Status string `json:"status"` }
+type computerAgent struct { name,secret string; roots map[string]string; mu sync.Mutex; tickets map[string]agentTicket; progress map[string]agentTransferProgress }
+type agentProgressWriter struct { dst io.Writer; onWrite func(int) }
+func (w agentProgressWriter) Write(b []byte)(int,error){n,e:=w.dst.Write(b);if n>0{w.onWrite(n)};return n,e}
+func (a *computerAgent) progressSet(id string,p agentTransferProgress){a.mu.Lock();if a.progress==nil{a.progress=map[string]agentTransferProgress{}};a.progress[id]=p;a.mu.Unlock()}
+func (a *computerAgent) serveProgress(w http.ResponseWriter,r *http.Request){
+ if r.Method!="GET"{computerError(w,405,"GET required");return}
+ a.mu.Lock();p,ok:=a.progress[r.URL.Query().Get("id")];a.mu.Unlock()
+ if !ok{computerError(w,404,"Transfer progress not found");return}
+ computerJSON(w,200,p)
+}
 type agentIdentity struct { Secret string `json:"secret"` }
 
 func computerJSON(w http.ResponseWriter,code int,v any) {
@@ -176,6 +186,10 @@ func (a *computerAgent) serveDownload(w http.ResponseWriter,r *http.Request){
  h:=sha256.New()
  if n,e:=io.Copy(io.MultiWriter(w,h),f);e==nil&&n==ticket.Size {
   w.Header().Set("X-Syncria-SHA256",hex.EncodeToString(h.Sum(nil)))
+  token:=strings.TrimPrefix(r.Header.Get("Authorization"),"Bearer ")
+  a.mu.Lock()
+  if current,ok:=a.tickets[token];ok{current.Expires=time.Now().Add(30*time.Minute);a.tickets[token]=current}
+  a.mu.Unlock()
  }
 }
 func agentJSONPost(ctx context.Context,c *http.Client,endpoint,key string,payload any,answer any)error{
@@ -192,11 +206,15 @@ func (a *computerAgent) servePull(w http.ResponseWriter,r *http.Request){
  var body struct{
   Root string `json:"root"`;Path string `json:"path"`
   SourceURL string `json:"source_url"`;Fingerprint string `json:"fingerprint"`
-  Ticket string `json:"ticket"`; Size int64 `json:"size"`
+  Ticket string `json:"ticket"`; Size int64 `json:"size"`; TransferID string `json:"transfer_id"`
  }
  if e:=computerDecode(r,&body);e!=nil{computerError(w,400,e.Error());return}
  if _,e:=validAgentURL(body.SourceURL);e!=nil{computerError(w,400,e.Error());return}
- if body.Size<0||body.Ticket==""||body.Path==""{computerError(w,400,"invalid transfer request");return}
+ if body.Size<0||body.Ticket==""||body.Path==""||len(body.TransferID)!=32{computerError(w,400,"invalid transfer request");return}
+ if _,e:=hex.DecodeString(body.TransferID);e!=nil{computerError(w,400,"invalid transfer ID");return}
+ a.progressSet(body.TransferID,agentTransferProgress{Total:body.Size,Status:"transferring"})
+ succeeded:=false
+ defer func(){if !succeeded{a.mu.Lock();p:=a.progress[body.TransferID];p.Status="failed";a.progress[body.TransferID]=p;a.mu.Unlock()}}()
  if body.Size>1<<50{computerError(w,400,"file exceeds maximum transfer size");return}
  if _,e:=a.resolve(body.Root,body.Path,true);e!=nil{computerError(w,400,e.Error());return}
  handle,e:=os.OpenRoot(a.roots[body.Root]);if e!=nil{computerError(w,400,e.Error());return};defer handle.Close()
@@ -216,7 +234,10 @@ func (a *computerAgent) servePull(w http.ResponseWriter,r *http.Request){
  f,e:=handle.OpenFile(temp,os.O_CREATE|os.O_EXCL|os.O_WRONLY,0600);if e!=nil{computerError(w,500,e.Error());return}
  defer handle.Remove(temp)
  h:=sha256.New()
- written,e:=io.Copy(io.MultiWriter(f,h),io.LimitReader(response.Body,body.Size+1))
+ writer:=agentProgressWriter{dst:io.MultiWriter(f,h),onWrite:func(n int){
+  a.mu.Lock();p:=a.progress[body.TransferID];p.Bytes+=int64(n);a.progress[body.TransferID]=p;a.mu.Unlock()
+ }}
+ written,e:=io.Copy(writer,io.LimitReader(response.Body,body.Size+1))
  if e!=nil{f.Close();computerError(w,502,"transfer interrupted: "+e.Error());return}
  if written!=body.Size{f.Close();computerError(w,409,"transferred file size mismatch");return}
  digest:=hex.EncodeToString(h.Sum(nil))
@@ -225,6 +246,8 @@ func (a *computerAgent) servePull(w http.ResponseWriter,r *http.Request){
  if e:=f.Close();e!=nil{computerError(w,500,e.Error());return}
  if _,e:=a.resolve(body.Root,parentRel,false);e!=nil{computerError(w,409,e.Error());return}
  if e:=handle.Link(temp,body.Path);e!=nil{computerError(w,409,"cannot publish without overwriting: "+e.Error());return}
+ succeeded=true
+ a.progressSet(body.TransferID,agentTransferProgress{Total:body.Size,Bytes:written,Status:"verified"})
  computerJSON(w,200,map[string]any{"size":written,"sha256":digest,"path":body.Path})
 }
 func (a *computerAgent) serveDelete(w http.ResponseWriter,r *http.Request){
@@ -297,6 +320,7 @@ func runComputerAgent(listen,dataDir,name string,folders []string)error{
  mux.HandleFunc("/v1/grant",agent.authorize(agent.serveGrant))
  mux.HandleFunc("/v1/download",agent.serveDownload)
  mux.HandleFunc("/v1/pull",agent.authorize(agent.servePull))
+ mux.HandleFunc("/v1/progress",agent.authorize(agent.serveProgress))
  mux.HandleFunc("/v1/delete",agent.authorize(agent.serveDelete))
  // No CORS, no wildcard file access, HTTPS-only transport with certificate pinning.
  log.Printf("Syncria Computer Agent listening at https://%s",listen)
