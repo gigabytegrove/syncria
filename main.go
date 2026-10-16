@@ -159,6 +159,10 @@ type App struct {
     updateBusy bool
     updateProgress UpdateProgress
     syncProgress map[string]SyncProgress
+    computerTransferMu sync.Mutex
+    computerTransferJobs map[string]computerTransfer
+    computerTransferCancels map[string]context.CancelFunc
+    computerTransferSlots chan struct{}
     index *syncIndex
     indexBroken bool
     watchers sync.Map
@@ -1627,11 +1631,13 @@ func main() {
 	listen := flag.String("listen", "127.0.0.1:9764", "Web UI listen address (use reverse proxy for external access)")
 	dataDir := flag.String("data", "", "Configuration/data directory")
 	agentMode := flag.Bool("agent", false, "Run a native computer agent instead of the Syncria hub")
+    transferWorkerMode := flag.Bool("transfer-worker", false, "Internal isolated direct-transfer worker")
 	agentData := flag.String("agent-data", "", "Persistent agent identity directory")
 	agentName := flag.String("agent-name", "", "Computer name shown in Syncria")
 	var agentRoots agentRootsFlag
 	flag.Var(&agentRoots, "agent-root", "Shared folder Name=/absolute/path (repeatable)")
 	flag.Parse()
+	if *transferWorkerMode { if err:=runComputerTransferWorker();err!=nil{log.Fatal("Transfer worker: ",err)};return }
 	if *agentMode { if err := runComputerAgent(*listen,*agentData,*agentName,agentRoots);err!=nil{log.Fatal(err)};return }
 	dir := *dataDir
 	if dir == "" {
@@ -1671,6 +1677,7 @@ func main() {
  if err:=a.initializeFileIndex(dir);err!=nil{log.Fatal("File index startup failed: ",err)}
  defer a.index.Close()
  a.reconcileUpdateOnStartup()
+    if err:=a.restoreComputerTransfers();err!=nil{log.Fatal("Cannot read direct transfer history: ",err)}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go a.scheduler(ctx)
@@ -1684,6 +1691,7 @@ func main() {
 	mux.HandleFunc("/api/computers/remove",a.computerRemoveAPI)
 	mux.HandleFunc("/api/computers/browse",a.computerBrowseAPI)
 	mux.HandleFunc("/api/computers/transfers",a.computerTransfersAPI)
+	mux.HandleFunc("/api/computers/transfers/action",a.computerTransferActionAPI)
 	mux.HandleFunc("/assets/syncria-logo.svg", serveBrandLogo)
 	mux.HandleFunc("/api/browse/drive", a.browseDrive)
 	mux.HandleFunc("/api/update/status", a.updateStatus)
