@@ -170,9 +170,10 @@ func (a *App) computerTransfersAPI(w http.ResponseWriter,r *http.Request){
  if _,e:=agentRelative(body.DestinationPath);e!=nil{computerError(w,400,e.Error());return}
  transfer:=computerTransfer{ID:newID(),Source:source.Label,Destination:dest.Label,DestinationID:dest.ID,File:body.SourcePath,Target:body.DestinationPath,Move:body.Move,Status:"queued",Started:time.Now()}
  computerTransferLock.Lock()
- if len(computerTransfers)>500{
+ if len(computerTransfers)>=500{
   for id,j:=range computerTransfers{if j.Status=="completed"||j.Status=="failed"{delete(computerTransfers,id)}}
  }
+ if len(computerTransfers)>=500{computerTransferLock.Unlock();computerError(w,429,"Transfer queue is full; wait for current transfers to finish");return}
  computerTransfers[transfer.ID]=transfer;computerTransferLock.Unlock()
  // Background job continues if the browser closes. The response contains a real job ID.
  go runComputerTransfer(source,dest,body.SourceRoot,body.DestinationRoot,body.SourcePath,body.DestinationPath,transfer)
