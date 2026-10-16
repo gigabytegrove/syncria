@@ -64,10 +64,11 @@ func TestSyncUIShowsProgressAndFourWizardSteps(t *testing.T){
  }
 }
 
-func TestAlphaPrefixedReleaseRestartConfirmsInstalledBinary(t *testing.T){
+func TestChannelPrefixedReleaseRestartConfirmsInstalledBinary(t *testing.T){
  if runtime.GOOS=="windows"{t.Skip("in-app updater runs inside Linux")}
- if got:=releaseTagAppVersion("alpha-"+appVersion);got!=appVersion{
-  t.Fatalf("alpha channel release tag was not normalized: %q vs %q",got,appVersion)
+ tag:=computerAgentVersionTag()
+ if got:=releaseTagAppVersion(tag);got!=appVersion{
+  t.Fatalf("release channel prefix was not normalized: %q vs %q",got,appVersion)
  }
  if got:=releaseTagAppVersion("beta-v0.8.6-beta.2");got!="v0.8.6-beta.2"{
   t.Fatalf("beta channel release tag was not normalized: %q",got)
@@ -79,7 +80,7 @@ func TestAlphaPrefixedReleaseRestartConfirmsInstalledBinary(t *testing.T){
   t.Fatalf("malformed tag accepted: %q",got)
  }
  app:=&App{file:filepath.Join(t.TempDir(),"state.json")}
- p:=UpdateProgress{Phase:"restarting",Operation:"install",From:"v0.8.5",Target:"alpha-"+appVersion,Active:true,Percent:97}
+ p:=UpdateProgress{Phase:"restarting",Operation:"install",From:"v0.8.5",Target:tag,Active:true,Percent:97}
  app.updateMu.Lock()
  err:=app.writeUpdateProgressLocked(p)
  app.updateMu.Unlock()
@@ -87,10 +88,10 @@ func TestAlphaPrefixedReleaseRestartConfirmsInstalledBinary(t *testing.T){
  app.reconcileUpdateOnStartup()
  state:=app.updateProgressSnapshot()
  if state.Phase!="complete"||state.Active||state.Percent!=100{
-  t.Fatalf("valid alpha restart was reported failed instead of completed: %+v",state)
+  t.Fatalf("valid prerelease restart was reported failed instead of completed: %+v",state)
  }
  if _,err:=os.Stat(app.updateProgressPath());!os.IsNotExist(err){
-  t.Fatalf("completed alpha update left stale status file: %v",err)
+  t.Fatalf("completed prerelease update left stale status file: %v",err)
  }
  if !strings.Contains(newUI,"runtimeVersionOfRelease(expectedVersion)")||
   !strings.Contains(newUI,"runtimeVersionOfRelease(p.target)") {
