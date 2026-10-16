@@ -159,6 +159,9 @@ type App struct {
     updateBusy bool
     updateProgress UpdateProgress
     syncProgress map[string]SyncProgress
+    computerInviteMu sync.Mutex
+    computerInvites map[string]*computerInvite
+    computerAssetMu sync.Mutex
     computerTransferMu sync.Mutex
     computerTransferJobs map[string]computerTransfer
     computerTransferCancels map[string]context.CancelFunc
@@ -1634,11 +1637,13 @@ func main() {
     transferWorkerMode := flag.Bool("transfer-worker", false, "Internal isolated direct-transfer worker")
 	agentData := flag.String("agent-data", "", "Persistent agent identity directory")
 	agentName := flag.String("agent-name", "", "Computer name shown in Syncria")
+    enrollHub := flag.String("enroll-hub", "", "HTTPS Syncria server for one-time automatic pairing")
+    enrollToken := flag.String("enroll-token", "", "One-time pairing code issued by Syncria")
 	var agentRoots agentRootsFlag
 	flag.Var(&agentRoots, "agent-root", "Shared folder Name=/absolute/path (repeatable)")
 	flag.Parse()
 	if *transferWorkerMode { if err:=runComputerTransferWorker();err!=nil{log.Fatal("Transfer worker: ",err)};return }
-	if *agentMode { if err := runComputerAgent(*listen,*agentData,*agentName,agentRoots);err!=nil{log.Fatal(err)};return }
+	if *agentMode { if err := runComputerAgentWithEnrollment(*listen,*agentData,*agentName,agentRoots,*enrollHub,*enrollToken);err!=nil{log.Fatal(err)};return }
 	dir := *dataDir
 	if dir == "" {
 		if u, e := os.UserConfigDir(); e == nil {
@@ -1687,6 +1692,10 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.home)
 	mux.HandleFunc("/api/computers",a.computersAPI)
+    mux.HandleFunc("/api/computers/invite",a.computerInviteAPI)
+    mux.HandleFunc("/api/computers/enroll",a.computerEnrollAPI)
+    mux.HandleFunc("/api/computers/bootstrap",a.computerBootstrapAPI)
+    mux.HandleFunc("/api/computers/asset",a.computerAgentAssetAPI)
 	mux.HandleFunc("/api/computers/register",a.computerRegisterAPI)
 	mux.HandleFunc("/api/computers/remove",a.computerRemoveAPI)
 	mux.HandleFunc("/api/computers/browse",a.computerBrowseAPI)
