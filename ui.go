@@ -1147,7 +1147,7 @@ function updateComputerSetupPlatform(){
  const win=platform==='windows';
  $('computerAgentPlatformLabel').textContent=win?'Windows · PowerShell':'Linux · terminal';
  $('computerAgentCommand').textContent=win?".\\syncria-windows-amd64.exe -agent -listen 0.0.0.0:9765 -agent-data \"C:\\SyncriaAgent\" -agent-name \"My PC\" -agent-root \"Files=C:\\Users\\Public\\Documents\"":"./syncria-linux-amd64 -agent -listen 0.0.0.0:9765 -agent-data \"$HOME/.config/syncria-agent\" -agent-name \"My PC\" -agent-root \"Files=$HOME/Documents\"";
- $('computerAgentDownload').href='https://github.com/gigabytegrove/syncria/releases/tag/alpha-v0.8.6-alpha.2';
+ $('computerAgentDownload').href='https://github.com/gigabytegrove/syncria/releases/tag/alpha-v0.8.6-alpha.3';
  $('computerAgentDownload').textContent=win?'Download Windows agent ↗':'Download Linux agent ↗';
 }
 async function copyComputerAgentCommand(){
