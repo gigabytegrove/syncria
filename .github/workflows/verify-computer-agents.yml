@@ -50,6 +50,35 @@ jobs:
           done
           (cd dist && sha256sum syncria-* > SHA256SUMS)
           (cd dist && sha256sum -c SHA256SUMS)
+      - name: Start and probe real native Linux agent
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(mktemp -d)"
+          mkdir -p "$root/documents"
+          printf 'Syncria agent smoke test\n' > "$root/documents/hello.txt"
+          dist/syncria-linux-amd64 -agent -listen 127.0.0.1:19865 \
+            -agent-data "$root/identity" -agent-name "CI agent" \
+            -agent-root "Documents=$root/documents" > "$root/agent.log" 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; rm -rf "$root"' EXIT
+          for i in $(seq 1 80); do
+            if test -s "$root/identity/identity.json"; then
+              if curl -ks --max-time 2 https://127.0.0.1:19865/v1/status -o /dev/null; then break; fi
+            fi
+            sleep 0.25
+          done
+          token="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["secret"])' "$root/identity/identity.json")"
+          curl --fail --silent --show-error --insecure --max-time 10 \
+            -H "Authorization: Bearer $token" \
+            https://127.0.0.1:19865/v1/status > "$root/status.json"
+          python3 - "$root/status.json" <<'PY'
+          import json,sys
+          v=json.load(open(sys.argv[1]))
+          assert v["name"] == "CI agent"
+          assert v["roots"][0]["name"] == "Documents"
+          print("PASS: native TLS agent started and listed its configured root")
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: syncria-computer-agent-preview
