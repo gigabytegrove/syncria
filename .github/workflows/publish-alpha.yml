@@ -6,6 +6,7 @@ on:
     branches: [feature/direct-computer-agents]
     paths:
       - '.github/workflows/publish-alpha.yml'
+      - 'scripts/verify-direct-worker.py'
   workflow_dispatch:
 
 permissions:
