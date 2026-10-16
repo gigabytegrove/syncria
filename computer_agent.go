@@ -1,7 +1,6 @@
 package main
 
 import (
- "context"
  "crypto/rand"
  "crypto/rsa"
  "crypto/sha256"
@@ -24,7 +23,6 @@ import (
  "path"
  "path/filepath"
  "sort"
- "strconv"
  "strings"
  "sync"
  "time"
@@ -124,9 +122,12 @@ func (a *computerAgent) serveStatus(w http.ResponseWriter,r *http.Request){
 func (a *computerAgent) serveList(w http.ResponseWriter,r *http.Request){
  if r.Method!="GET"{computerError(w,405,"GET required");return}
  root,rel:=r.URL.Query().Get("root"),r.URL.Query().Get("path")
- p,e:=a.resolve(root,rel,false);if e!=nil{computerError(w,400,e.Error());return}
- info,e:=os.Lstat(p);if e!=nil||!info.IsDir(){computerError(w,400,"not a directory");return}
- entries,e:=os.ReadDir(p);if e!=nil{computerError(w,500,e.Error());return}
+ _,e:=a.resolve(root,rel,false);if e!=nil{computerError(w,400,e.Error());return}
+ handle,e:=os.OpenRoot(a.roots[root]);if e!=nil{computerError(w,500,e.Error());return};defer handle.Close()
+ dirName:=rel;if dirName==""{dirName="."}
+ dir,e:=handle.Open(dirName);if e!=nil{computerError(w,400,e.Error());return};defer dir.Close()
+ info,e:=dir.Stat();if e!=nil||!info.IsDir(){computerError(w,400,"not a directory");return}
+ entries,e:=dir.ReadDir(-1);if e!=nil{computerError(w,500,e.Error());return}
  out:=make([]agentFile,0,len(entries))
  for _,entry:=range entries{
   if strings.HasPrefix(entry.Name(),".syncria-")||entry.Type()&os.ModeSymlink!=0 {continue}
@@ -143,8 +144,9 @@ func (a *computerAgent) serveGrant(w http.ResponseWriter,r *http.Request){
  if r.Method!="POST"{computerError(w,405,"POST required");return}
  var body struct {Root string `json:"root"`; Path string `json:"path"`}
  if e:=computerDecode(r,&body);e!=nil{computerError(w,400,e.Error());return}
- p,e:=a.resolve(body.Root,body.Path,false);if e!=nil{computerError(w,400,e.Error());return}
- info,e:=os.Lstat(p);if e!=nil||!info.Mode().IsRegular(){computerError(w,400,"regular file required");return}
+ _,e:=a.resolve(body.Root,body.Path,false);if e!=nil{computerError(w,400,e.Error());return}
+ handle,e:=os.OpenRoot(a.roots[body.Root]);if e!=nil{computerError(w,400,e.Error());return};defer handle.Close()
+ info,e:=handle.Lstat(body.Path);if e!=nil||!info.Mode().IsRegular(){computerError(w,400,"regular file required");return}
  ticket:=b64rand()
  grant:=agentTicket{Root:body.Root,Relative:body.Path,Size:info.Size(),Modified:info.ModTime(),Expires:time.Now().Add(30*time.Minute)}
  a.mu.Lock()
@@ -162,8 +164,10 @@ func (a *computerAgent) serveDownload(w http.ResponseWriter,r *http.Request){
  if r.Method!="GET"{computerError(w,405,"GET required");return}
  ticket,ok:=a.getTicket(strings.TrimPrefix(r.Header.Get("Authorization"),"Bearer "))
  if !ok{computerError(w,401,"invalid or expired transfer ticket");return}
- p,e:=a.resolve(ticket.Root,ticket.Relative,false);if e!=nil{computerError(w,409,"source path changed");return}
- f,e:=os.Open(p);if e!=nil{computerError(w,404,"source file unavailable");return};defer f.Close()
+ _,e:=a.resolve(ticket.Root,ticket.Relative,false);if e!=nil{computerError(w,409,"source path changed");return}
+ handle,e:=os.OpenRoot(a.roots[ticket.Root]);if e!=nil{computerError(w,409,e.Error());return};defer handle.Close()
+ if info,e:=handle.Lstat(ticket.Relative);e!=nil||!info.Mode().IsRegular(){computerError(w,409,"source is not a regular file");return}
+ f,e:=handle.Open(ticket.Relative);if e!=nil{computerError(w,404,"source file unavailable");return};defer f.Close()
  info,e:=f.Stat()
  if e!=nil||!info.Mode().IsRegular()||info.Size()!=ticket.Size||!info.ModTime().Equal(ticket.Modified){computerError(w,409,"source changed since transfer was approved");return}
  w.Header().Set("Content-Type","application/octet-stream")
@@ -193,12 +197,14 @@ func (a *computerAgent) servePull(w http.ResponseWriter,r *http.Request){
  if e:=computerDecode(r,&body);e!=nil{computerError(w,400,e.Error());return}
  if _,e:=validAgentURL(body.SourceURL);e!=nil{computerError(w,400,e.Error());return}
  if body.Size<0||body.Ticket==""||body.Path==""{computerError(w,400,"invalid transfer request");return}
- dest,e:=a.resolve(body.Root,body.Path,true);if e!=nil{computerError(w,400,e.Error());return}
- if _,e:=os.Lstat(dest);e==nil{computerError(w,409,"destination already exists");return}else if !os.IsNotExist(e){computerError(w,400,e.Error());return}
- // Preserve file data on its destination machine; never write payloads to Syncria's hub.
+ if body.Size>1<<50{computerError(w,400,"file exceeds maximum transfer size");return}
+ if _,e:=a.resolve(body.Root,body.Path,true);e!=nil{computerError(w,400,e.Error());return}
+ handle,e:=os.OpenRoot(a.roots[body.Root]);if e!=nil{computerError(w,400,e.Error());return};defer handle.Close()
+ if _,e:=handle.Lstat(body.Path);e==nil{computerError(w,409,"destination already exists");return}else if !os.IsNotExist(e){computerError(w,400,e.Error());return}
+ // All file mutations go through Go's traversal-resistant os.Root API.
  parentRel:=path.Dir(body.Path);if parentRel=="."{parentRel=""}
- parent,e:=a.resolve(body.Root,parentRel,true);if e!=nil{computerError(w,400,e.Error());return}
- if e:=os.MkdirAll(parent,0700);e!=nil{computerError(w,500,e.Error());return}
+ if _,e:=a.resolve(body.Root,parentRel,true);e!=nil{computerError(w,400,e.Error());return}
+ if parentRel!=""{if e:=handle.MkdirAll(parentRel,0700);e!=nil{computerError(w,500,e.Error());return}}
  if _,e:=a.resolve(body.Root,parentRel,false);e!=nil{computerError(w,400,e.Error());return}
  client,e:=pinnedComputerClient(body.Fingerprint);if e!=nil{computerError(w,400,e.Error());return}
  request,e:=http.NewRequestWithContext(r.Context(),"GET",body.SourceURL+"/v1/download",nil)
@@ -206,8 +212,9 @@ func (a *computerAgent) servePull(w http.ResponseWriter,r *http.Request){
  request.Header.Set("Authorization","Bearer "+body.Ticket)
  response,e:=client.Do(request);if e!=nil{computerError(w,502,e.Error());return};defer response.Body.Close()
  if response.StatusCode!=200{b,_:=io.ReadAll(io.LimitReader(response.Body,1024));computerError(w,502,fmt.Sprintf("source HTTP %d: %s",response.StatusCode,string(b)));return}
- f,e:=os.CreateTemp(parent,".syncria-transfer-*");if e!=nil{computerError(w,500,e.Error());return}
- temp:=f.Name();defer os.Remove(temp)
+ temp:=path.Join(parentRel,".syncria-transfer-"+newID())
+ f,e:=handle.OpenFile(temp,os.O_CREATE|os.O_EXCL|os.O_WRONLY,0600);if e!=nil{computerError(w,500,e.Error());return}
+ defer handle.Remove(temp)
  h:=sha256.New()
  written,e:=io.Copy(io.MultiWriter(f,h),io.LimitReader(response.Body,body.Size+1))
  if e!=nil{f.Close();computerError(w,502,"transfer interrupted: "+e.Error());return}
@@ -217,7 +224,7 @@ func (a *computerAgent) servePull(w http.ResponseWriter,r *http.Request){
  if e:=f.Sync();e!=nil{f.Close();computerError(w,500,e.Error());return}
  if e:=f.Close();e!=nil{computerError(w,500,e.Error());return}
  if _,e:=a.resolve(body.Root,parentRel,false);e!=nil{computerError(w,409,e.Error());return}
- if e:=os.Link(temp,dest);e!=nil{computerError(w,409,"cannot publish without overwriting: "+e.Error());return}
+ if e:=handle.Link(temp,body.Path);e!=nil{computerError(w,409,"cannot publish without overwriting: "+e.Error());return}
  computerJSON(w,200,map[string]any{"size":written,"sha256":digest,"path":body.Path})
 }
 func (a *computerAgent) serveDelete(w http.ResponseWriter,r *http.Request){
@@ -226,14 +233,16 @@ func (a *computerAgent) serveDelete(w http.ResponseWriter,r *http.Request){
  if e:=computerDecode(r,&body);e!=nil{computerError(w,400,e.Error());return}
  ticket,ok:=a.getTicket(body.Ticket);if !ok{computerError(w,409,"transfer ticket expired");return}
  if len(body.SHA256)!=64{computerError(w,400,"invalid checksum");return}
- p,e:=a.resolve(ticket.Root,ticket.Relative,false);if e!=nil{computerError(w,409,e.Error());return}
- f,e:=os.Open(p);if e!=nil{computerError(w,409,e.Error());return}
+ _,e:=a.resolve(ticket.Root,ticket.Relative,false);if e!=nil{computerError(w,409,e.Error());return}
+ handle,e:=os.OpenRoot(a.roots[ticket.Root]);if e!=nil{computerError(w,409,e.Error());return};defer handle.Close()
+ if info,e:=handle.Lstat(ticket.Relative);e!=nil||!info.Mode().IsRegular(){computerError(w,409,"source is not a regular file");return}
+ f,e:=handle.Open(ticket.Relative);if e!=nil{computerError(w,409,e.Error());return}
  info,e:=f.Stat()
  if e!=nil||!info.Mode().IsRegular()||info.Size()!=ticket.Size||!info.ModTime().Equal(ticket.Modified){f.Close();computerError(w,409,"source changed; copy preserved, original not deleted");return}
  h:=sha256.New();_,e=io.Copy(h,f);f.Close()
  if e!=nil||hex.EncodeToString(h.Sum(nil))!=body.SHA256{computerError(w,409,"source checksum changed; original not deleted");return}
  if _,e:=a.resolve(ticket.Root,ticket.Relative,false);e!=nil{computerError(w,409,e.Error());return}
- if e:=os.Remove(p);e!=nil{computerError(w,409,e.Error());return}
+ if e:=handle.Remove(ticket.Relative);e!=nil{computerError(w,409,e.Error());return}
  a.mu.Lock();delete(a.tickets,body.Ticket);a.mu.Unlock()
  computerJSON(w,200,map[string]any{"deleted":true})
 }
@@ -296,5 +305,3 @@ func runComputerAgent(listen,dataDir,name string,folders []string)error{
  log.Printf("Shared folders: %d; no SMB/NFS required",len(roots))
  return (&http.Server{Addr:listen,Handler:mux,ReadHeaderTimeout:10*time.Second,IdleTimeout:60*time.Second,MaxHeaderBytes:1<<20}).ListenAndServeTLS(certFile,filepath.Join(dataDir,"agent.key"))
 }
-var _ = context.Background
-var _ = strconv.Itoa
