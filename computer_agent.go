@@ -331,6 +331,14 @@ func runComputerAgentWithEnrollment(listen,dataDir,name string,folders []string,
    return fmt.Errorf("agent identity directory must not be inside shared folder %q",label)
   }
  }
+ // A freshly installed agent can enroll from a single 0600 pending-invite
+ // file. Startup service arguments never contain the invitation token.
+ if hub==""{
+  pending:=struct{Hub string `json:"hub"`;Code string `json:"code"`}{}
+  if raw,err:=os.ReadFile(filepath.Join(dataDir,"pending-enrollment.json"));err==nil{
+   if json.Unmarshal(raw,&pending)==nil {hub,code=pending.Hub,pending.Code}
+  }
+ }
  secret,certFile,fingerprint,e:=createAgentIdentity(dataDir);if e!=nil{return e}
  if name==""{name,_=os.Hostname()}
  agent:=&computerAgent{name:name,secret:secret,roots:roots,tickets:map[string]agentTicket{}}
@@ -352,7 +360,7 @@ func runComputerAgentWithEnrollment(listen,dataDir,name string,folders []string,
   if len(code)!=64{return errors.New("missing or invalid one-time enrollment code")}
   _,portText,err:=net.SplitHostPort(listen);if err!=nil{return err}
   port,err:=strconv.Atoi(portText);if err!=nil||port<1024||port>65535{return errors.New("invalid agent enrollment listen port")}
-  go announceComputerToHub(hub,code,secret,fingerprint,port)
+  go announceComputerToHub(hub,code,secret,fingerprint,port,dataDir)
  }
  log.Printf("Shared folders: %d; no SMB/NFS required",len(roots))
  return (&http.Server{Addr:listen,Handler:mux,ReadHeaderTimeout:10*time.Second,IdleTimeout:60*time.Second,MaxHeaderBytes:1<<20}).ListenAndServeTLS(certFile,filepath.Join(dataDir,"agent.key"))
