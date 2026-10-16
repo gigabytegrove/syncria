@@ -92,7 +92,37 @@ code{overflow-wrap:anywhere}
 .sync-history-file small{font-size:12px;color:#496d86}
 .sync-detail-pager{display:flex;justify-content:flex-start;margin-top:12px}
 @media(max-width:850px){.sync-detail-columns{grid-template-columns:minmax(0,1fr)}.sync-run-list{max-height:320px}}
-` + v051Theme + syncriaDesignCSS + `</style></head><body>
+` + v051Theme + syncriaDesignCSS + `
+.computer-layout{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;margin-bottom:18px}
+.computer-device-list,.computer-transfer-list{display:grid;gap:10px}
+.computer-device{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 14px;border:1px solid #dce7f0;border-radius:10px;background:#fff}
+.computer-device strong,.computer-device small{display:block;overflow-wrap:anywhere}
+.computer-device small{color:#658095;margin-top:4px;font-size:12px}
+.computer-device .secondary{flex-shrink:0}
+.computer-online{color:#237556}.computer-offline{color:#a5483b}
+.computer-help{background:#f3f8fc;padding:15px;border:1px solid #dce9f2;border-radius:10px;margin-bottom:16px;display:grid;gap:8px}
+.computer-help strong{font-size:12px}.computer-help code{display:block;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}
+.computer-help small{color:#536e84;line-height:1.5}
+.computer-pair-form{display:grid;gap:10px}
+.computer-explorer{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+.computer-explorer-pane{min-width:0;border:1px solid #dce7f0;border-radius:12px;padding:16px;background:#f9fcfe}
+.computer-explorer-pane h3{margin:0 0 14px}
+.computer-path{display:flex;align-items:center;gap:10px;padding:10px 0;min-width:0}
+.computer-path span{font-size:12px;overflow-wrap:anywhere;min-width:0}
+.computer-file-list{height:320px;overflow-y:auto;border:1px solid #dce7f0;background:#fff;border-radius:9px;padding:6px}
+.computer-file-list p{padding:8px}
+.computer-file{display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px;padding:11px;border:0;border-bottom:1px solid #edf1f6;background:transparent;text-align:left;color:inherit;cursor:pointer}
+.computer-file:hover,.computer-file.is-selected{background:#e9f4fd}
+.computer-file strong{font-size:13px;overflow-wrap:anywhere}
+.computer-file small{font-size:11px;white-space:nowrap;color:#658095}
+.computer-file.is-selected{outline:2px solid #6eb6e7;outline-offset:-2px}
+.computer-transfer-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid #e6edf3;margin-top:18px;padding-top:16px}
+.computer-transfer-actions strong,.computer-transfer-actions small{display:block}
+.computer-transfer-actions small{font-size:12px;color:#5a7489;margin-top:5px}
+.computer-transfer-record{padding:12px;border:1px solid #e0eaf1;border-radius:10px;background:#fff;display:grid;gap:5px}
+.computer-transfer-record strong{overflow-wrap:anywhere;font-size:13px}.computer-transfer-record small{font-size:12px;color:#57738a}
+@media(max-width:950px){.computer-layout,.computer-explorer{grid-template-columns:minmax(0,1fr)}.computer-file-list{height:250px}}
+</style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">
 {{if and .Configured .Logged}}
 <aside class="sidebar" aria-label="Syncria navigation">
@@ -105,6 +135,7 @@ code{overflow-wrap:anywhere}
     </nav></div>
     <div class="nav-group"><p class="nav-section-label">CONNECTIONS</p><nav class="nav" aria-label="Connections">
       <button type="button" data-view="storage" class="" aria-label="My NAS Boxes"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="8" rx="2"/><rect x="3" y="13" width="18" height="8" rx="2"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6"/></svg></span><span class="nav-copy"><strong>My NAS Boxes</strong><small>Network storage</small></span></button>
+      <button type="button" data-view="computers" aria-label="My Computers"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></span><span class="nav-copy"><strong>My Computers</strong><small>Direct file transfers</small></span></button>
       <button type="button" data-view="accounts" class="" aria-label="Cloud Accounts"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16.5a4 4 0 0 1 1-7.7 7.5 7.5 0 0 1 14.4 1.2A4.5 4.5 0 0 1 18 19H6.5"/><path d="M8 16h8m-4-4v8"/></svg></span><span class="nav-copy"><strong>Cloud Accounts</strong><small>Google & Dropbox</small></span></button>
     </nav></div>
     <div class="nav-group"><p class="nav-section-label">SYSTEM</p><nav class="nav" aria-label="System">
@@ -457,6 +488,30 @@ code{overflow-wrap:anywhere}
 <section class="panel hidden" id="updateHistoryPanel"><div class="panel-head"><h2>Live update log</h2><span class="status" id="updateLogState">Waiting</span></div><p class="muted">Real events recorded by Syncria, with timestamps.</p><ol class="update-timeline" id="updateEventTimeline" aria-live="polite"><li><strong>Ready</strong><small>Events appear here during an update.</small></li></ol></section>
 <section class="update-advanced-section"><details class="advanced-update"><summary>Advanced options</summary><div class="advanced-update-body"><div class="update-rollback-section"><h2>Restore previous version</h2><p class="muted">Return to the saved executable if a recent update has caused problems. Your sync settings are retained.</p><button id="rollbackUpdateButton" class="secondary" type="button" onclick="startUpdate('rollback')">Restore previous version</button></div><p class="muted">For troubleshooting or installations without access to automatic updates. Most people won't need these options.</p><h2>Manual installation</h2><p class="muted">Use this only when automatic downloads are unavailable. Supply a matching app file and SHA256SUMS. Your previous version remains available for rollback.</p><form id="manualUpdateForm" action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return submitManualUpdate(event)"><label class="field">App executable<input type="file" name="binary" id="manualBinary" required></label><label class="field">SHA256SUMS<input type="file" name="checksums" required></label><button id="manualUpdateButton" class="secondary" type="submit">Verify & install files</button></form></div></details></section>
 </div>
+</section>
+
+<section class="view" id="view-computers">
+ <div class="workspace-intro"><div><span class="mini-overline">DIRECT CONNECTIONS</span><h2>Computers on your network</h2><p>Browse and transfer files between Windows and Linux computers without SMB or NFS. The files travel directly between the computers, not through Syncria's server.</p></div><button type="button" class="secondary" onclick="loadComputers()">Refresh computers</button></div>
+ <div class="computer-layout">
+  <section class="panel"><div class="section-heading"><div><h2>Connected computers</h2><p>Syncria verifies each agent's pairing key and TLS certificate before connecting.</p></div></div><div id="computerDeviceList" class="computer-device-list"><p class="muted">Open this page to check connected computers.</p></div></section>
+  <section class="panel"><div class="section-heading"><div><h2>Add a computer</h2><p>Run the Syncria executable on the computer you're sharing. Use a dedicated folder and agent identity directory.</p></div></div>
+   <div class="computer-help"><strong>Windows (PowerShell)</strong><code>.\syncria-windows-amd64.exe -agent -listen 0.0.0.0:9765 -agent-data "C:\SyncriaAgent" -agent-name "My PC" -agent-root "Files=C:\Users\Public\Documents"</code><strong>Linux</strong><code>./syncria-linux-amd64 -agent -listen 0.0.0.0:9765 -agent-data "$HOME/.config/syncria-agent" -agent-name "My PC" -agent-root "Files=$HOME/Documents"</code><small>Allow inbound TCP 9765 from your trusted LAN. The agent displays its pairing key and TLS SHA-256 fingerprint on first start. Keep both private. For additional folders, repeat <code>-agent-root Name=/path</code>. Running this as a normal user limits access to that user's files.</small></div>
+   <form id="computerPairForm" onsubmit="event.preventDefault();pairComputer()" class="computer-pair-form">
+    <label class="field">Computer name<input id="computerPairLabel" autocomplete="off" placeholder="Living room desktop" required maxlength="80"></label>
+    <label class="field">HTTPS address<input id="computerPairURL" autocomplete="off" placeholder="https://192.168.1.42:9765" required></label>
+    <label class="field">Pairing key<input id="computerPairKey" type="password" autocomplete="off" required></label>
+    <label class="field">TLS SHA-256 fingerprint<input id="computerPairFingerprint" autocomplete="off" placeholder="64 hexadecimal characters" required></label>
+    <button id="computerPairButton" type="submit" class="primary">Connect computer</button><p id="computerPairMessage" class="muted" role="status"></p>
+   </form>
+  </section>
+ </div>
+ <section class="panel computer-transfer-workspace"><div class="section-heading"><div><h2>Transfer between computers</h2><p>Choose a file on the left and a folder on the right. A move deletes the original only after the destination verifies the complete file.</p></div></div>
+  <div class="computer-explorer">
+   <div class="computer-explorer-pane"><h3>From this computer</h3><label class="field">Computer<select id="computerSourceID" onchange="computerSideChanged('source')"><option value="">Select source</option></select></label><label class="field">Shared folder<select id="computerSourceRoot" onchange="computerRootChanged('source')"><option value="">Choose folder</option></select></label><div class="computer-path"><button type="button" class="secondary" onclick="computerUp('source')">↑ Up</button><span id="computerSourcePath">Choose a computer</span></div><div class="computer-file-list" id="computerSourceFiles" role="list"><p class="muted">Select a source computer.</p></div></div>
+   <div class="computer-explorer-pane"><h3>To this computer</h3><label class="field">Computer<select id="computerDestinationID" onchange="computerSideChanged('destination')"><option value="">Select destination</option></select></label><label class="field">Shared folder<select id="computerDestinationRoot" onchange="computerRootChanged('destination')"><option value="">Choose folder</option></select></label><div class="computer-path"><button type="button" class="secondary" onclick="computerUp('destination')">↑ Up</button><span id="computerDestinationPath">Choose a computer</span></div><div class="computer-file-list" id="computerDestinationFiles" role="list"><p class="muted">Select a destination computer.</p></div></div>
+  </div><div class="computer-transfer-actions"><div><strong id="computerSelectedFile">No file selected</strong><small id="computerTransferMessage">Destination files are never silently overwritten.</small></div><div class="row"><button type="button" class="secondary" onclick="startComputerTransfer(false)">Copy file →</button><button type="button" class="primary" onclick="startComputerTransfer(true)">Move file →</button></div></div>
+ </section>
+ <section class="panel"><div class="section-heading"><div><h2>Recent direct transfers</h2><p>Actual copy/move operations and their results; a failed move never silently removes the source.</p></div><button type="button" class="secondary" onclick="refreshComputerTransfers()">Refresh transfers</button></div><div id="computerTransferList" class="computer-transfer-list"><p class="muted">No transfers started in this session.</p></div></section>
 </section>
 <section class="view" id="view-settings"><div class="workspace-intro"><div><p>Manage account credentials and connection settings. These usually only need to be configured once.</p></div></div><section class="panel"><h2>Google sign-in settings (advanced)</h2><p>For an administrator: create a Google Cloud web sign-in app, enable the Google Drive API, and add the address shown below as its redirect URL:</p><div class="selected"><code>{{.Callback}}</code></div><form method="post" action="/action"><input type="hidden" name="action" value="oauth_settings"><label class="field">Google app ID (Client ID)<input name="client_id" value="{{.ClientID}}" required></label><label class="field">Google app secret<input name="client_secret" type="password" placeholder="Leave blank to keep existing secret"></label><label class="field">Your Syncria web address<input name="base_url" value="{{.BaseURL}}" required></label><button class="primary">Save Google sign-in settings</button></form></section><section class="panel"><h2>Dropbox sign-in settings (advanced)</h2>
 <p>For an administrator: add this return address to your Dropbox developer app:</p><div class="selected"><code>{{.DropboxCallback}}</code></div>
@@ -918,6 +973,142 @@ async function loadSyncRun(runID,more=false){
   }
  }catch(error){$('syncRunSummary').textContent='Unable to load run details: '+error.message;}
 }
+
+let computerCache=[];
+const computerSides={source:{id:'',root:'',path:'',parent:'',selected:null,seq:0},destination:{id:'',root:'',path:'',parent:'',selected:null,seq:0}};
+async function computerJSON(url,options){
+ const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options});
+ if(!response.ok)throw Error((await response.text()).trim()||'HTTP '+response.status);
+ return response.json();
+}
+async function pairComputer(){
+ const button=$('computerPairButton'),message=$('computerPairMessage');
+ button.disabled=true;message.textContent='Verifying encrypted connection…';
+ try{
+  await computerJSON('/api/computers/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+   label:$('computerPairLabel').value,url:$('computerPairURL').value,key:$('computerPairKey').value,fingerprint:$('computerPairFingerprint').value
+  })});
+  $('computerPairForm').reset();message.textContent='Computer connected successfully.';
+  await loadComputers();
+ }catch(error){message.textContent=error.message}
+ finally{button.disabled=false}
+}
+function computerOption(select,value,label){
+ const option=document.createElement('option');option.value=value;option.textContent=label;select.append(option);
+}
+async function loadComputers(){
+ let data;
+ try{data=await computerJSON('/api/computers')}catch(error){$('computerDeviceList').textContent=error.message;return}
+ computerCache=data.computers||[];
+ const list=$('computerDeviceList');list.replaceChildren();
+ if(!computerCache.length){const p=document.createElement('p');p.className='muted';p.textContent='No computers connected yet. Add one using the form.';list.append(p)}
+ for(const c of computerCache){
+  const row=document.createElement('div');row.className='computer-device';
+  const desc=document.createElement('div'),name=document.createElement('strong'),meta=document.createElement('small'),status=document.createElement('small');
+  name.textContent=c.label;meta.textContent=c.url+' · '+(c.roots||[]).length+' shared folders';
+  status.textContent=c.online?'● Connected':'● Offline'+(c.error?' — '+c.error:'');
+  status.className=c.online?'computer-online':'computer-offline';
+  desc.append(name,meta,status);row.append(desc);
+  const remove=document.createElement('button');remove.type='button';remove.className='secondary';remove.textContent='Remove';remove.addEventListener('click',()=>removeComputer(c));row.append(remove);list.append(row);
+ }
+ for(const side of ['source','destination']){
+  const sel=$('computer'+(side==='source'?'Source':'Destination')+'ID'),old=sel.value;
+  sel.replaceChildren();computerOption(sel,'','Choose computer');
+  for(const c of computerCache)computerOption(sel,c.id,c.label+(c.online?'':' (offline)'));
+  sel.value=computerCache.some(c=>c.id===old)?old:'';
+  if(sel.value!==computerSides[side].id)computerSideChanged(side);
+  else if(sel.value)computerUpdateRoots(side);
+ }
+}
+async function removeComputer(c){
+ if(!confirm('Remove '+c.label+' from Syncria? No files on the computer will be deleted.'))return;
+ try{await computerJSON('/api/computers/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:c.id})});await loadComputers()}
+ catch(error){alert(error.message)}
+}
+function computerSidePrefix(side){return side==='source'?'computerSource':'computerDestination'}
+function computerUpdateRoots(side){
+ const s=computerSides[side],prefix=computerSidePrefix(side);
+ const dev=computerCache.find(c=>c.id===s.id),list=$(''+prefix+'Root'),old=list.value;
+ list.replaceChildren();computerOption(list,'','Choose shared folder');
+ for(const root of dev?.roots||[])computerOption(list,root.name,root.name);
+ list.value=(dev?.roots||[]).some(x=>x.name===old)?old:'';
+ if(s.root!==list.value)computerRootChanged(side);
+}
+function computerSideChanged(side){
+ const s=computerSides[side],prefix=computerSidePrefix(side);
+ s.id=$(prefix+'ID').value;s.root='';s.path='';s.selected=null;s.seq++;
+ computerUpdateRoots(side);
+ $(prefix+'Files').replaceChildren();$(prefix+'Path').textContent=s.id?'Choose a shared folder':'Choose a computer';
+ if(side==='source')$('computerSelectedFile').textContent='No file selected';
+}
+function computerRootChanged(side){
+ const s=computerSides[side],prefix=computerSidePrefix(side);
+ s.root=$(prefix+'Root').value;s.path='';s.selected=null;s.seq++;
+ if(side==='source')$('computerSelectedFile').textContent='No file selected';
+ if(s.root)browseComputer(side,'');
+ else{$(prefix+'Files').replaceChildren();$(prefix+'Path').textContent='Choose a shared folder'}
+}
+function computerUp(side){const s=computerSides[side];if(s.root&&s.path)browseComputer(side,s.parent)}
+async function browseComputer(side,relative){
+ const s=computerSides[side],prefix=computerSidePrefix(side),seq=++s.seq;
+ const list=$(prefix+'Files');list.textContent='Loading files…';
+ try{
+  const query=new URLSearchParams({id:s.id,root:s.root,path:relative});
+  const data=await computerJSON('/api/computers/browse?'+query);
+  if(seq!==s.seq)return;
+  s.path=data.path||'';s.parent=data.parent||'';
+  if(side==='source'){s.selected=null;$('computerSelectedFile').textContent='No file selected'}
+  $(prefix+'Path').textContent=s.root+(s.path?' / '+s.path:' /');
+  list.replaceChildren();
+  if(!(data.entries||[]).length){const p=document.createElement('p');p.className='muted';p.textContent='This folder is empty.';list.append(p)}
+  for(const file of data.entries||[]){
+   const row=document.createElement('button');row.type='button';row.className='computer-file';
+   const name=document.createElement('strong');name.textContent=(file.directory?'📁 ':'📄 ')+file.name;
+   const size=document.createElement('small');size.textContent=file.directory?'Open folder':formatBytes(file.size);
+   row.append(name,size);
+   if(file.directory)row.addEventListener('click',()=>browseComputer(side,s.path?s.path+'/'+file.name:file.name));
+   else if(side==='source')row.addEventListener('click',()=>{
+    list.querySelectorAll('.computer-file').forEach(node=>node.classList.remove('is-selected'));
+    row.classList.add('is-selected');s.selected=file;
+    $('computerSelectedFile').textContent=file.name+' ('+formatBytes(file.size)+')';
+   });
+   else{row.disabled=true;row.title='Choose a destination folder, not a file'}
+   list.append(row);
+  }
+ }catch(error){if(seq===s.seq){list.textContent=error.message;$(prefix+'Path').textContent='Unable to browse shared folder'}}
+}
+async function startComputerTransfer(move){
+ const from=computerSides.source,to=computerSides.destination;
+ const message=$('computerTransferMessage');
+ if(!from.selected||!from.id||!from.root||!to.id||!to.root){message.textContent='Choose a source file and destination shared folder.';return}
+ if(from.id===to.id){message.textContent='Select two different computers.';return}
+ const file=from.selected.name;
+ const sourcePath=from.path?from.path+'/'+file:file;
+ const destPath=to.path?to.path+'/'+file:file;
+ if(!confirm((move?'Move':'Copy')+' '+file+' from '+computerCache.find(c=>c.id===from.id)?.label+' to '+computerCache.find(c=>c.id===to.id)?.label+'? Existing destination files will not be overwritten.'))return;
+ message.textContent='Submitting secure direct transfer…';
+ try{
+  await computerJSON('/api/computers/transfers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+   source_id:from.id,destination_id:to.id,source_root:from.root,destination_root:to.root,
+   source_path:sourcePath,destination_path:destPath,move
+  })});
+  message.textContent='Transfer queued. Progress appears below.';
+  await refreshComputerTransfers();
+ }catch(error){message.textContent='Transfer could not start: '+error.message}
+}
+async function refreshComputerTransfers(){
+ let data;try{data=await computerJSON('/api/computers/transfers')}catch(error){$('computerTransferList').textContent=error.message;return}
+ const list=$('computerTransferList');list.replaceChildren();
+ if(!data.transfers?.length){const p=document.createElement('p');p.className='muted';p.textContent='No direct transfers yet.';list.append(p);return}
+ for(const t of data.transfers){
+  const row=document.createElement('div');row.className='computer-transfer-record';
+  const name=document.createElement('strong');name.textContent=(t.move?'Move':'Copy')+': '+t.file+' — '+t.source+' → '+t.destination;
+  const info=document.createElement('small');info.textContent=t.status+(t.bytes?' · '+formatBytes(t.bytes):'')+(t.error?' · '+t.error:'');
+  row.append(name,info);list.append(row);
+ }
+}
+setInterval(()=>{if(document.getElementById('view-computers')?.classList.contains('active'))refreshComputerTransfers()},2500);
+
 function navigate(view){
  if(!$('view-'+view))return;
  const feedback=$('actionFeedback');if(feedback&&currentView!==view)feedback.remove();
@@ -932,6 +1123,7 @@ function navigate(view){
   overview:['Your overview','OVERVIEW'],
   sync:['Your syncs','MY SYNCS'],
   storage:['Storage devices','MY NAS BOXES'],
+  computers:['My computers','DIRECT CONNECTIONS'],
   accounts:['Cloud connections','CLOUD ACCOUNTS'],
   activity:['Transfer activity','ACTIVITY'],
   'sync-detail':['Sync details','SYNC DETAILS'],
@@ -943,6 +1135,7 @@ function navigate(view){
  const breadcrumb=$('pageBreadcrumb');if(breadcrumb)breadcrumb.textContent=page[1];
  history.replaceState(null,'',view==='sync-detail'&&selectedSyncID?'#sync-detail/'+encodeURIComponent(selectedSyncID)+'/'+selectedSyncDetailTab:'#'+view);
  if(view==='updates')checkUpdate();
+ if(view==='computers'){loadComputers();refreshComputerTransfers();}
 }
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.view)));
 let syncReviewed=false,syncStep=1,selectedNASTargetID='';
