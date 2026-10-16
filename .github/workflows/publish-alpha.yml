@@ -1,4 +1,4 @@
-name: Publish Syncria v0.8.6-alpha.4 (opt-in prerelease)
+name: Publish Syncria v0.8.6-alpha.5 (opt-in prerelease)
 # This deliberately uses an alpha- prefixed tag. Syncria v0.8.5's legacy
 # tag-scanning updater must NOT accidentally offer the prerelease as Stable.
 on:
@@ -14,6 +14,9 @@ on:
       - 'computer_agent_distribution.go'
       - 'computer_enroll_client.go'
       - 'computer_onboarding.go'
+      - 'ui.go'
+      - 'computer_enroll_client.go'
+      - 'docs/RELEASE-v0.8.6-alpha.5.md'
   workflow_dispatch:
 
 permissions:
@@ -24,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     concurrency:
-      group: syncria-alpha-v086-4
+      group: syncria-alpha-v086-5
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
@@ -39,8 +42,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(cat VERSION)" = "v0.8.6-alpha.4"
-          test -s docs/RELEASE-v0.8.6-alpha.4.md
+          test "$(cat VERSION)" = "v0.8.6-alpha.5"
+          test -s docs/RELEASE-v0.8.6-alpha.5.md
           npm install --no-audit --no-fund
           npm run build:css
           test -s assets/syncria.css
@@ -63,7 +66,7 @@ jobs:
             ext=""
             if [[ "$os" == windows ]]; then ext=".exe"; fi
             CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath \
-              -ldflags="-s -w -X main.appVersion=v0.8.6-alpha.4" \
+              -ldflags="-s -w -X main.appVersion=v0.8.6-alpha.5" \
               -o "dist/syncria-${os}-${arch}${ext}" .
           done
           (cd dist && sha256sum syncria-* > SHA256SUMS)
@@ -77,7 +80,7 @@ jobs:
       - name: Publish immutable alpha GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          REL: alpha-v0.8.6-alpha.4
+          REL: alpha-v0.8.6-alpha.5
         shell: bash
         run: |
           set -euo pipefail
@@ -97,8 +100,8 @@ jobs:
           fi
           gh release create "$REL" dist/* \
             --verify-tag --prerelease \
-            --title "Syncria v0.8.6-alpha.4" \
-            --notes-file docs/RELEASE-v0.8.6-alpha.4.md
+            --title "Syncria v0.8.6-alpha.5" \
+            --notes-file docs/RELEASE-v0.8.6-alpha.5.md
           gh release view "$REL" --json tagName,isPrerelease,isDraft,assets \
             --jq '{tag:.tagName,prerelease:.isPrerelease,draft:.isDraft,files:[.assets[].name]}'
       - name: Verify GitHub published the exact alpha artifacts
@@ -107,7 +110,7 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import json,urllib.request
-          tag="alpha-v0.8.6-alpha.4"
+          tag="alpha-v0.8.6-alpha.5"
           url="https://api.github.com/repos/gigabytegrove/syncria/releases/tags/"+tag
           req=urllib.request.Request(url,headers={"Accept":"application/vnd.github+json","User-Agent":"Syncria-alpha-verification"})
           with urllib.request.urlopen(req,timeout=30) as resp: obj=json.load(resp)
