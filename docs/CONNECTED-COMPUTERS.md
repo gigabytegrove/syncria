@@ -1,6 +1,6 @@
 # Syncria connected computers — direct file transfers
 
-This feature is part of the opt-in **v0.8.6-alpha.3** preview ([release notes](RELEASE-v0.8.6-alpha.3.md)) and under ongoing review in [PR #19](https://github.com/gigabytegrove/syncria/pull/19). **Production Stable remains v0.8.5.** The cross-platform Syncria executable also runs as a native computer agent.
+This feature is part of the opt-in **v0.8.6-alpha.4** preview ([release notes](RELEASE-v0.8.6-alpha.4.md)) and under ongoing review in [PR #19](https://github.com/gigabytegrove/syncria/pull/19). **Production Stable remains v0.8.5.** The cross-platform Syncria executable also runs as a native computer agent.
 
 ## What the first implementation does
 
@@ -32,7 +32,7 @@ To share multiple folders, repeat `-agent-root Name=/absolute/path`, using an ab
 
 The first start generates an independent pairing key, a self-signed TLS certificate and its SHA-256 fingerprint. **Protect the agent identity directory as you would a password.** Do not expose the agent port to the public Internet, and restrict the TCP 9765 firewall rule to your trusted LAN or VPN. For all normal use, run the agent as an unprivileged user that has access only to the intended folders.
 
-In the main Syncria dashboard, open **My Computers → + Add computer**. Follow the three-step onboarding wizard and select Windows or Linux. Enter a friendly name, HTTPS address (for example `https://redacted.invalid:9765`), the pairing key and certificate fingerprint printed by the agent. Syncria tests the connection and rejects invalid keys or fingerprints.
+In **My Computers → + Add computer**, name the computer and copy the Windows PowerShell/CMD or Linux one-liner onto that computer. Syncria serves the SHA-256-verified agent installer and binary itself, chooses the correct CPU build, configures startup and an empty `Syncria Shared` folder, and pairs the agent automatically. Manual IP addresses, pairing keys, and TLS fingerprints are not needed. Enrollment invites expire after 20 minutes and can be used only once. Enter a friendly name, HTTPS address (for example `https://redacted.invalid:9765`), the pairing key and certificate fingerprint printed by the agent. Syncria tests the connection and rejects invalid keys or fingerprints.
 
 To transfer files, open the separate **Computer Transfers** workspace. Select a source computer and shared folder on the left, choose up to 100 individual files, then select a destination computer and folder on the right. **Copy file** or **Move file** creates independent queued jobs per file. Monitor actual bytes, cancel work, filter history, or retry failures without overwriting files.
 
