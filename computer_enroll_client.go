@@ -30,7 +30,7 @@ func agentLANAddresses(hub string)[]string{
  // hosts with several Ethernet/Wi-Fi/VPN interfaces.
  parsed,_:=url.Parse(hub)
  remoteHost:=parsed.Hostname()
- remotePort:=parsed.Port();if remotePort==""{remotePort="443"}
+ remotePort:=parsed.Port();if remotePort==""{if parsed.Scheme=="http"{remotePort="80"}else{remotePort="443"}}
  conn,err:=net.DialTimeout("udp",net.JoinHostPort(remoteHost,remotePort),3*time.Second)
  if err==nil{
   if addr,ok:=conn.LocalAddr().(*net.UDPAddr);ok{add(addr.IP)}
