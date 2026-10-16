@@ -178,6 +178,14 @@ func parseUpdateVersion(tag string)(parsedUpdateVersion,bool){
  v.Stage=pre[0];v.Sequence=sequence
  return v,true
 }
+// The public GitHub tag has a protective channel prefix; the executable's
+// actual version never does. Compare the normalized target after restart.
+func releaseTagAppVersion(tag string)string{
+ if _,ok:=parseUpdateVersion(tag);!ok{return ""}
+ if strings.HasPrefix(tag,"alpha-"){return strings.TrimPrefix(tag,"alpha-")}
+ if strings.HasPrefix(tag,"beta-"){return strings.TrimPrefix(tag,"beta-")}
+ return tag
+}
 func updateVersionNewer(candidate,running string)bool{
  a,ok:=parseUpdateVersion(candidate);if !ok{return false}
  b,ok:=parseUpdateVersion(running);if !ok{return false} // never guess about a custom runtime version
