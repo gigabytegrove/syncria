@@ -94,7 +94,7 @@ func TestComputerSeparatedWorkspaceControls(t *testing.T){
  if start<0||transfer<0||end<0||!(start<transfer&&transfer<end){t.Fatal("computer screens are not independent pages")}
  segment:=newUI[start:transfer]
  if strings.Contains(segment,`id="computerSourceFiles"`){t.Fatal("file transfer explorer must not be stacked into My Computers")}
- for _,required:=range []string{`id="computerOnboard"`,`id="computerPairForm"`,`id="computerTransferList"`,
+ for _,required:=range []string{`id="computerOnboard"`,`id="computerPSCommand"`,`id="computerCMDCommand"`,`id="computerLinuxCommand"`,`id="computerTransferList"`,
   `data-view="computer-transfers"`,`computerTransferFilter`,`changeComputerTransfer(t,action)`} {
   if !strings.Contains(newUI,required){t.Errorf("missing new direct-transfer feature %s",required)}
  }
