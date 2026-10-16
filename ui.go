@@ -1124,13 +1124,15 @@ async function computerJSON(url,options){
  if(!response.ok)throw Error((await response.text()).trim()||'HTTP '+response.status);
  return response.json();
 }
-let computerSetupStep=1;
+let computerSetupStep=1,computerEnrollmentCode='',computerEnrollmentPoll=null;
+const computerBootstrapCommands={ps:'',cmd:'',linux:''};
 function openComputerOnboard(){
- computerSetupStep=1;computerSetupShow(1);
+ computerSetupShow(1);
  const dialog=$('computerOnboard');
  if(!dialog.open)dialog.showModal();
 }
 function closeComputerOnboard(){
+ if(computerEnrollmentPoll){clearInterval(computerEnrollmentPoll);computerEnrollmentPoll=null;}
  const dialog=$('computerOnboard');
  if(dialog.open)dialog.close();
 }
@@ -1140,44 +1142,70 @@ function computerSetupShow(step){
   $('computerStep'+i).classList.toggle('hidden',i!==step);
   document.querySelector('[data-computer-step="'+i+'"]')?.classList.toggle('active',i===step);
  }
- $('computerStepBack').disabled=step===1;
- $('computerStepNext').classList.toggle('hidden',step===3);
+ $('computerStepBack').disabled=step!==1?true:true;
+ $('computerStepBack').classList.add('hidden');
+ $('computerStepNext').classList.toggle('hidden',step!==1);
  $('computerPairMessage').textContent='';
- if(step===2)updateComputerSetupPlatform();
+ if(step===1){$('computerStepNext').disabled=false;}
 }
-function computerSetupNext(){
- if(computerSetupStep===1&&!$('computerPairLabel').value.trim()){
-  $('computerPairMessage').textContent='Name this computer before continuing.';return;
+async function computerSetupNext(){
+ if(computerSetupStep!==1)return;
+ const label=$('computerPairLabel').value.trim();
+ if(!label){$('computerPairMessage').textContent='Name this computer before continuing.';return;}
+ if(location.protocol!=='https:'){
+  $('computerPairMessage').textContent='One-command enrollment requires Syncria to be opened using trusted HTTPS (not HTTP).';return;
  }
- computerSetupShow(Math.min(3,computerSetupStep+1));
-}
-function computerSetupBack(){computerSetupShow(Math.max(1,computerSetupStep-1))}
-function updateComputerSetupPlatform(){
- const platform=document.querySelector('input[name="computerPlatform"]:checked')?.value||'windows';
- const win=platform==='windows';
- $('computerAgentPlatformLabel').textContent=win?'Windows · PowerShell':'Linux · terminal';
- $('computerAgentCommand').textContent=win?".\\syncria-windows-amd64.exe -agent -listen 0.0.0.0:9765 -agent-data \"C:\\SyncriaAgent\" -agent-name \"My PC\" -agent-root \"Files=C:\\Users\\Public\\Documents\"":"./syncria-linux-amd64 -agent -listen 0.0.0.0:9765 -agent-data \"$HOME/.config/syncria-agent\" -agent-name \"My PC\" -agent-root \"Files=$HOME/Documents\"";
- $('computerAgentDownload').href='https://github.com/gigabytegrove/syncria/releases/tag/alpha-v0.8.6-alpha.3';
- $('computerAgentDownload').textContent=win?'Download Windows agent ↗':'Download Linux agent ↗';
-}
-async function copyComputerAgentCommand(){
- const value=$('computerAgentCommand').textContent;
- try{await navigator.clipboard.writeText(value);$('computerPairMessage').textContent='Agent command copied.'}
- catch(e){$('computerPairMessage').textContent='Copy is unavailable in this browser. Select and copy the command above.'}
-}
-async function pairComputer(){
- const button=$('computerPairButton'),message=$('computerPairMessage');
- button.disabled=true;message.textContent='Verifying encryption, pairing key, and shared folders…';
+ $('computerStepNext').disabled=true;
+ $('computerPairMessage').textContent='Creating a secure, single-use invitation…';
  try{
-  await computerJSON('/api/computers/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-   label:$('computerPairLabel').value,url:$('computerPairURL').value,key:$('computerPairKey').value,fingerprint:$('computerPairFingerprint').value
-  })});
-  $('computerPairForm').reset();
-  $('computerPairLabel').value='';
-  closeComputerOnboard();
-  navigate('computers');
- }catch(error){message.textContent='Pairing failed: '+error.message}
- finally{button.disabled=false}
+  const issued=await computerJSON('/api/computers/invite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({label})});
+  computerEnrollmentCode=issued.code;
+  const base=location.origin;
+  const windowsURL=base+'/api/computers/bootstrap?code='+encodeURIComponent(issued.code)+'&platform=windows&hub='+encodeURIComponent(base);
+  const linuxURL=base+'/api/computers/bootstrap?code='+encodeURIComponent(issued.code)+'&platform=linux&hub='+encodeURIComponent(base);
+  computerBootstrapCommands.ps="powershell -NoProfile -ExecutionPolicy Bypass -Command \"irm '"+windowsURL+"' | iex\"";
+  computerBootstrapCommands.cmd="powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"irm '"+windowsURL+"' | iex\"";
+  computerBootstrapCommands.linux="curl -fsSL '"+linuxURL+"' | bash";
+  $('computerPSCommand').textContent=computerBootstrapCommands.ps;
+  $('computerCMDCommand').textContent=computerBootstrapCommands.cmd;
+  $('computerLinuxCommand').textContent=computerBootstrapCommands.linux;
+  $('computerInviteExpiry').textContent='Expires '+new Date(issued.expires_at).toLocaleTimeString()+' · Single use';
+  computerSetupShow(2);
+  $('computerEnrollState').textContent='Waiting for agent installation and secure connection…';
+  $('computerEnrollDetail').textContent='Agent address and pairing credentials will be detected and verified automatically.';
+  if(computerEnrollmentPoll)clearInterval(computerEnrollmentPoll);
+  computerEnrollmentPoll=setInterval(checkComputerEnrollment,2500);
+  await checkComputerEnrollment();
+ }catch(error){$('computerPairMessage').textContent='Could not create invitation: '+error.message;$('computerStepNext').disabled=false;}
+}
+function computerSetupBack(){closeComputerOnboard();openComputerOnboard();}
+async function copyComputerBootstrap(which){
+ const code=computerBootstrapCommands[which];
+ if(!code)return;
+ try{
+  await navigator.clipboard.writeText(code);
+  $('computerPairMessage').textContent=(which==='ps'?'PowerShell':which==='cmd'?'CMD':'Linux')+' command copied. Run it on the computer you are adding.';
+ }catch(error){$('computerPairMessage').textContent='Clipboard unavailable. Select the command text and copy it manually.';}
+}
+async function checkComputerEnrollment(){
+ if(!computerEnrollmentCode||computerSetupStep!==2)return;
+ try{
+  const state=await computerJSON('/api/computers/invite?code='+encodeURIComponent(computerEnrollmentCode));
+  if(state.status==='connected'){
+   clearInterval(computerEnrollmentPoll);computerEnrollmentPoll=null;
+   computerSetupShow(3);
+   $('computerPairMessage').textContent=state.message||'Secure enrollment complete.';
+   computerEnrollmentCode='';
+   await loadComputers();return;
+  }
+  $('computerEnrollState').textContent=state.status==='verifying'?'Checking agent encryption and network reachability…':'Waiting for the new agent…';
+  if(new Date(state.expires_at).getTime()<Date.now()){
+   clearInterval(computerEnrollmentPoll);computerEnrollmentPoll=null;
+   $('computerEnrollState').textContent='Invitation expired — start over to generate fresh commands.';
+  }
+ }catch(error){
+  $('computerEnrollDetail').textContent='Connection status: '+error.message+'. If invitation expired, close this window and generate a new one.';
+ }
 }
 function computerOption(select,value,label){
  const option=document.createElement('option');option.value=value;option.textContent=label;select.append(option);
