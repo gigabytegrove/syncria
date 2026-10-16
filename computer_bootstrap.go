@@ -68,7 +68,8 @@ if ($Actual -ne $Expected) { Remove-Item -Force $Stage; throw 'Agent SHA256 does
 Move-Item -Force $Stage $Binary
 # Token is only needed for first enrollment, and is erased by the agent on success.
 @{hub=$Hub;code=$Code} | ConvertTo-Json | Set-Content -Path (Join-Path $Identity 'pending-enrollment.json') -Encoding UTF8
-$Arguments = "-agent -listen 0.0.0.0:9765 -agent-data `"$Identity`" -agent-name `"$env:COMPUTERNAME`" -agent-root `"Files=$Shared`""
+$DQ = [char]34
+$Arguments = '-agent -listen 0.0.0.0:9765 -agent-data ' + $DQ + $Identity + $DQ + ' -agent-name ' + $DQ + $env:COMPUTERNAME + $DQ + ' -agent-root ' + $DQ + 'Files=' + $Shared + $DQ
 $Startup = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup\Syncria Agent.lnk'
 $Shell = New-Object -ComObject WScript.Shell
 $Shortcut = $Shell.CreateShortcut($Startup)
