@@ -168,7 +168,7 @@ func (a *App) reconcileUpdateOnStartup() {
   return
  }
  if p.Active {
-  if p.Phase=="restarting"&&((p.Operation=="install"&&p.Target==appVersion)||(p.Operation=="rollback"&&p.From!=appVersion)||p.Operation=="manual"){
+  if p.Phase=="restarting"&&((p.Operation=="install"&&releaseTagAppVersion(p.Target)==appVersion)||(p.Operation=="rollback"&&p.From!=appVersion)||p.Operation=="manual"){
    p.Phase="complete";p.Percent=100;p.Message="Syncria "+appVersion+" is running";p.Error="";p.Active=false
    p.Events=append(p.Events,UpdateEvent{At:time.Now().UTC(),Phase:"complete",Detail:"Verified running version "+appVersion+" after restart"})
    p.UpdatedAt=time.Now().UTC()
