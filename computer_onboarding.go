@@ -10,6 +10,7 @@ import (
  "net/http"
  "net/url"
  "strings"
+ "strconv"
  "time"
 )
 
@@ -118,11 +119,43 @@ func (a *App) computerEnrollAPI(w http.ResponseWriter,r *http.Request){
 }
 // The enrollment token is not itself the agent key. The agent generates and
 // retains its own random key and private TLS certificate.
+// Private-LAN HTTP is an intentional opt-in implicit in serving Syncria over
+// http:// from a LAN address. This changes *hub enrollment transport only*.
+// Agents still use certificate-pinned HTTPS for all file operations.
+func privateComputerHubHostname(host string)bool{
+ host=strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)),".")
+ if host==""{return false}
+ if ip:=net.ParseIP(host);ip!=nil{return safeComputerAddress(ip.String())}
+ if host=="localhost"||!strings.Contains(host,".")||
+  strings.HasSuffix(host,".local")||strings.HasSuffix(host,".lan")||
+  strings.HasSuffix(host,".home.arpa")||strings.HasSuffix(host,".internal"){
+  return true
+ }
+ // Custom LAN DNS names (including private split-horizon FQDNs) are useful
+ // in homelabs. Never permit HTTP for names resolving to public addresses.
+ ctx,cancel:=context.WithTimeout(context.Background(),2*time.Second)
+ defer cancel()
+ addrs,err:=net.DefaultResolver.LookupIPAddr(ctx,host)
+ if err!=nil||len(addrs)==0{return false}
+ for _,addr:=range addrs{if !safeComputerAddress(addr.IP.String()){return false}}
+ return true
+}
 func computerEnrollmentHubURL(raw string)error{
  u,err:=url.Parse(raw)
  if err!=nil{return err}
- if u.Scheme!="https"||u.Hostname()==""||u.User!=nil||u.Path!=""||u.RawQuery!=""||u.Fragment!=""{
-  return errors.New("Syncria enrollment requires an HTTPS origin with a trusted certificate")
+ if (u.Scheme!="http"&&u.Scheme!="https")||u.Hostname()==""||
+  u.User!=nil||u.Path!=""||u.RawQuery!=""||u.Fragment!=""||u.Opaque!=""{
+  return errors.New("Syncria enrollment requires an HTTP or HTTPS server origin without credentials, paths or query parameters")
+ }
+ if strings.HasSuffix(u.Host,":")||strings.ContainsAny(u.Hostname()," \\@#"){
+  return errors.New("Invalid Syncria server hostname")
+ }
+ if port:=u.Port();port!="" {
+  number,err:=strconv.Atoi(port)
+  if err!=nil||number<1||number>65535{return errors.New("Invalid Syncria server port")}
+ }
+ if u.Scheme=="http"&&!privateComputerHubHostname(u.Hostname()){
+  return errors.New("HTTP agent enrollment is permitted only for private LAN addresses or local hostnames; use HTTPS for public hosts")
  }
  return nil
 }
