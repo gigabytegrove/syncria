@@ -2,12 +2,10 @@ package main
 
 import (
  "context"
- "encoding/hex"
  "encoding/json"
  "fmt"
  "io"
  "net/http"
- "net/url"
  "strings"
  "sync"
  "time"
@@ -30,22 +28,22 @@ type computerPublic struct {
 }
 type computerTransfer struct {
  ID string `json:"id"`
+ SourceID string `json:"source_id"`
+ DestinationID string `json:"destination_id"`
  Source string `json:"source"`
  Destination string `json:"destination"`
- DestinationID string `json:"-"`
+ SourceRoot string `json:"source_root"`
+ DestinationRoot string `json:"destination_root"`
  File string `json:"file"`
  Target string `json:"target"`
  Move bool `json:"move"`
  Status string `json:"status"`
  Error string `json:"error,omitempty"`
  Bytes int64 `json:"bytes"`
+ Total int64 `json:"total"`
  Started time.Time `json:"started"`
  Finished time.Time `json:"finished,omitempty"`
 }
-var computerTransferSlots=make(chan struct{},3)
-var computerTransferLock sync.Mutex
-var computerTransfers=map[string]computerTransfer{}
-
 func (a *App) computerByID(id string)(ComputerRecord,bool){
  a.mu.Lock();defer a.mu.Unlock()
  for _,v:=range a.cfg.Computers {if v.ID==id{return v,true}}
@@ -112,6 +110,14 @@ func (a *App) computerRemoveAPI(w http.ResponseWriter,r *http.Request){
  if e:=computerDecode(r,&body);e!=nil{computerError(w,400,e.Error());return}
  a.mu.Lock();defer a.mu.Unlock()
  for i,c:=range a.cfg.Computers{if c.ID==body.ID{
+  a.computerTransferMu.Lock()
+  for _,job:=range a.computerTransferJobs{
+   if !terminalComputerTransfer(job.Status)&&(job.SourceID==body.ID||job.DestinationID==body.ID){
+    a.computerTransferMu.Unlock()
+    computerError(w,409,"Computer has active or queued transfers. Cancel them in Computer Transfers first.");return
+   }
+  }
+  a.computerTransferMu.Unlock()
   old:=append([]ComputerRecord(nil),a.cfg.Computers...)
   a.cfg.Computers=append(a.cfg.Computers[:i],a.cfg.Computers[i+1:]...)
   if e:=a.save();e!=nil{a.cfg.Computers=old;computerError(w,500,e.Error());return}
@@ -132,84 +138,4 @@ func (a *App) computerBrowseAPI(w http.ResponseWriter,r *http.Request){
  query:=url.Values{"root":{root},"path":{rel}}
  if e:=agentGET(ctx,rec,"/v1/list?"+query.Encode(),&result);e!=nil{computerError(w,502,e.Error());return}
  computerJSON(w,200,result)
-}
-func (a *App) computerTransfersAPI(w http.ResponseWriter,r *http.Request){
- if !a.authenticated(r){computerError(w,401,"Sign in to Syncria");return}
- if r.Method=="GET"{
-  computerTransferLock.Lock();result:=make([]computerTransfer,0,len(computerTransfers))
-  for _,job:=range computerTransfers{result=append(result,job)}
-  computerTransferLock.Unlock()
-  // Browser displays newest-first.
-  for i:=0;i<len(result);i++{for j:=i+1;j<len(result);j++{if result[j].Started.After(result[i].Started){result[i],result[j]=result[j],result[i]}}}
-  if len(result)>100{result=result[:100]}
-  // Poll only active receiving agents; bytes reflect what that agent actually wrote.
-  for i:=range result{
-   if result[i].Status!="transferring"{continue}
-   receiver,ok:=a.computerByID(result[i].DestinationID);if !ok{continue}
-   ctx,cancel:=context.WithTimeout(r.Context(),1500*time.Millisecond)
-   var p agentTransferProgress
-   e:=agentGET(ctx,receiver,"/v1/progress?id="+url.QueryEscape(result[i].ID),&p)
-   cancel()
-   if e==nil&&p.Bytes>=0&&p.Bytes>=result[i].Bytes{result[i].Bytes=p.Bytes}
-  }
-  computerJSON(w,200,map[string]any{"transfers":result});return
- }
- if !localPost(r){computerError(w,405,"Same-origin POST required");return}
- var body struct{
-  SourceID string `json:"source_id"`; DestinationID string `json:"destination_id"`
-  SourceRoot string `json:"source_root"`;DestinationRoot string `json:"destination_root"`
-  SourcePath string `json:"source_path"`;DestinationPath string `json:"destination_path"`
-  Move bool `json:"move"`
- }
- if e:=computerDecode(r,&body);e!=nil{computerError(w,400,e.Error());return}
- source,ok:=a.computerByID(body.SourceID);if !ok{computerError(w,400,"Source computer missing");return}
- dest,ok:=a.computerByID(body.DestinationID);if !ok{computerError(w,400,"Destination computer missing");return}
- if source.ID==dest.ID{computerError(w,400,"Select two different computers");return}
- if body.SourcePath==""||body.DestinationPath==""{computerError(w,400,"Select a file and destination folder");return}
- if _,e:=agentRelative(body.SourcePath);e!=nil{computerError(w,400,e.Error());return}
- if _,e:=agentRelative(body.DestinationPath);e!=nil{computerError(w,400,e.Error());return}
- transfer:=computerTransfer{ID:newID(),Source:source.Label,Destination:dest.Label,DestinationID:dest.ID,File:body.SourcePath,Target:body.DestinationPath,Move:body.Move,Status:"queued",Started:time.Now()}
- computerTransferLock.Lock()
- if len(computerTransfers)>=500{
-  for id,j:=range computerTransfers{if j.Status=="completed"||j.Status=="failed"{delete(computerTransfers,id)}}
- }
- if len(computerTransfers)>=500{computerTransferLock.Unlock();computerError(w,429,"Transfer queue is full; wait for current transfers to finish");return}
- computerTransfers[transfer.ID]=transfer;computerTransferLock.Unlock()
- // Background job continues if the browser closes. The response contains a real job ID.
- go runComputerTransfer(source,dest,body.SourceRoot,body.DestinationRoot,body.SourcePath,body.DestinationPath,transfer)
- computerJSON(w,202,map[string]any{"id":transfer.ID,"status":"preparing"})
-}
-func updateComputerTransfer(t computerTransfer){
- computerTransferLock.Lock();computerTransfers[t.ID]=t;computerTransferLock.Unlock()
-}
-func runComputerTransfer(src,dst ComputerRecord,sr,dr,sourcePath,destinationPath string,t computerTransfer){
- computerTransferSlots<-struct{}{}
- defer func(){<-computerTransferSlots}()
- t.Status="preparing";updateComputerTransfer(t)
- defer func(){if v:=recover();v!=nil{t.Status="failed";t.Error="Unexpected transfer failure";t.Finished=time.Now();updateComputerTransfer(t)}}()
- ctx,cancel:=context.WithTimeout(context.Background(),24*time.Hour);defer cancel()
- sourceClient,e:=pinnedComputerClient(src.Fingerprint)
- if e!=nil {t.Status="failed";t.Error=e.Error();t.Finished=time.Now();updateComputerTransfer(t);return}
- var grant struct{Ticket string `json:"ticket"`;Size int64 `json:"size"`}
- e=agentJSONPost(ctx,sourceClient,src.URL+"/v1/grant",src.Key,map[string]any{"root":sr,"path":sourcePath},&grant)
- if e!=nil{t.Status="failed";t.Error="Source: "+e.Error();t.Finished=time.Now();updateComputerTransfer(t);return}
- t.Status="transferring";updateComputerTransfer(t)
- destClient,e:=pinnedComputerClient(dst.Fingerprint)
- if e!=nil{t.Status="failed";t.Error=e.Error();t.Finished=time.Now();updateComputerTransfer(t);return}
- var result struct{Size int64 `json:"size"`;SHA256 string `json:"sha256"`}
- e=agentJSONPost(ctx,destClient,dst.URL+"/v1/pull",dst.Key,map[string]any{
-  "root":dr,"path":destinationPath,"source_url":src.URL,"fingerprint":src.Fingerprint,"ticket":grant.Ticket,"size":grant.Size,"transfer_id":t.ID,
- },&result)
- if e!=nil{t.Status="failed";t.Error="Destination: "+e.Error();t.Finished=time.Now();updateComputerTransfer(t);return}
- if result.Size!=grant.Size||len(result.SHA256)!=64{
-  t.Status="failed";t.Error="Destination did not verify transferred bytes";t.Finished=time.Now();updateComputerTransfer(t);return
- }
- if _,e=hex.DecodeString(result.SHA256);e!=nil{t.Status="failed";t.Error="Destination checksum invalid";t.Finished=time.Now();updateComputerTransfer(t);return}
- t.Bytes=result.Size
- if t.Move{
-  t.Status="removing source";updateComputerTransfer(t)
-  e=agentJSONPost(ctx,sourceClient,src.URL+"/v1/delete",src.Key,map[string]any{"ticket":grant.Ticket,"sha256":result.SHA256},nil)
-  if e!=nil{t.Status="failed";t.Error="File copied and verified, but source was NOT deleted: "+e.Error();t.Finished=time.Now();updateComputerTransfer(t);return}
- }
- t.Status="completed";t.Finished=time.Now();updateComputerTransfer(t)
 }
