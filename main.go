@@ -82,6 +82,9 @@ type PendingDeletion struct {
   Folder bool `json:"folder,omitempty"`
 }
 type Job struct {
+    AgentDeviceID string `json:"agent_device_id,omitempty"`
+    AgentGrantID string `json:"agent_grant_id,omitempty"`
+    AgentPeerURL string `json:"agent_peer_url,omitempty"`
     RelationshipType string `json:"relationship_type,omitempty"`
     CloudProvider string `json:"cloud_provider,omitempty"`
     DropboxAccountID string `json:"dropbox_account_id,omitempty"`
@@ -735,6 +738,10 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
       a.bridgeSyncMu.Lock()
       err=a.syncBridge(ctx,&job)
       a.bridgeSyncMu.Unlock()
+    case "agent_bridge":
+      a.bridgeSyncMu.Lock()
+      err=a.syncAgentBridge(ctx,&job)
+      a.bridgeSyncMu.Unlock()
     case "storage":
       err=a.executeStorage(ctx,&job)
     case "","google_drive":
@@ -1328,6 +1335,7 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if action == "delete_job" {
+            agentCredentialJob:=j.Provider=="agent_bridge"
 			if _, running := a.runs.Load(id); running {
 				a.mu.Unlock()
 				redirect(w, r, "Wait for sync to finish before deleting")
@@ -1345,6 +1353,7 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, e.Error(), 500)
 				return
 			}
+            if agentCredentialJob {if cleanupErr:=removeAgentPeerCredential(a.file,id); cleanupErr!=nil {log.Printf("agent job %s credential cleanup failed: %v",id,cleanupErr);redirect(w,r,"Mapping removed; credential cleanup failed; check server logs");return}}
 			redirect(w, r, "Mapping removed. Files left untouched")
 			return
 		}

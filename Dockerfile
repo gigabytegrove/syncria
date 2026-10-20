@@ -13,9 +13,19 @@ ARG APP_VERSION=v0.8.5
 WORKDIR /src
 COPY go.mod ./
 COPY *.go ./
+# Include the approved device-agent and controller packages. The pre-1.0
+# Dockerfile copied only root Go sources and could not build these imports.
+COPY agentclient/ ./agentclient/
+COPY agentcontrol/ ./agentcontrol/
+COPY agentfiles/ ./agentfiles/
+COPY agentpeer/ ./agentpeer/
+COPY agentpolicy/ ./agentpolicy/
+COPY agenttransfer/ ./agenttransfer/
+COPY agentpublish/ ./agentpublish/
+COPY cmd/ ./cmd/
 COPY assets/ ./assets/
 COPY --from=css /src/assets/syncria.css ./assets/syncria.css
-RUN go mod tidy && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w -X main.appVersion=$APP_VERSION" -o /out/syncria .
+RUN go mod tidy && go test ./... && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w -X main.appVersion=$APP_VERSION" -o /out/syncria .
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates tzdata nfs-utils cifs-utils samba-client util-linux inotify-tools && mkdir -p /data
