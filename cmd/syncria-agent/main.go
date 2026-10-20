@@ -21,6 +21,9 @@ import (
 const version = "1.0.0-dev"
 
 func run(args []string, input io.Reader, output io.Writer) error {
+	if len(args) > 0 && args[0] == "grants" {
+		return runGrants(args[1:], output)
+	}
 	if len(args) == 0 {
 		return errors.New("usage: syncria-agent enroll|run|status [options]")
 	}

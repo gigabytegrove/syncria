@@ -56,13 +56,33 @@ func secureAgentRequest(r *http.Request) bool {
 			if h, _, e := net.SplitHostPort(requestHost); e == nil {
 				requestHost = h
 			}
-			return strings.EqualFold(requestHost, "localhost") ||
-				(net.ParseIP(requestHost) != nil && net.ParseIP(requestHost).IsLoopback())
+			if strings.EqualFold(requestHost, "localhost") ||
+				(net.ParseIP(requestHost) != nil && net.ParseIP(requestHost).IsLoopback()) {
+				return true
+			}
 		}
 	}
-	// Proxy should overwrite forwarded headers and only be trusted when
-	// explicitly configured. Proxies must block direct public access.
-	return os.Getenv("SYNCRIA_TRUSTED_HTTPS_PROXY") == "1" && strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+	// Do not trust a client-supplied X-Forwarded-Proto header on a direct
+	// HTTP connection. The actual TCP peer MUST be an explicitly trusted
+	// reverse proxy; a toggle alone must never authorize internet peers.
+	if os.Getenv("SYNCRIA_TRUSTED_HTTPS_PROXY") != "1" ||
+		!strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") || err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	if ip.IsLoopback() {
+		return true
+	}
+	for _, entry := range strings.Split(os.Getenv("SYNCRIA_TRUSTED_PROXY_CIDRS"), ",") {
+		_, network, parseErr := net.ParseCIDR(strings.TrimSpace(entry))
+		if parseErr == nil && network.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
