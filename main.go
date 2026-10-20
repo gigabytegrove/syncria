@@ -1666,6 +1666,7 @@ func main() {
     // remain supported only when their existing opt-in mounting is configured.
     if os.Getenv("SYNCRIA_ENABLE_MOUNTS")=="1" {go a.restoreShares()}
 	mux := http.NewServeMux()
+	if err := registerAgentAPIs(mux, a, dir); err != nil { log.Fatal(err) }
 	mux.HandleFunc("/", a.home)
 	mux.HandleFunc("/assets/syncria-logo.svg", serveBrandLogo)
 	mux.HandleFunc("/api/browse/drive", a.browseDrive)
