@@ -137,7 +137,8 @@ func (a *App) syncAgentBridge(ctx context.Context, j *Job) error {
 	// destination changed independently, no automatic first-run overwrite.
 	// The job on disk remains provider=agent_bridge and is never modified here.
 	safe := *j
-	safe.Provider = "nas_bridge"
+	// Keep the actual device provider in the shared policy engine; never masquerade
+	// as a NAS-only job to bypass or reinterpret device-specific safety rules.
 	safe.PropagateDeletions = boolPtr(false)
 	safe.RecoveryEnabled = boolPtr(true)
 	key := relationPairKey("device:"+j.AgentDeviceID+":"+j.AgentGrantID, j.NASDestinations[0])

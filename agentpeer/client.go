@@ -67,6 +67,7 @@ func (c Client) request(ctx context.Context, method, route string, headers http.
 	return clone.Do(req)
 }
 func (c Client) Inventory(ctx context.Context, id string) ([]agentfiles.Entry, error) {
+	if !validGrantID(id) { return nil, errors.New("invalid approved source grant") }
 	resp, err := c.request(ctx, "GET", "/v1/roots/"+url.PathEscape(id)+"/inventory", nil)
 	if err != nil {
 		return nil, err
@@ -75,16 +76,19 @@ func (c Client) Inventory(ctx context.Context, id string) ([]agentfiles.Entry, e
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("remote inventory HTTP %d", resp.StatusCode)
 	}
-	var result struct {
-		Entries []agentfiles.Entry `json:"entries"`
-	}
-	if err = json.NewDecoder(io.LimitReader(resp.Body, MaxInventoryBytes+1)).Decode(&result); err != nil {
-		return nil, err
-	}
-	if len(result.Entries) > agentfiles.MaxEntries {
-		return nil, errors.New("remote inventory too large")
-	}
-	return result.Entries, nil
+	// An incomplete or truncated inventory is not an empty source.
+	payload, err := io.ReadAll(io.LimitReader(resp.Body, MaxInventoryBytes+1))
+	if err != nil { return nil, fmt.Errorf("read source inventory: %w", err) }
+	if len(payload) > MaxInventoryBytes { return nil, errors.New("remote inventory exceeds byte limit") }
+	var result struct { Entries *[]agentfiles.Entry `json:"entries"` }
+	dec := json.NewDecoder(bytes.NewReader(payload))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&result); err != nil { return nil, fmt.Errorf("invalid remote inventory: %w", err) }
+	var trailing any
+	if err := dec.Decode(&trailing); !errors.Is(err, io.EOF) { return nil, errors.New("remote inventory contains trailing data") }
+	if result.Entries == nil { return nil, errors.New("remote inventory missing entries") }
+	if len(*result.Entries) > agentfiles.MaxEntries { return nil, errors.New("remote inventory too large") }
+	return *result.Entries, nil
 }
 
 // Stage downloads a selected source file through the authenticated peer
@@ -95,7 +99,9 @@ func (c Client) Stage(ctx context.Context, grantID, relative, sourceID string, s
 	if store == nil {
 		return agenttransfer.Transfer{}, errors.New("transfer store required")
 	}
-	route := "/v1/roots/" + url.PathEscape(grantID) + "/files/" + relative
+	if !validGrantID(grantID) || !validPeerRelative(relative) || sourceID == "" || len(sourceID) > 128 { return agenttransfer.Transfer{}, errors.New("invalid approved transfer source") }
+	// Escape each component: reserved URL syntax may be part of a filename.
+	route := "/v1/roots/" + url.PathEscape(grantID) + "/files/" + peerEncodedPath(relative)
 	head, err := c.request(ctx, "HEAD", route, nil)
 	if err != nil {
 		return agenttransfer.Transfer{}, err
