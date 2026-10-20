@@ -84,7 +84,11 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
    row.Action="copy";row.From="Primary";row.To="Secondary";row.Bytes=l.Size;row.Reason="Missing on secondary"
   case !tracked:
    row.FirstRun=true
-   if l.Modified.IsZero()||r.Modified.IsZero(){
+   // Agent inventories contain metadata, not proof of content equality.
+   // Alpha first-run collisions MUST be blocked in preview and execution.
+   if oneWay && j.Provider=="agent_bridge"{
+    row.Action="blocked";row.Reason="Device-to-NAS first-run conflict: destination file already exists; review or move it. No files replaced"
+   }else if l.Modified.IsZero()||r.Modified.IsZero(){
     if oneWay && j.Provider=="bridge" {
      // The source is explicitly authoritative in cloud-to-NAS one-way mode,
      // even when a provider does not expose modification times.
@@ -118,7 +122,7 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
    changeL,changeR:=metadataChanged(old,l,r)
    switch {
    case changeL&&changeR:
-    if oneWay&&j.Provider=="nas_bridge"{row.Action="blocked";row.Reason="Both files changed in one-way NAS relationship"
+    if oneWay&&(j.Provider=="nas_bridge"||j.Provider=="agent_bridge"){row.Action="blocked";row.Reason="Both files changed in one-way NAS relationship"
     }else if oneWay {row.Action="replace";row.From="Primary";row.To="Secondary";row.Bytes=l.Size;row.Reason="One-way: source wins when both changed; NAS changes are not uploaded"
     }else if policy==conflictPrimary||policy==conflictSecondary{
      row.Action="replace";row.From="Primary";row.To="Secondary";if policy==conflictSecondary{row.From="Secondary";row.To="Primary"}
@@ -129,7 +133,7 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
     }else{row.Action="review";row.Reason="Both files changed; a conflict decision is required"}
    case changeL:row.Action="replace";row.From="Primary";row.To="Secondary";row.Bytes=l.Size;row.Reason="Primary changed since last sync"
    case changeR:
-    if oneWay&&j.Provider=="nas_bridge"{row.Action="blocked";row.Reason="One-way NAS destination changed; no overwrite attempted"
+    if oneWay&&(j.Provider=="nas_bridge"||j.Provider=="agent_bridge"){row.Action="blocked";row.Reason="One-way NAS destination changed; no overwrite attempted"
     }else if oneWay{row.Action="replace";row.From="Primary";row.To="Secondary";row.Bytes=l.Size;row.Reason="One-way: restore the source copy to the destination"
     }else{row.Action="replace";row.From="Secondary";row.To="Primary";row.Bytes=r.Size;row.Reason="Secondary changed since last sync"}
    default:row.Action="unchanged";row.Reason="No recorded changes"
@@ -140,6 +144,7 @@ func planSyncPair(p *syncPreviewResult,j *Job,key string,left,right map[string]b
 }
 func (a *App) previewBridge(ctx context.Context,j *Job)(syncPreviewResult,error){return a.previewBridgeProgress(ctx,j,nil)}
 func (a *App) previewBridgeProgress(ctx context.Context,j *Job,notify func(string,string,int64))(syncPreviewResult,error){
+ if j.Provider=="agent_bridge"{return a.previewAgentBridgeProgress(ctx,j,notify)}
  result:=syncPreviewResult{Job:j.Name,ReadOnly:true,Generated:time.Now(),Rows:[]syncPreviewRow{},Counts:map[string]int{},Warnings:[]string{
   "This is a read-only scan, not an execution. Files can change after preview.",
   "First-run matches and transfer decisions use modification timestamps, not full-file checksums. Matching timestamps and sizes are skipped; missing or ambiguous metadata requires review.",
@@ -245,7 +250,7 @@ func (a *App) previewSyncAPI(w http.ResponseWriter,r *http.Request){
  a.mu.Unlock()
  var j Job
  if err:=json.Unmarshal(blob,&j);err!=nil{http.Error(w,"Unable to read sync configuration",500);return}
- if j.Provider!="bridge"&&j.Provider!="nas_bridge"{http.Error(w,"Preview currently supports NAS and cloud/NAS relationships",400);return}
+ if j.Provider!="bridge"&&j.Provider!="nas_bridge"&&j.Provider!="agent_bridge"{http.Error(w,"Preview not available for this relationship",400);return}
  ctx,cancel:=context.WithTimeout(r.Context(),2*time.Minute);defer cancel()
  preview,err:=a.previewBridge(ctx,&j)
  w.Header().Set("Content-Type","application/json; charset=utf-8")

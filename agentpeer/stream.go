@@ -19,7 +19,7 @@ import (
 // length or truncated-stream failure must be observed before the destination
 // commits its temporary file.
 func (c Client) OpenVerified(ctx context.Context, grant, relative string) (io.ReadCloser, int64, error) {
-	if len(grant) != 32 || !validPeerRelative(relative) {
+	if !validGrantID(grant) || !validPeerRelative(relative) {
 		return nil, 0, errors.New("invalid approved source selection")
 	}
 	route := "/v1/roots/" + url.PathEscape(grant) + "/files/" + peerEncodedPath(relative)
@@ -148,3 +148,13 @@ func peerEncodedPath(relative string) string {
 	}
 	return strings.Join(parts, "/")
 }
+
+ // validGrantID accepts only the lowercase hexadecimal IDs created by
+ // locally approved folder grants, never arbitrary remote URI segments.
+ func validGrantID(id string) bool {
+  if len(id)!=32 {return false}
+  for _,ch:=range id {
+   if !((ch>='0'&&ch<='9')||(ch>='a'&&ch<='f')) {return false}
+  }
+  return true
+ }
