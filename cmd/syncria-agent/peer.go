@@ -22,6 +22,7 @@ import (
 	"github.com/gigabytegrove/syncria/agentclient"
 	"github.com/gigabytegrove/syncria/agentpeer"
 	"github.com/gigabytegrove/syncria/agentpolicy"
+	"github.com/gigabytegrove/syncria/agentpublish"
 	"github.com/gigabytegrove/syncria/agenttransfer"
 )
 
@@ -29,7 +30,7 @@ import (
 // A peer's token is intentionally separate from its controller identity.
 func runPeer(args []string, input io.Reader, output io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: syncria-agent peer init|serve|inventory|stage")
+		return errors.New("usage: syncria-agent peer init|serve|inventory|stage|publish|receive")
 	}
 	identityFile, err := agentclient.DefaultFile()
 	if err != nil {
@@ -49,6 +50,8 @@ func runPeer(args []string, input io.Reader, output io.Writer) error {
 	relative := fs.String("relative", "", "relative source file within approved grant")
 	sourceID := fs.String("source-id", "", "remote agent identity")
 	staging := fs.String("staging", filepath.Join(dir, "incoming"), "private destination staging directory")
+	destinationGrant := fs.String("destination-grant", "", "locally approved writable destination grant")
+	transferID := fs.String("transfer", "", "verified staged transfer ID")
 	if err = fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -56,6 +59,29 @@ func runPeer(args []string, input io.Reader, output io.Writer) error {
 		return errors.New("unexpected peer arguments")
 	}
 	switch args[0] {
+	case "publish":
+		if *destinationGrant == "" || *transferID == "" {
+			return errors.New("peer publish requires -destination-grant and -transfer")
+		}
+		if _, err := agentclient.Read(*identity); err != nil {
+			return fmt.Errorf("local agent not enrolled: %w", err)
+		}
+		permissions, err := agentpolicy.Open(*grantsPath)
+		if err != nil {
+			return err
+		}
+		stage, err := agenttransfer.Open(*staging, agenttransfer.DefaultMaxPendingBytes)
+		if err != nil {
+			return err
+		}
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		result, err := (agentpublish.Publisher{Grants: permissions, Transfers: stage}).Publish(ctx, *destinationGrant, *transferID)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(output, "Published verified file %s (%d bytes, SHA-256 %s) into approved destination %s. Existing files were not replaced.\n", result.Path, result.Bytes, result.SHA256, result.GrantID)
+		return nil
 	case "init":
 		key, err := agentpeer.GenerateKey(*keyFile)
 		if err != nil {
@@ -83,7 +109,10 @@ func runPeer(args []string, input io.Reader, output io.Writer) error {
 		}
 		fmt.Fprintf(output, "Verified inventory response: %d files (no files modified).\n", len(entries))
 		return nil
-	case "stage":
+	case "stage", "receive":
+		if args[0] == "receive" && *destinationGrant == "" {
+			return errors.New("peer receive requires -destination-grant")
+		}
 		if *peerURL == "" || *grant == "" || *relative == "" || *sourceID == "" {
 			return errors.New("peer stage requires -peer -grant -relative and -source-id")
 		}
@@ -106,6 +135,17 @@ func runPeer(args []string, input io.Reader, output io.Writer) error {
 			return err
 		}
 		fmt.Fprintf(output, "Verified %s: %d bytes staged under %s. No destination files overwritten.\n", done.RelativePath, done.ReceivedBytes, done.ID)
+		if args[0] == "receive" {
+			permissions, err := agentpolicy.Open(*grantsPath)
+			if err != nil {
+				return err
+			}
+			result, err := (agentpublish.Publisher{Grants: permissions, Transfers: store}).Publish(ctx, *destinationGrant, done.ID)
+			if err != nil {
+				return fmt.Errorf("transfer verified and retained in staging as %s; destination publish refused: %w", done.ID, err)
+			}
+			fmt.Fprintf(output, "Received %s: %d bytes published to approved destination %s (SHA-256: %s).\n", result.Path, result.Bytes, result.GrantID, result.SHA256)
+		}
 		return nil
 	case "serve":
 		credentials, err := agentclient.Read(*identity)
@@ -195,7 +235,7 @@ func runPeer(args []string, input io.Reader, output io.Writer) error {
 		}
 		return err
 	default:
-		return fmt.Errorf("unknown peer command %q; choose init, serve, inventory, or stage", args[0])
+		return fmt.Errorf("unknown peer command %q; choose init, serve, inventory, stage, receive, or publish", args[0])
 	}
 }
 func readPeerToken(input io.Reader) (string, error) {
