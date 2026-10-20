@@ -29,6 +29,10 @@ You don't need to know networking terms to use Syncria's everyday screens. Once 
 
 For examples and explanations of common choices, read [Getting Started](docs/GETTING-STARTED.md).
 
+## Product direction
+
+The approved product scope, implementation priorities, and compatibility boundaries are documented in [Product Direction](docs/PRODUCT-DIRECTION.md). Proposed capabilities are not represented as released until implemented and tested.
+
 ## What can Syncria do?
 
 - **Google Drive ↔ NAS:** Keep cloud files and a NAS folder matched.
