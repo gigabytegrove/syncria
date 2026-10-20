@@ -359,3 +359,20 @@ func (s *Store) Allows(grantID, relative string, write bool) error {
 	}
 	return ErrDenied
 }
+
+// Get returns an independent copy of a locally approved grant. File access
+// callers must still check Allows for each requested relative path and use
+// handle-relative filesystem operations; Get does not grant additional rights.
+func (s *Store) Get(id string) (Grant, error) {
+	if !validID(id) {
+		return Grant{}, ErrMissing
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, grant := range s.state.Grants {
+		if grant.ID == id {
+			return cloneGrant(grant), nil
+		}
+	}
+	return Grant{}, ErrMissing
+}
