@@ -3,6 +3,21 @@ package main
 // newUI is a complete replacement for the original single-page dashboard.
 var newUI = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Syncria — Your files, in sync</title>
 <style>
+
+.update-channel-panel{margin-bottom:18px}
+.channel-choice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
+.channel-choice{display:flex;align-items:flex-start;gap:11px;padding:16px;border:1px solid #d7e5f0;border-radius:12px;background:#f8fbfe;cursor:pointer;min-width:0;min-height:110px}
+.channel-choice:has(input:checked){border-color:#4397cf;background:#edf7ff;box-shadow:0 0 0 1px #4397cf inset}
+.channel-choice:focus-within{outline:2px solid #4397cf;outline-offset:2px}
+.channel-choice input{margin-top:4px;flex:none;accent-color:#1275ad}
+.channel-choice span,.channel-choice strong,.channel-choice small{display:block}
+.channel-choice strong{font-size:14px;margin-bottom:6px}
+.channel-choice small{font-size:12px;color:#59758a;line-height:1.45}
+.channel-choice-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:16px}
+.channel-choice-footer p{margin:0}
+@media(max-width:760px){.channel-choice-grid{grid-template-columns:minmax(0,1fr)}.channel-choice{min-height:0}}
+
+
 /* Functional layout primitives. Product styling is centralized in ui_theme.go. */
 *{box-sizing:border-box}
 body{margin:0}

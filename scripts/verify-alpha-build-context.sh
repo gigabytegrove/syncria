@@ -18,6 +18,9 @@ grep -Fq 'FROM scratch AS alpha-agent-export' Dockerfile || { echo "FAIL: native
 grep -Fq 'syncria_alpha_isolated_data' compose.alpha.yaml || { echo "FAIL: dedicated alpha volume missing" >&2; exit 1; }
 grep -Fq 'syncria-alpha' compose.alpha.yaml || { echo "FAIL: dedicated alpha container missing" >&2; exit 1; }
 grep -Fq 'v1.0.0-alpha.1-local' compose.alpha.yaml || { echo "FAIL: distinct alpha build version missing" >&2; exit 1; }
+grep -Fq 'for target in linux/amd64 linux/arm64 linux/arm windows/amd64 windows/arm64 darwin/amd64 darwin/arm64;' scripts/publish-alpha-prerelease.sh || { echo "FAIL: seven controller platform targets are not all exported" >&2; exit 1; }
+grep -Fq '[[ "$count" == 16 ]]' scripts/publish-alpha-prerelease.sh || { echo "FAIL: release publish is not gated by full asset count" >&2; exit 1; }
+grep -Fq -- '--draft --prerelease --latest=false' scripts/publish-alpha-prerelease.sh || { echo "FAIL: release is not staged as a draft" >&2; exit 1; }
 printf 'PASS: all tracked Go source trees are copied into Docker.\n'
 printf 'PASS: full Go unit/static build gates and separate alpha data volume configured.\n'
 printf 'NOTE: actual Go 1.25 compilation, browser, NAS, and OS runtime validation still required.\n'
