@@ -16,6 +16,7 @@ import (
 
 	"github.com/gigabytegrove/syncria/agentcontrol"
 	"github.com/gigabytegrove/syncria/agentpeer"
+	"github.com/gigabytegrove/syncria/syncpolicy"
 )
 
 // A device pairing credential is distinct from the one-time enrollment secret.
@@ -108,6 +109,7 @@ type agentSyncCreateRequest struct {
 	NASShareID string `json:"nas_share_id"`
 	NASFolder  string `json:"nas_folder"`
 	Interval   int    `json:"interval_minutes"`
+	Policy *syncpolicy.Policy `json:"policy,omitempty"`
 }
 
 func (a *App) registerAgentSyncRoutes(mux *http.ServeMux, control *agentcontrol.Store) {
@@ -156,6 +158,7 @@ func (a *App) registerAgentSyncRoutes(mux *http.ServeMux, control *agentcontrol.
 			http.Error(w, "invalid relationship settings", 400)
 			return
 		}
+		if req.Policy != nil { if err:=req.Policy.Validate(); err != nil { http.Error(w,"invalid bandwidth or schedule policy",400);return } }
 		if err := validateAgentPeerURL(req.PeerURL); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
@@ -201,7 +204,7 @@ func (a *App) registerAgentSyncRoutes(mux *http.ServeMux, control *agentcontrol.
 			return
 		}
 		id := newID()
-		job := Job{Provider: "agent_bridge", RelationshipType: "agent", ID: id, Name: req.Name, Direction: "one_way", ConflictPolicy: conflictManual, AgentDeviceID: req.DeviceID, AgentGrantID: req.GrantID, AgentPeerURL: req.PeerURL, NASShareID: destination.ShareID, NASFolder: destination.Folder, NASDestinations: []NASDestination{destination}, ScheduleMode: "interval", Interval: req.Interval, Enabled: false, State: map[string]Item{}, PropagateDeletions: boolPtr(false), RecoveryEnabled: boolPtr(true)}
+		job := Job{Provider: "agent_bridge", RelationshipType: "agent", ID: id, Name: req.Name, Direction: "one_way", ConflictPolicy: conflictManual, AgentDeviceID: req.DeviceID, AgentGrantID: req.GrantID, AgentPeerURL: req.PeerURL, NASShareID: destination.ShareID, NASFolder: destination.Folder, NASDestinations: []NASDestination{destination}, ScheduleMode: "interval", Interval: req.Interval, Enabled: false, AgentSyncPolicy: req.Policy, State: map[string]Item{}, PropagateDeletions: boolPtr(false), RecoveryEnabled: boolPtr(true)}
 		if err = saveAgentPeerCredential(a.file, id, req.PeerToken); err != nil {
 			http.Error(w, "could not save device credential", 500)
 			return

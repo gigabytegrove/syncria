@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
+
+	"github.com/gigabytegrove/syncria/syncpolicy"
 
 	"github.com/gigabytegrove/syncria/agentpeer"
 )
@@ -18,6 +21,7 @@ type agentReadEndpoint struct {
 	grant     string
 	scanHook  func(string, int64)
 	inventory map[string]bridgeEntry
+	policy *syncpolicy.Policy
 }
 
 func (p *agentReadEndpoint) Close() {}
@@ -88,7 +92,14 @@ func (p *agentReadEndpoint) Open(ctx context.Context, rel string) (io.ReadCloser
 		_ = r.Close()
 		return nil, 0, errors.New("device file changed after inventory")
 	}
-	return r, size, nil
+	if p.policy != nil {
+        rate := &syncpolicy.RateReader{Source: r, Context: ctx, BytesPerSecond: int64(p.policy.KiBPerSecond) * 1024}
+        if len(p.policy.Windows) > 0 {
+            rate.Allowed = func(now time.Time) bool { return p.policy.Allowed(now) }
+        }
+        return rate, size, nil
+    }
+    return r, size, nil
 }
 func (p *agentReadEndpoint) Mkdir(context.Context, string) (bridgeEntry, error) {
 	return bridgeEntry{}, errors.New("device endpoint is read-only")
@@ -119,11 +130,15 @@ func (a *App) syncAgentBridge(ctx context.Context, j *Job) error {
 	if j.AgentDeviceID == "" || j.AgentGrantID == "" || j.AgentPeerURL == "" || len(j.NASDestinations) != 1 {
 		return errors.New("incomplete device/NAS relationship")
 	}
-	secret, err := readAgentPeerCredential(a.file, j.ID)
+	if j.AgentSyncPolicy != nil {
+        if err := j.AgentSyncPolicy.Validate(); err != nil { return fmt.Errorf("invalid agent sync policy: %w", err) }
+        if !j.AgentSyncPolicy.Allowed(time.Now()) { return syncpolicy.ErrOutsideWindow }
+    }
+    secret, err := readAgentPeerCredential(a.file, j.ID)
 	if err != nil {
 		return fmt.Errorf("device peer credential unavailable: %w", err)
 	}
-	device := &agentReadEndpoint{peer: agentpeer.Client{Server: j.AgentPeerURL, Token: secret}, grant: j.AgentGrantID}
+	device := &agentReadEndpoint{peer: agentpeer.Client{Server: j.AgentPeerURL, Token: secret}, grant: j.AgentGrantID, policy: j.AgentSyncPolicy}
 	device.scanHook = func(rel string, count int64) {
 		if j.scanHook != nil {
 			j.scanHook("Device", rel, count)
