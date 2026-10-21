@@ -22,6 +22,10 @@ COPY agentpeer/ ./agentpeer/
 COPY agentpolicy/ ./agentpolicy/
 COPY agenttransfer/ ./agenttransfer/
 COPY agentpublish/ ./agentpublish/
+COPY agentversion/ ./agentversion/
+COPY agentupdate/ ./agentupdate/
+COPY syncpolicy/ ./syncpolicy/
+COPY synctopology/ ./synctopology/
 COPY cmd/ ./cmd/
 COPY assets/ ./assets/
 COPY --from=css /src/assets/syncria.css ./assets/syncria.css

@@ -113,6 +113,7 @@ type agentSyncCreateRequest struct {
 }
 
 func (a *App) registerAgentSyncRoutes(mux *http.ServeMux, control *agentcontrol.Store) {
+	mux.HandleFunc("/api/v1/sync/topology", a.syncTopologyHandler(control))
 	mux.HandleFunc("/api/v1/agent-sync/jobs", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		if !a.authenticated(r) {
