@@ -6,55 +6,54 @@ import (
  "time"
 )
 
-// GitHub metadata is shared across clients so opening multiple dashboard tabs
-// cannot exhaust the unauthenticated GitHub API rate limit.
+type channelUpdateCache struct{validUntil,lastRefresh time.Time;response map[string]any}
+// Keep the stable cache fields for existing tests and legacy API consumers.
 var updateLookup struct {
  sync.Mutex
  validUntil time.Time
  lastRefresh time.Time
  response map[string]any
+ channels map[string]channelUpdateCache
 }
-
-func cachedUpdateStatus(ctx context.Context) map[string]any {
- return lookupUpdateStatus(ctx,false)
-}
-// A user pressing Check again should query the public release API instead of
-// silently showing cached results. Throttle repeated manual checks to protect
-// against GitHub's unauthenticated API rate limits.
-func refreshedUpdateStatus(ctx context.Context) map[string]any {
- return lookupUpdateStatus(ctx,true)
-}
-func lookupUpdateStatus(ctx context.Context,force bool) map[string]any {
- updateLookup.Lock()
- defer updateLookup.Unlock()
+func cachedUpdateStatus(ctx context.Context)map[string]any{return lookupUpdateStatus(ctx,false)}
+func refreshedUpdateStatus(ctx context.Context)map[string]any{return lookupUpdateStatus(ctx,true)}
+func lookupUpdateStatus(ctx context.Context,force bool)map[string]any{return channelUpdateStatus(ctx,"stable",force)}
+func channelUpdateStatus(ctx context.Context,channel string,force bool)map[string]any{
+ if !validUpdateChannel(channel){return map[string]any{"error":"invalid release channel"}}
+ updateLookup.Lock();defer updateLookup.Unlock()
  now:=time.Now()
- if updateLookup.response!=nil {
-  if !force&&now.Before(updateLookup.validUntil) {return updateLookup.response}
-  if force&&now.Sub(updateLookup.lastRefresh)<15*time.Second {return updateLookup.response}
+ var cached channelUpdateCache
+ if channel=="stable"{
+  cached=channelUpdateCache{updateLookup.validUntil,updateLookup.lastRefresh,updateLookup.response}
+ }else{cached=updateLookup.channels[channel]}
+ if cached.response!=nil{
+  if !force&&now.Before(cached.validUntil){return cached.response}
+  if force&&now.Sub(cached.lastRefresh)<15*time.Second{return cached.response}
  }
- if force {updateLookup.lastRefresh=now}
- c,cancel:=context.WithTimeout(ctx,15*time.Second)
- defer cancel()
- status:=map[string]any{"current":appVersion}
+ if force{cached.lastRefresh=now}
+ ctx,cancel:=context.WithTimeout(ctx,15*time.Second);defer cancel()
+ status:=map[string]any{"current":appVersion,"channel":channel,"available":false,"pending":false}
  ttl:=5*time.Minute
- tag,err:=latestTag(c)
- if err != nil {
-  status["error"]=err.Error()
-  ttl=10*time.Minute
- } else {
-  status["latest"]=tag
-  newer:=newerVersion(tag,appVersion)
-  status["available"]=false
-  status["pending"]=false
-  if newer {
-   if _,err=releaseForTag(c,tag);err!=nil {
-    status["pending"]=true
-    status["message"]=err.Error()
-    ttl=10*time.Minute
-   } else {status["available"]=true}
+ release,err:=latestChannelRelease(ctx,channel)
+ if err!=nil{
+  status["error"]=err.Error();ttl=10*time.Minute
+ }else{
+  status["latest"]=release.Tag
+  if newerVersion(release.Tag,appVersion){
+   if err=requireUpdateAssets(release);err!=nil{
+    status["pending"]=true;status["message"]=err.Error();ttl=10*time.Minute
+   }else{status["available"]=true}
   }
  }
- updateLookup.response=status
- updateLookup.validUntil=time.Now().Add(ttl)
+ cached.response=status
+ cached.validUntil=time.Now().Add(ttl)
+ if channel=="stable"{
+  updateLookup.response=cached.response
+  updateLookup.validUntil=cached.validUntil
+  updateLookup.lastRefresh=cached.lastRefresh
+ }else{
+  if updateLookup.channels==nil{updateLookup.channels=map[string]channelUpdateCache{}}
+  updateLookup.channels[channel]=cached
+ }
  return status
 }

@@ -23,7 +23,7 @@ const tagsAPI = "https://api.github.com/repos/gigabytegrove/syncria/tags?per_pag
 const releaseForTagAPI = "https://api.github.com/repos/gigabytegrove/syncria/releases/tags/"
 
 type releaseAsset struct { Name string `json:"name"`; URL string `json:"url"` }
-type releaseInfo struct { Tag string `json:"tag_name"`; Assets []releaseAsset `json:"assets"` }
+type releaseInfo struct { Tag string `json:"tag_name"`; Assets []releaseAsset `json:"assets"`; Draft bool `json:"draft"`; Prerelease bool `json:"prerelease"` }
 type githubTag struct { Name string `json:"name"` }
 
 // githubRetryAfter honors secondary limits and primary rate-limit reset headers.
@@ -104,10 +104,9 @@ func versionParts(tag string)([3]int,bool){
  return p,true
 }
 func newerVersion(a,b string)bool{
- x,ok:=versionParts(a);if !ok{return false}
- y,ok:=versionParts(b);if !ok{return true}
- for i:=0;i<3;i++{if x[i]!=y[i]{return x[i]>y[i]}}
- return false
+ candidate,ok:=parseReleaseTag(a);if !ok{return false}
+ installed,ok:=parseReleaseTag(strings.TrimSuffix(b,"-local"));if !ok{return true}
+ return candidate.compare(installed)>0
 }
 func latestTag(ctx context.Context)(string,error){
  resp,err:=releaseRequest(ctx,tagsAPI,"application/vnd.github+json");if err!=nil{return "",err};defer resp.Body.Close()
@@ -129,10 +128,7 @@ func releaseForTag(ctx context.Context,tag string)(releaseInfo,error){
  if _,ok:=assetFor(r,"SHA256SUMS");!ok{return r,fmt.Errorf("%s has no checksum file",tag)}
  return r,nil
 }
-func latestRelease(ctx context.Context)(releaseInfo,error){
- tag,err:=latestTag(ctx);if err!=nil{return releaseInfo{},err}
- return releaseForTag(ctx,tag)
-}
+func latestRelease(ctx context.Context)(releaseInfo,error){return latestChannelRelease(ctx,"stable")}
 func assetName()string{return "syncria-"+runtime.GOOS+"-"+runtime.GOARCH+func()string{if runtime.GOOS=="windows"{return ".exe"};return ""}()}
 func assetFor(r releaseInfo,name string)(releaseAsset,bool){for _,a:=range r.Assets{if a.Name==name{return a,true}};return releaseAsset{},false}
 // downloadAssetWithProgress exposes actual received bytes and Content-Length;
@@ -230,4 +226,73 @@ func rollbackBinary(dir string)(string,error){
  if err:=os.Rename(current,old);err!=nil{return "",err}
  if err:=os.Rename(previous,current);err!=nil{os.Rename(old,current);return "",err}
  os.Rename(old,previous);return current,nil
+}
+
+// Published GitHub Releases determine update channels. Tags alone are not
+// proof of a published or complete release, so never install raw tag targets.
+const publishedReleasesAPI = "https://api.github.com/repos/gigabytegrove/syncria/releases?per_page=100"
+func validUpdateChannel(ch string)bool{return ch=="stable"||ch=="beta"||ch=="alpha"}
+type parsedUpdateVersion struct{major,minor,patch int;channel string;sequence int}
+func parseReleaseTag(tag string)(parsedUpdateVersion,bool){
+ var v parsedUpdateVersion
+ prefix:=""
+ if strings.HasPrefix(tag,"alpha-"){prefix="alpha";tag=strings.TrimPrefix(tag,"alpha-")
+ }else if strings.HasPrefix(tag,"beta-"){prefix="beta";tag=strings.TrimPrefix(tag,"beta-")}
+ tag=strings.TrimPrefix(tag,"v")
+ if strings.Contains(tag,"+"){return v,false}
+ split:=strings.SplitN(tag,"-",2)
+ numbers:=strings.Split(split[0],".")
+ if len(numbers)!=3{return v,false}
+ fields:=[]*int{&v.major,&v.minor,&v.patch}
+ for i,s:=range numbers{
+  if s==""||(len(s)>1&&s[0]=='0'){return v,false}
+  for _,c:=range s{if c<'0'||c>'9'{return v,false}}
+  n,err:=strconv.Atoi(s);if err!=nil{return v,false};*fields[i]=n
+ }
+ v.channel="stable"
+ if len(split)==2{
+  pre:=strings.Split(split[1],".")
+  if len(pre)!=2||(pre[0]!="alpha"&&pre[0]!="beta"){return parsedUpdateVersion{},false}
+  v.channel=pre[0]
+  if pre[1]==""||(len(pre[1])>1&&pre[1][0]=='0'){return parsedUpdateVersion{},false}
+  for _,c:=range pre[1]{if c<'0'||c>'9'{return parsedUpdateVersion{},false}}
+  n,err:=strconv.Atoi(pre[1]);if err!=nil{return parsedUpdateVersion{},false};v.sequence=n
+ }
+ if prefix!=""&&prefix!=v.channel{return parsedUpdateVersion{},false}
+ return v,true
+}
+func (v parsedUpdateVersion)compare(w parsedUpdateVersion)int{
+ left,right:=[]int{v.major,v.minor,v.patch},[]int{w.major,w.minor,w.patch}
+ for i:=0;i<3;i++{if left[i]>right[i]{return 1};if left[i]<right[i]{return -1}}
+ rank:=func(ch string)int{switch ch{case "stable":return 3;case "beta":return 2;case "alpha":return 1};return 0}
+ if rank(v.channel)>rank(w.channel){return 1};if rank(v.channel)<rank(w.channel){return -1}
+ if v.sequence>w.sequence{return 1};if v.sequence<w.sequence{return -1}
+ return 0
+}
+func choosePublishedRelease(channel string,releases []releaseInfo)(releaseInfo,error){
+ if !validUpdateChannel(channel){return releaseInfo{},errors.New("invalid release channel")}
+ var best releaseInfo;var version parsedUpdateVersion;found:=false
+ for _,release:=range releases{
+  if release.Tag==""||release.Draft{continue}
+  parsed,ok:=parseReleaseTag(release.Tag)
+  if !ok||parsed.channel!=channel{continue}
+  if (channel=="stable"&&release.Prerelease)||(channel!="stable"&&!release.Prerelease){continue}
+  if !found||parsed.compare(version)>0{found=true;best=release;version=parsed}
+ }
+ if !found{return releaseInfo{},fmt.Errorf("no published %s release found",channel)}
+ return best,nil
+}
+func latestChannelRelease(ctx context.Context,channel string)(releaseInfo,error){
+ if !validUpdateChannel(channel){return releaseInfo{},errors.New("invalid release channel")}
+ response,err:=releaseRequest(ctx,publishedReleasesAPI,"application/vnd.github+json")
+ if err!=nil{return releaseInfo{},err};defer response.Body.Close()
+ if response.StatusCode!=http.StatusOK{return releaseInfo{},githubAPIError(response,"Published GitHub Releases")}
+ var releases []releaseInfo
+ if err:=json.NewDecoder(io.LimitReader(response.Body,4<<20)).Decode(&releases);err!=nil{return releaseInfo{},err}
+ return choosePublishedRelease(channel,releases)
+}
+func requireUpdateAssets(release releaseInfo)error{
+ if _,ok:=assetFor(release,assetName());!ok{return fmt.Errorf("%s lacks a platform executable",release.Tag)}
+ if _,ok:=assetFor(release,"SHA256SUMS");!ok{return fmt.Errorf("%s lacks SHA256SUMS",release.Tag)}
+ return nil
 }

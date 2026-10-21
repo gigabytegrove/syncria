@@ -207,11 +207,15 @@ func (a *App) updateProgressAPI(w http.ResponseWriter,r *http.Request) {
  if err:=r.ParseForm();err!=nil{http.Error(w,"Invalid update request",http.StatusBadRequest);return}
  operation:=strings.TrimSpace(r.FormValue("operation"))
  if operation!="install"&&operation!="rollback"{http.Error(w,"Invalid update operation",http.StatusBadRequest);return}
+ channel:=strings.TrimSpace(r.FormValue("channel"));if channel==""{channel="stable"}
+ if !validUpdateChannel(channel){http.Error(w,"Invalid release channel",http.StatusBadRequest);return}
+ expected:=strings.TrimSpace(r.FormValue("expected_tag"))
+ if len(expected)>100{http.Error(w,"Invalid expected version",http.StatusBadRequest);return}
  if err:=a.beginUpdate(operation);err!=nil{http.Error(w,err.Error(),http.StatusConflict);return}
  w.Header().Set("Content-Type","application/json; charset=utf-8")
  w.WriteHeader(http.StatusAccepted)
  _=json.NewEncoder(w).Encode(a.updateProgressSnapshot())
- go a.runUpdate(operation)
+ go a.runUpdateForChannel(operation,channel,expected)
 }
 // Update stages represent observed actions. Only download and SHA-256 hashing
 // report percentages: both have exact byte counters. Network handshakes,
@@ -228,7 +232,8 @@ func (a *App) updateEvent(phase,detail string){
  if len(p.Events)>45{p.Events=p.Events[len(p.Events)-45:]}
  if err:=a.writeUpdateProgressLocked(p);err!=nil{log.Printf("update event state: %v",err)}
 }
-func (a *App) runUpdate(operation string) {
+func (a *App) runUpdate(operation string) {a.runUpdateForChannel(operation,"stable","")}
+func (a *App) runUpdateForChannel(operation,channel,expected string) {
  defer func(){
   if x:=recover();x!=nil{a.finishUpdate("failed","Updater panicked; restart not attempted",fmt.Sprint(x))}
  }()
@@ -241,8 +246,10 @@ func (a *App) runUpdate(operation string) {
   a.updateEvent("staging","Previous executable restored; requesting supervisor restart")
  }else{
   a.setUpdateProgress("checking","Reading published release metadata from GitHub","",-1,-1,-1,"")
-  rel,err:=latestRelease(ctx)
+  rel,err:=latestChannelRelease(ctx,channel)
   if err!=nil{a.finishUpdate("failed","Release lookup failed",err.Error());return}
+  if expected!=""&&rel.Tag!=expected{a.finishUpdate("failed","Release selection changed","Recheck the "+channel+" channel before installing");return}
+  if err:=requireUpdateAssets(rel);err!=nil{a.finishUpdate("failed","Release is incomplete",err.Error());return}
   if !newerVersion(rel.Tag,appVersion){
    a.finishUpdate("complete","Syncria "+appVersion+" is already the latest published version","")
    return
