@@ -25,6 +25,7 @@ type RestoreResult struct {
  Relative string `json:"relative"`
  Bytes int64 `json:"bytes"`
  SHA256 string `json:"sha256"`
+ CaptureVerified bool `json:"capture_verified"`
 }
 func newRestoreName(relative string)(string,error){
  var nonce [16]byte
@@ -37,10 +38,21 @@ func newRestoreName(relative string)(string,error){
 // Existing live files and retained archives are never intentionally replaced.
 // SMB Rename is not guaranteed no-replace on every NAS; a malicious concurrent
 // writer can still race the final rename. Validate on real SMB before GA.
+// RestoreCopy supports legacy archives while reporting missing proof.
 func RestoreCopy(ctx context.Context,remote RestoreRemote,root,jobID,versionID,relative string)(RestoreResult,error){
+ return restoreCopy(ctx,remote,root,jobID,versionID,relative,false)
+}
+func RestoreCopyVerified(ctx context.Context,remote RestoreRemote,root,jobID,versionID,relative string)(RestoreResult,error){
+ return restoreCopy(ctx,remote,root,jobID,versionID,relative,true)
+}
+func restoreCopy(ctx context.Context,remote RestoreRemote,root,jobID,versionID,relative string,requireProof bool)(RestoreResult,error){
  if remote==nil||!safeRoot(root)||!validID(jobID)||!validID(versionID)||!safeRel(relative){return RestoreResult{},ErrUnsafePath}
  if err:=ctx.Err();err!=nil{return RestoreResult{},err}
  archived:=path.Join(root,".syncria-versions",jobID,versionID,relative)
+ proof,hasProof,err:=readProof(remote,root,jobID,versionID)
+ if err!=nil{return RestoreResult{},fmt.Errorf("archive capture proof failed: %w",err)}
+ if requireProof&&!hasProof{return RestoreResult{},errors.New("archive has no capture-time checksum; automatic restore requires verified history")}
+ if hasProof&&proof.Relative!=relative{return RestoreResult{},errors.New("archive proof does not match selected file")}
  sourceInfo,err:=remote.Stat(archived)
  if err!=nil{return RestoreResult{},fmt.Errorf("historical version unavailable: %w",err)}
  if !sourceInfo.Mode().IsRegular()||sourceInfo.Size()<0{return RestoreResult{},ErrUnsafePath}
@@ -77,6 +89,7 @@ func RestoreCopy(ctx context.Context,remote RestoreRemote,root,jobID,versionID,r
  }
  if err:=dst.Close();err!=nil{return RestoreResult{},err}
  if copied!=sourceInfo.Size(){return RestoreResult{},io.ErrUnexpectedEOF}
+ if hasProof&&(copied!=proof.Bytes||hex.EncodeToString(h.Sum(nil))!=proof.SHA256){return RestoreResult{},errors.New("historical archive failed capture-time SHA-256 verification")}
  // Re-read what landed on NAS and compare its SHA256 to source stream.
  stagedFile,err:=remote.Open(temp);if err!=nil{return RestoreResult{},err}
  actualHash:=sha256.New()
@@ -91,7 +104,7 @@ func RestoreCopy(ctx context.Context,remote RestoreRemote,root,jobID,versionID,r
  if _,err:=remote.Stat(destination);err==nil{return RestoreResult{},errors.New("recovery destination appeared during copy")}else if !os.IsNotExist(err){return RestoreResult{},err}
  if err:=remote.Rename(temp,destination);err!=nil{return RestoreResult{},fmt.Errorf("publish NAS recovery copy: %w",err)}
  staged=false
- return RestoreResult{Relative:restored,Bytes:copied,SHA256:hex.EncodeToString(h.Sum(nil))},nil
+ return RestoreResult{Relative:restored,Bytes:copied,SHA256:hex.EncodeToString(h.Sum(nil)),CaptureVerified:hasProof},nil
 }
 type contextReader struct{ctx context.Context;reader io.Reader}
 func (r *contextReader)Read(p []byte)(int,error){if err:=r.ctx.Err();err!=nil{return 0,err};return r.reader.Read(p)}

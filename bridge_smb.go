@@ -193,7 +193,7 @@ func (s *directSMB) putWithVersion(ctx context.Context,root,rel string,source io
  if versionJobID!=""{
   // Previous bytes are retained on this NAS before publishing the verified
   // staging file. A failure rolls the old name back or reports its archive.
-  if _,e:=nasversion.Promote(ctx,s.share,root,rel,temp,versionJobID);e!=nil{return fmt.Errorf("retain NAS version for %q: %w",rel,e)}
+  if _,e:=nasversion.PromoteVerified(ctx,s.share,root,rel,temp,versionJobID);e!=nil{return fmt.Errorf("retain NAS version for %q: %w",rel,e)}
   complete=true
   return nil
  }

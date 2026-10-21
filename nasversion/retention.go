@@ -7,6 +7,7 @@ import (
  "encoding/json"
  "errors"
  "fmt"
+ "io"
  "os"
  "path"
  "sort"
@@ -98,8 +99,24 @@ func ApplyRetention(ctx context.Context,remote RetentionRemote,root,jobID string
   if p!=v.Path||!validID(v.VersionID)||!safeRel(v.Relative){return removed,ErrUnsafePath}
   info,e:=remote.Stat(p);if e!=nil{return removed,e}
   if !info.Mode().IsRegular()||info.Size()!=v.Bytes||!info.ModTime().Equal(v.Modified){return removed,errors.New("archived file changed; remaining versions preserved")}
+  if v.CaptureProofPresent {
+    reader,ok:=remote.(interface{Open(string)(io.ReadCloser,error)})
+    if !ok{return removed,errors.New("NAS cannot verify archive before cleanup")}
+    actual,e:=hashRemote(ctx,reader,p,v.Bytes)
+    if e!=nil{return removed,e}
+    if actual!=v.CaptureSHA256{return removed,errors.New("archive integrity changed; cleanup stopped")}
+  }
   if e:=remote.Remove(p);e!=nil{return removed,fmt.Errorf("remove archived version: %w",e)}
   removed++
+  // Remove the proof and empty archive directories only AFTER the selected
+  // archived payload; never remove the relationship's archival root.
+  if v.CaptureProofPresent{
+    if e:=remote.Remove(proofPath(root,jobID,v.VersionID));e!=nil&&!os.IsNotExist(e){return removed,fmt.Errorf("archive removed but proof cleanup needs retry: %w",e)}
+  }
+  parent:=path.Join(root,".syncria-versions",jobID)
+  for dir:=path.Dir(p);dir!=parent&&strings.HasPrefix(dir,parent+"/");dir=path.Dir(dir){
+    if e:=remote.Remove(dir);e!=nil&&!os.IsNotExist(e){return removed,fmt.Errorf("archive removed but empty folder cleanup needs retry: %w",e)}
+  }
  }
  return removed,nil
 }

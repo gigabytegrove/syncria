@@ -93,7 +93,7 @@ func (a *App)agentVersionRestoreAPI(w http.ResponseWriter,r *http.Request){
  ctx,cancel:=context.WithTimeout(r.Context(),60*time.Minute);defer cancel()
  remote,closeFn,err:=a.openVersionNAS(ctx,job)
  if err!=nil{http.Error(w,"NAS archive unavailable",503);return};defer closeFn()
- restored,err:=nasversion.RestoreCopy(ctx,remote,job.NASDestinations[0].Folder,job.ID,req.VersionID,req.Relative)
+ restored,err:=nasversion.RestoreCopyVerified(ctx,remote,job.NASDestinations[0].Folder,job.ID,req.VersionID,req.Relative)
  if err!=nil{http.Error(w,"NAS restore failed; existing live files were not intentionally replaced",409);return}
  respondNASVersions(w,201,map[string]any{"job_id":job.ID,"restored":restored,"note":"Recovered copy has a new filename; historical and live files remain."})
 }
