@@ -39,6 +39,7 @@ type bridgeSMBEndpoint struct {
  client *directSMB
  root string
  scanHook func(string,int64)
+ archiveJobID string // non-empty only for approved agent_bridge relationships
 }
 func (b *bridgeSMBEndpoint) Close(){if b.client!=nil{b.client.Close()}}
 func (b *bridgeSMBEndpoint) Scan(ctx context.Context)(map[string]bridgeEntry,error){
@@ -57,7 +58,13 @@ func (b *bridgeSMBEndpoint) Open(ctx context.Context,rel string)(io.ReadCloser,i
  return b.client.open(b.root,rel)
 }
 func (b *bridgeSMBEndpoint) Put(ctx context.Context,rel string,source io.Reader,size int64,expectedMD5 string,onBytes func(int64))(bridgeEntry,error){
- if err:=b.client.put(ctx,b.root,rel,source,size,expectedMD5,onBytes);err!=nil{return bridgeEntry{},err}
+ var err error
+ if b.archiveJobID!="" {
+  err=b.client.putWithVersion(ctx,b.root,rel,source,size,expectedMD5,onBytes,b.archiveJobID)
+ }else{
+  err=b.client.put(ctx,b.root,rel,source,size,expectedMD5,onBytes)
+ }
+ if err!=nil{return bridgeEntry{},err}
  target,err:=joinRemotePath(b.root,rel);if err!=nil{return bridgeEntry{},err}
  st,err:=b.client.share.Stat(target);if err!=nil{return bridgeEntry{},err}
  return bridgeEntry{Size:st.Size(),Fingerprint:fmt.Sprintf("%d:%d",st.Size(),st.ModTime().UnixNano()),Modified:st.ModTime()},nil
