@@ -15,6 +15,7 @@ import (
  "time"
 
  smb2 "github.com/cloudsoda/go-smb2"
+ "github.com/gigabytegrove/syncria/nasversion"
 )
 
 // directSMB is a remote SMB2/3 connection, NOT a kernel mount. File contents
@@ -105,7 +106,7 @@ func (s *directSMB) scanWithProgress(ctx context.Context,root string,onScan func
    if !info.IsDir() && ignoredSyncMetadata(name) {continue}
    // Internal recovery files remain on the NAS for Undo and are never
    // treated as ordinary files or a fatal scan error.
-   if name==".syncria-recovery" {continue}
+   if name==".syncria-recovery" || name==".syncria-versions" {continue}
    if !safeName(name){return fmt.Errorf("Unsafe NAS item name %q",name)}
    folded:=strings.ToLower(name);if seen[folded]{return fmt.Errorf("Case-colliding NAS filenames under %q",dir)}
    seen[folded]=true
@@ -148,6 +149,11 @@ func (s *directSMB) open(root,rel string)(io.ReadCloser,int64,error){
 // put streams source -> NAS temporary file. The partial file is only on
 // the NAS, never the machine or container hosting Syncria.
 func (s *directSMB) put(ctx context.Context,root,rel string,source io.Reader,expectedSize int64,expectedMD5 string,report func(int64))error {
+ return s.putWithVersion(ctx,root,rel,source,expectedSize,expectedMD5,report,"")
+}
+
+// putWithVersion is enabled only for approved one-way agent/NAS jobs.
+func (s *directSMB) putWithVersion(ctx context.Context,root,rel string,source io.Reader,expectedSize int64,expectedMD5 string,report func(int64),versionJobID string)error {
  dest,err:=joinRemotePath(root,rel);if err!=nil{return err}
  if err=s.mkdir(root,path.Dir(rel));err!=nil{return err}
  temp:=dest+".syncria-pending-"+newID()
@@ -183,6 +189,13 @@ func (s *directSMB) put(ctx context.Context,root,rel string,source io.Reader,exp
    if !strings.EqualFold(dropboxChecksum.HexSum(),expectedMD5){return errors.New("Dropbox source content hash mismatch; original NAS file preserved")}
   default:return errors.New("Unrecognized source checksum; NAS destination unchanged")
   }
+ }
+ if versionJobID!=""{
+  // Previous bytes are retained on this NAS before publishing the verified
+  // staging file. A failure rolls the old name back or reports its archive.
+  if _,e:=nasversion.Promote(ctx,s.share,root,rel,temp,versionJobID);e!=nil{return fmt.Errorf("retain NAS version for %q: %w",rel,e)}
+  complete=true
+  return nil
  }
  // Renaming a completed staging file is performed on the NAS. Existing
  // destination files are never removed first; if the NAS disallows

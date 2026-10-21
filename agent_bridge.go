@@ -148,6 +148,9 @@ func (a *App) syncAgentBridge(ctx context.Context, j *Job) error {
 	if err != nil {
 		return fmt.Errorf("destination NAS: %w", err)
 	}
+    smb,ok:=nas.(*bridgeSMBEndpoint)
+    if !ok {nas.Close();return errors.New("NAS version retention requires a direct SMB destination")}
+    smb.archiveJobID=j.ID
 	// Reuse the established one-way NAS conflict rule: no replacement when the
 	// destination changed independently, no automatic first-run overwrite.
 	// The job on disk remains provider=agent_bridge and is never modified here.
