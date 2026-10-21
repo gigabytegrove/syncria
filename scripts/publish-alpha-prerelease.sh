@@ -8,7 +8,7 @@ version='v1.0.0-alpha.1'
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 fail(){ printf 'ERROR: %s\n' "$*" >&2; exit 1; }
-for cmd in git docker gh sha256sum mktemp cp mv; do
+for cmd in git docker gh sha256sum mktemp cp mv awk; do
   command -v "$cmd" >/dev/null || fail "$cmd is required"
 done
 docker info >/dev/null 2>&1 || fail 'Docker Engine unavailable'
@@ -22,15 +22,24 @@ gh repo view "$repo" --json name >/dev/null || fail 'GitHub account cannot acces
 if gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then fail "Release $tag exists"; fi
 if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then fail "Tag $tag exists"; fi
 sha="$(git rev-parse HEAD)"
+remote_sha="$(git ls-remote origin refs/heads/feature/v2-release-foundation | awk '{print $1}')"
+[[ "$remote_sha" == "$sha" ]] || fail "Local checkout $sha does not match the published development branch $remote_sha; push or update the checkout first"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/dist"
-for arch in amd64 arm64; do
-  mkdir -p "$tmp/server-$arch"
+# Match the seven native server assets required by the existing in-app updater.
+# Every target must build and pass Go 1.25 tests before any release becomes public.
+for target in linux/amd64 linux/arm64 linux/arm windows/amd64 windows/arm64 darwin/amd64 darwin/arm64; do
+  target_os="${target%/*}"
+  target_arch="${target#*/}"
+  extension=''
+  [[ "$target_os" == windows ]] && extension='.exe'
+  file="syncria-${target_os}-${target_arch}${extension}"
+  mkdir -p "$tmp/server-${target_os}-${target_arch}"
   docker buildx build --progress=plain --build-arg APP_VERSION="$version" \
-    --build-arg TARGETOS=linux --build-arg TARGETARCH="$arch" \
-    --target alpha-server-export --output "type=local,dest=$tmp/server-$arch" .
-  test -s "$tmp/server-$arch/syncria" || fail "Missing controller $arch"
-  cp "$tmp/server-$arch/syncria" "$tmp/dist/syncria-linux-$arch"
+    --build-arg TARGETOS="$target_os" --build-arg TARGETARCH="$target_arch" \
+    --target alpha-server-export --output "type=local,dest=$tmp/server-${target_os}-${target_arch}" .
+  test -s "$tmp/server-${target_os}-${target_arch}/syncria" || fail "Missing server binary $file"
+  cp "$tmp/server-${target_os}-${target_arch}/syncria" "$tmp/dist/$file"
 done
 mkdir -p "$tmp/agents"
 docker buildx build --progress=plain --build-arg APP_VERSION="$version" \
@@ -44,7 +53,7 @@ for target in linux-amd64 linux-arm64 linux-arm windows-amd64 windows-arm64 darw
   cp "$tmp/agents/$file" "$tmp/dist/$file"
 done
 git archive --format=zip --prefix="syncria-$version/" HEAD > "$tmp/dist/syncria-$version-source.zip"
-(cd "$tmp/dist" && sha256sum syncria-linux-* syncria-agent-* "syncria-$version-source.zip" > SHA256SUMS)
+(cd "$tmp/dist" && sha256sum syncria-linux-* syncria-windows-* syncria-darwin-* syncria-agent-* "syncria-$version-source.zip" > SHA256SUMS)
 (cd "$tmp/dist" && sha256sum -c SHA256SUMS)
 cat > "$tmp/RELEASE-NOTES.md" <<EOF
 # Syncria $version — opt-in alpha
@@ -56,9 +65,14 @@ Includes experimental central agent-to-NAS sync and retained NAS history.
 Known gaps: real SMB tests, native installers, signed updates and rollback.
 The alpha- tag prefix prevents the existing stable updater from selecting this release.
 EOF
+# Keep the release a draft until all sixteen assets have finished uploading.
+# A failed upload must never appear as a selectable but incomplete alpha.
 gh release create "$tag" "$tmp/dist/"* --repo "$repo" --target "$sha" \
-  --prerelease --latest=false --title "Syncria $version (opt-in alpha)" \
+  --draft --prerelease --latest=false --title "Syncria $version (opt-in alpha)" \
   --notes-file "$tmp/RELEASE-NOTES.md"
+count="$(gh release view "$tag" --repo "$repo" --json assets --jq '.assets | length')"
+[[ "$count" == 16 ]] || fail "GitHub has $count/16 assets. Release remains a draft; fix the upload before publishing"
+gh release edit "$tag" --repo "$repo" --draft=false --prerelease --latest=false
 gh release view "$tag" --repo "$repo" --json tagName,isDraft,isPrerelease,url,assets \
   --jq '{tag: .tagName, draft: .isDraft, prerelease: .isPrerelease, url: .url, asset_count: (.assets | length)}'
-echo 'Alpha release published; no production instance upgraded.'
+echo 'Alpha release published with all platform executables; no production instance upgraded.'
