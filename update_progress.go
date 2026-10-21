@@ -29,6 +29,7 @@ type UpdateProgress struct {
  Events []UpdateEvent `json:"events,omitempty"`
  Phase string `json:"phase"`
  Operation string `json:"operation,omitempty"`
+ Channel string `json:"channel,omitempty"`
  From string `json:"from,omitempty"`
  Target string `json:"target,omitempty"`
  Message string `json:"message,omitempty"`
@@ -96,8 +97,11 @@ func (a *App) beginUpdate(operation string) error {
  busy:=false
  a.runs.Range(func(_, _ any)bool{busy=true;return false})
  if busy{return errors.New("an active sync must finish before updating")}
+ a.mu.Lock()
+ channel:=normalizeUpdateChannel(a.cfg.UpdateChannel)
+ a.mu.Unlock()
  now:=time.Now().UTC()
- p:=UpdateProgress{Phase:"checking",Operation:operation,From:appVersion,Message:"Checking release metadata",Percent:-1,Active:true,StartedAt:now,
+ p:=UpdateProgress{Phase:"checking",Operation:operation,Channel:channel,From:appVersion,Message:"Checking release metadata",Percent:-1,Active:true,StartedAt:now,
  Events:[]UpdateEvent{{At:now,Phase:"checking",Detail:"Checking release metadata from GitHub Releases"}}}
  if operation=="rollback"{
   p.Phase="staging";p.Message="Restoring the saved previous executable";p.Percent=-1
@@ -164,7 +168,7 @@ func (a *App) reconcileUpdateOnStartup() {
   return
  }
  if p.Active {
-  if p.Phase=="restarting"&&((p.Operation=="install"&&p.Target==appVersion)||(p.Operation=="rollback"&&p.From!=appVersion)||p.Operation=="manual"){
+  if p.Phase=="restarting"&&((p.Operation=="install"&&releaseTagAppVersion(p.Target)==appVersion)||(p.Operation=="rollback"&&p.From!=appVersion)||p.Operation=="manual"){
    p.Phase="complete";p.Percent=100;p.Message="Syncria "+appVersion+" is running";p.Error="";p.Active=false
    p.Events=append(p.Events,UpdateEvent{At:time.Now().UTC(),Phase:"complete",Detail:"Verified running version "+appVersion+" after restart"})
    p.UpdatedAt=time.Now().UTC()
@@ -207,15 +211,11 @@ func (a *App) updateProgressAPI(w http.ResponseWriter,r *http.Request) {
  if err:=r.ParseForm();err!=nil{http.Error(w,"Invalid update request",http.StatusBadRequest);return}
  operation:=strings.TrimSpace(r.FormValue("operation"))
  if operation!="install"&&operation!="rollback"{http.Error(w,"Invalid update operation",http.StatusBadRequest);return}
- channel:=strings.TrimSpace(r.FormValue("channel"));if channel==""{channel="stable"}
- if !validUpdateChannel(channel){http.Error(w,"Invalid release channel",http.StatusBadRequest);return}
- expected:=strings.TrimSpace(r.FormValue("expected_tag"))
- if len(expected)>100{http.Error(w,"Invalid expected version",http.StatusBadRequest);return}
  if err:=a.beginUpdate(operation);err!=nil{http.Error(w,err.Error(),http.StatusConflict);return}
  w.Header().Set("Content-Type","application/json; charset=utf-8")
  w.WriteHeader(http.StatusAccepted)
  _=json.NewEncoder(w).Encode(a.updateProgressSnapshot())
- go a.runUpdateForChannel(operation,channel,expected)
+ go a.runUpdate(operation)
 }
 // Update stages represent observed actions. Only download and SHA-256 hashing
 // report percentages: both have exact byte counters. Network handshakes,
@@ -232,8 +232,7 @@ func (a *App) updateEvent(phase,detail string){
  if len(p.Events)>45{p.Events=p.Events[len(p.Events)-45:]}
  if err:=a.writeUpdateProgressLocked(p);err!=nil{log.Printf("update event state: %v",err)}
 }
-func (a *App) runUpdate(operation string) {a.runUpdateForChannel(operation,"stable","")}
-func (a *App) runUpdateForChannel(operation,channel,expected string) {
+func (a *App) runUpdate(operation string) {
  defer func(){
   if x:=recover();x!=nil{a.finishUpdate("failed","Updater panicked; restart not attempted",fmt.Sprint(x))}
  }()
@@ -246,15 +245,17 @@ func (a *App) runUpdateForChannel(operation,channel,expected string) {
   a.updateEvent("staging","Previous executable restored; requesting supervisor restart")
  }else{
   a.setUpdateProgress("checking","Reading published release metadata from GitHub","",-1,-1,-1,"")
-  rel,err:=latestChannelRelease(ctx,channel)
+  a.updateMu.Lock()
+  channel:=normalizeUpdateChannel(a.updateProgress.Channel)
+  a.updateMu.Unlock()
+  rel,err:=latestReleaseForChannel(ctx,channel)
   if err!=nil{a.finishUpdate("failed","Release lookup failed",err.Error());return}
-  if expected!=""&&rel.Tag!=expected{a.finishUpdate("failed","Release selection changed","Recheck the "+channel+" channel before installing");return}
-  if err:=requireUpdateAssets(rel);err!=nil{a.finishUpdate("failed","Release is incomplete",err.Error());return}
-  if !newerVersion(rel.Tag,appVersion){
+  if !updateVersionNewer(rel.Tag,appVersion){
    a.finishUpdate("complete","Syncria "+appVersion+" is already the latest published version","")
    return
   }
-  a.setUpdateProgress("manifest","Release "+rel.Tag+" found; obtaining SHA256SUMS",rel.Tag,-1,0,0,"")
+  if err:=verifyReleaseAssets(rel);err!=nil{a.finishUpdate("failed","Release artifacts are incomplete",err.Error());return}
+  a.setUpdateProgress("manifest","Release "+rel.Tag+" found on "+channel+"; obtaining SHA256SUMS",rel.Tag,-1,0,0,"")
   a.updateEvent("manifest","Platform executable: "+assetName())
   a.updateAsset(assetName())
   _,err=updateBinaryWithProgress(ctx,dir,rel,func(phase string,bytes,total int64){
