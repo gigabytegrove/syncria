@@ -75,3 +75,9 @@ This checks package tests with `-race`, vet and seven native desktop-agent cross
 - [ ] Production-grade version retention, conflict and recovery acceptance.
 
 **This is a versioned local alpha build candidate, not a certified or published `v1.0.0-alpha.1` release.** Full Go 1.25 build status can be determined by the test host; do not mark unverified release gates complete.
+
+## Publish an opt-in GitHub alpha prerelease
+
+An alpha release is **for testing**, not something that requires completed live NAS testing first. The source-build stage itself must compile and pass the available Go tests; real-device testing happens after publication. To publish from a clean `feature/v2-release-foundation` checkout on a Docker/Buildx host with GitHub CLI authenticated to a repo-writer account, run `bash scripts/publish-alpha-prerelease.sh`. It builds Linux AMD64/ARM64 controller binaries and seven native agent artifacts, verifies checksums, and creates GitHub prerelease `alpha-v1.0.0-alpha.1` targeting the exact development commit. No GitHub Actions are required.
+
+The `alpha-` prefix is essential: the existing production updater's stable-tag parser will **not** select the prerelease. **The alpha does not yet appear in the stable updater.** Test it through the isolated `compose.alpha.yaml` deployment or by downloading prerelease assets manually. Do not attach a production data volume or update an existing v0.8.5 instance in place. Making the production updater offer alpha would require a separate explicit channel-selection change and its own safety verification.
