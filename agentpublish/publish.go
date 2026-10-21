@@ -50,18 +50,25 @@ func (p Publisher) Publish(ctx context.Context, grantID, transferID string) (Res
 		return Result{}, err
 	}
 	defer input.Close()
-	relative := item.RelativePath
-	if err = p.Grants.Allows(grantID, relative, true); err != nil {
+	return p.PublishVerified(ctx, grantID, item.RelativePath, input, item.TotalBytes, item.SHA256)
+}
+
+// PublishVerified is a local-only destination operation shared by staged
+// transfers and verified historical versions. It never overwrites a file.
+// Authentication and folder selection are enforced by the device's own grants.
+// A caller-supplied checksum is never trusted: the streamed bytes are rehashed
+// before the no-replace atomic publication step.
+func (p Publisher) PublishVerified(ctx context.Context, grantID, relative string, input io.Reader, size int64, sha256Hex string) (Result, error) {
+	if p.Grants == nil || input == nil || size < 0 {
+		return Result{}, ErrDenied
+	}
+	if err := p.Grants.Allows(grantID, relative, true); err != nil {
 		return Result{}, ErrDenied
 	}
 	grant, err := p.Grants.Get(grantID)
-	if err != nil {
+	if err != nil || grant.ReadOnly {
 		return Result{}, ErrDenied
 	}
-	if grant.ReadOnly {
-		return Result{}, ErrDenied
-	}
-	// Reject a disappearing or replaced approval before publication as well.
 	recheck := func() error {
 		if err := p.Grants.Allows(grantID, relative, true); err != nil {
 			return ErrDenied
@@ -72,25 +79,27 @@ func (p Publisher) Publish(ctx context.Context, grantID, transferID string) (Res
 		}
 		return nil
 	}
-	want, err := hex.DecodeString(item.SHA256)
+	want, err := hex.DecodeString(sha256Hex)
 	if err != nil || len(want) != sha256.Size {
 		return Result{}, ErrChanged
 	}
 	copyAndVerify := func(writer io.Writer) error {
 		digest := sha256.New()
-		n, e := io.Copy(io.MultiWriter(writer, digest), &readerWithContext{ctx: ctx, r: input})
+		// Bound reads to declared content; reject trailing bytes rather than
+		// quietly accepting a truncated or extended historical version.
+		copied, e := io.Copy(io.MultiWriter(writer, digest), io.LimitReader(&readerWithContext{ctx: ctx, r: input}, size+1))
 		if e != nil {
 			return e
 		}
-		if n != item.TotalBytes || subtle.ConstantTimeCompare(digest.Sum(nil), want) != 1 {
+		if copied != size || subtle.ConstantTimeCompare(digest.Sum(nil), want) != 1 {
 			return ErrChanged
 		}
 		return recheck()
 	}
-	if err = publishNoReplace(ctx, grant.Root, relative, copyAndVerify, recheck); err != nil {
+	if err := publishNoReplace(ctx, grant.Root, relative, copyAndVerify, recheck); err != nil {
 		return Result{}, err
 	}
-	return Result{GrantID: grantID, Path: relative, SHA256: item.SHA256, Bytes: item.TotalBytes}, nil
+	return Result{GrantID: grantID, Path: relative, SHA256: sha256Hex, Bytes: size}, nil
 }
 
 type readerWithContext struct {
