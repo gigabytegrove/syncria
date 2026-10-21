@@ -21,5 +21,8 @@ func registerAgentAPIs(mux *http.ServeMux, a *App, dataDir string) error {
 		SameOriginPost: localPost,
 	})
 	a.registerAgentSyncRoutes(mux, store)
+	mux.HandleFunc("/api/v1/agent-sync/versions", a.agentVersionAPI)
+	mux.HandleFunc("/api/v1/agent-sync/versions/restore", a.agentVersionRestoreAPI)
+	mux.HandleFunc("/api/v1/agent-sync/versions/retention", a.agentVersionRetentionAPI)
 	return nil
 }

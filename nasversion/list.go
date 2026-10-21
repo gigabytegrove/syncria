@@ -24,6 +24,7 @@ type Version struct {
 	VersionID string    `json:"version_id"`
 	Bytes     int64     `json:"bytes"`
 	Modified  time.Time `json:"modified"`
+	Captured  time.Time `json:"captured"`
 }
 
 // List is a strict, bounded, all-or-error listing of retained NAS versions.
@@ -85,7 +86,7 @@ func List(ctx context.Context, remote Lister, root, jobID string) ([]Version, er
 				if !info.Mode().IsRegular() {
 					return ErrUnsafePath
 				}
-				found = append(found, Version{Path: full, Relative: child, VersionID: v.Name(), Bytes: info.Size(), Modified: info.ModTime()})
+				found = append(found, Version{Path: full, Relative: child, VersionID: v.Name(), Bytes: info.Size(), Modified: info.ModTime(), Captured: v.ModTime()})
 				if len(found) > 10000 {
 					return errors.New("NAS version file count exceeds limit")
 				}
@@ -97,10 +98,10 @@ func List(ctx context.Context, remote Lister, root, jobID string) ([]Version, er
 		}
 	}
 	sort.Slice(found, func(i, j int) bool {
-		if found[i].Modified.Equal(found[j].Modified) {
+		if found[i].Captured.Equal(found[j].Captured) {
 			return found[i].Path < found[j].Path
 		}
-		return found[i].Modified.After(found[j].Modified)
+		return found[i].Captured.After(found[j].Captured)
 	})
 	return found, nil
 }
