@@ -48,6 +48,10 @@ RUN set -eu; mkdir -p /out/agents; \
 FROM scratch AS alpha-agent-export
 COPY --from=alpha-agent-build /out/agents/ /
 
+# Export the controller executable with tests and vet as mandatory build gates.
+FROM scratch AS alpha-server-export
+COPY --from=build /out/syncria /syncria
+
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates tzdata nfs-utils cifs-utils samba-client util-linux inotify-tools && mkdir -p /data
 COPY --from=build /out/syncria /usr/local/bin/syncria
