@@ -90,7 +90,14 @@ func mkdirAll(remote Remote, dir string) error {
 // If new publication fails, rollback restores the old live file. If the
 // rollback also fails, it retains the old bytes at the reported version path
 // and returns an error describing where an operator can recover them.
+// Promote remains the legacy compatibility path.
 func Promote(ctx context.Context, remote Remote, root, relative, temp, jobID string) (Result, error) {
+ return promote(ctx,remote,nil,root,relative,temp,jobID)
+}
+func PromoteVerified(ctx context.Context,remote IntegrityRemote,root,relative,temp,jobID string)(Result,error){
+ return promote(ctx,remote,remote,root,relative,temp,jobID)
+}
+func promote(ctx context.Context, remote Remote, integrity IntegrityRemote, root, relative, temp, jobID string) (Result, error) {
 	if remote == nil || !safeRoot(root) || !safeRel(relative) || !validID(jobID) ||
 		temp == "" || len(temp) > 4096 || strings.ContainsAny(temp, "\\\x00\r\n") || path.Clean(temp) != temp || strings.HasPrefix(temp, "/") {
 		return Result{}, ErrUnsafePath
@@ -149,6 +156,15 @@ func Promote(ctx context.Context, remote Remote, root, relative, temp, jobID str
 	if err := remote.Rename(dest, version); err != nil {
 		return Result{}, fmt.Errorf("preserve existing NAS version: %w", err)
 	}
+ if integrity!=nil{
+   versionID:=path.Base(path.Dir(version))
+   if err:=writeProof(ctx,integrity,root,jobID,versionID,relative,version,old);err!=nil{
+     if undo:=remote.Rename(version,dest);undo!=nil{
+       return Result{VersionPath:version,Replaced:true},fmt.Errorf("archive proof failed and rollback failed; old bytes at %s: %v: %w",version,undo,err)
+     }
+     return Result{},fmt.Errorf("archive proof failed; original restored: %w",err)
+   }
+ }
 	if err := ctx.Err(); err != nil {
 		if undo := remote.Rename(version, dest); undo != nil {
 			return Result{VersionPath: version, Replaced: true}, fmt.Errorf("transfer canceled and rollback failed; original at %s: %v: %w", version, undo, err)
