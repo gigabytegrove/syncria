@@ -29,6 +29,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"github.com/gigabytegrove/syncria/syncpolicy"
 )
 
 var appVersion = "v0.8.5"
@@ -82,6 +83,7 @@ type PendingDeletion struct {
   Folder bool `json:"folder,omitempty"`
 }
 type Job struct {
+    AgentSyncPolicy *syncpolicy.Policy `json:"agent_sync_policy,omitempty"`
     AgentDeviceID string `json:"agent_device_id,omitempty"`
     AgentGrantID string `json:"agent_grant_id,omitempty"`
     AgentPeerURL string `json:"agent_peer_url,omitempty"`
