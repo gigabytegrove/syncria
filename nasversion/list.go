@@ -58,6 +58,7 @@ func List(ctx context.Context, remote Lister, root, jobID string) ([]Version, er
 		if !v.IsDir() || !validID(v.Name()) {
 			return nil, errors.New("invalid NAS version directory")
 		}
+		proofPresentOnDisk:=false
 		var walk func(dir, relative string, depth int) error
 		walk = func(dir, relative string, depth int) error {
 			if depth > 64 {
@@ -73,6 +74,7 @@ func List(ctx context.Context, remote Lister, root, jobID string) ([]Version, er
 				}
 				name := info.Name()
     if depth==0 && name==integrityName{
+      proofPresentOnDisk=true
       if !info.Mode().IsRegular()||info.Size()<1||info.Size()>integrityLimit{return errors.New("unsafe NAS archive proof file")}
       continue
     }
@@ -111,8 +113,12 @@ func List(ctx context.Context, remote Lister, root, jobID string) ([]Version, er
   if err := walk(path.Join(parent, v.Name()), "", 0); err != nil {
 			return nil, fmt.Errorf("inspect NAS version %s: %w", v.Name(), err)
 		}
+  // An empty snapshot or orphaned proof is incomplete, not an empty history.
+  if len(found)-start==0{return nil,fmt.Errorf("NAS version %s is incomplete: no archived file",v.Name())}
+  if proofPresentOnDisk&&!hasProof{
+   return nil,fmt.Errorf("NAS version %s contains a proof that could not be verified",v.Name())
+  }
   if hasProof{
-    if len(found)-start==0{continue}
     if len(found)-start!=1{return nil,errors.New("capture proof must identify one archived file")}
     entry:=&found[start]
     if entry.Relative!=proof.Relative||entry.Bytes!=proof.Bytes{return nil,errors.New("capture proof does not match archive")}

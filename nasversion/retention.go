@@ -92,20 +92,22 @@ func ApplyRetention(ctx context.Context,remote RetentionRemote,root,jobID string
  plan,err:=PreviewRetention(ctx,remote,root,jobID,keepPerFile,maxBytes)
  if err!=nil{return 0,err}
  if !strings.EqualFold(plan.Digest,digest){return 0,errors.New("archive changed since preview; nothing removed")}
+
+ // Preflight ALL requested deletions before the first Remove: a corrupted
+ // later candidate must not allow deletion of a healthy earlier candidate.
+ for _,v:=range plan.Delete {
+  if err:=verifyRetentionCandidate(ctx,remote,root,jobID,v);err!=nil{
+   return 0,fmt.Errorf("retention preflight refused deletion: %w",err)
+  }
+ }
  removed:=0
  for _,v:=range plan.Delete{
-  if err:=ctx.Err();err!=nil{return removed,err}
-  p:=path.Join(root,".syncria-versions",jobID,v.VersionID,v.Relative)
-  if p!=v.Path||!validID(v.VersionID)||!safeRel(v.Relative){return removed,ErrUnsafePath}
-  info,e:=remote.Stat(p);if e!=nil{return removed,e}
-  if !info.Mode().IsRegular()||info.Size()!=v.Bytes||!info.ModTime().Equal(v.Modified){return removed,errors.New("archived file changed; remaining versions preserved")}
-  if v.CaptureProofPresent {
-    reader,ok:=remote.(interface{Open(string)(io.ReadCloser,error)})
-    if !ok{return removed,errors.New("NAS cannot verify archive before cleanup")}
-    actual,e:=hashRemote(ctx,reader,p,v.Bytes)
-    if e!=nil{return removed,e}
-    if actual!=v.CaptureSHA256{return removed,errors.New("archive integrity changed; cleanup stopped")}
+  // A NAS writer may change data after preflight; check once more before
+  // each removal. This is not a transactional lock on a remote SMB share.
+  if err:=verifyRetentionCandidate(ctx,remote,root,jobID,v);err!=nil{
+   return removed,fmt.Errorf("archive changed after preflight: %w",err)
   }
+  p:=path.Join(root,".syncria-versions",jobID,v.VersionID,v.Relative)
   if e:=remote.Remove(p);e!=nil{return removed,fmt.Errorf("remove archived version: %w",e)}
   removed++
   // Remove the proof and empty archive directories only AFTER the selected
@@ -119,4 +121,29 @@ func ApplyRetention(ctx context.Context,remote RetentionRemote,root,jobID string
   }
  }
  return removed,nil
+}
+
+
+// verifyRetentionCandidate performs only read operations. A capture proof is
+// a corruption check, not a signature against NAS administrator tampering.
+func verifyRetentionCandidate(ctx context.Context,remote RetentionRemote,root,jobID string,v Version)error{
+ if err:=ctx.Err();err!=nil{return err}
+ p:=path.Join(root,".syncria-versions",jobID,v.VersionID,v.Relative)
+ if p!=v.Path||!validID(v.VersionID)||!safeRel(v.Relative){return ErrUnsafePath}
+ info,err:=remote.Stat(p);if err!=nil{return err}
+ if !info.Mode().IsRegular()||info.Size()!=v.Bytes||!info.ModTime().Equal(v.Modified){
+  return fmt.Errorf("version %s changed since review",v.VersionID)
+ }
+ if v.CaptureProofPresent{
+  reader,ok:=remote.(interface{Open(string)(io.ReadCloser,error)})
+  if !ok{return errors.New("NAS cannot verify archive before cleanup")}
+  proof,exists,e:=readProof(reader,root,jobID,v.VersionID)
+  if e!=nil{return e}
+  if !exists||proof.Relative!=v.Relative||proof.Bytes!=v.Bytes||proof.SHA256!=v.CaptureSHA256{
+   return errors.New("capture proof changed since review")
+  }
+  actual,e:=hashRemote(ctx,reader,p,v.Bytes);if e!=nil{return e}
+  if actual!=proof.SHA256{return errors.New("archive integrity changed; cleanup stopped")}
+ }
+ return nil
 }
