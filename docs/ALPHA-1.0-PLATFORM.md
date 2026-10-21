@@ -1,6 +1,6 @@
 # Syncria 1.0.0-alpha.1 — integrated platform testing checklist
 
-**Release state: PRE-ALPHA CANDIDATE. Do not publish a GitHub release until the verified gates below pass.**
+**Release state: ISOLATED ALPHA BUILD CANDIDATE (`v1.0.0-alpha.1-local`), NOT a published GitHub release.** The Docker build runs the complete Go 1.25 package test suite and vet before producing the runnable controller. Successful source-build verification on the local host is mandatory; do not install this over production.
 
 This candidate extends the existing v0.8.5 Go server, its standard dashboard, background scheduler, durable bbolt checkpoints and NAS bridge with a locally approved device-to-NAS **one-way relationship**. No separate synchronizer is introduced.
 
@@ -15,6 +15,19 @@ This candidate extends the existing v0.8.5 Go server, its standard dashboard, ba
 7. A missing or inaccessible device returns an error, never an empty file list. Devices expose selected regular files only. A sync **never propagates deletions from the device**. Existing destination files with a conflicting first-run state stop for manual review. Independent edits to existing destination files stop the relationship rather than silently overwriting changes.
 8. The other separate feature, **device-to-device peer receive**, remains a user-initiated workflow. Verified publication is Linux-only; Windows and macOS are currently supported as read-only approved sources, but are not yet supported as publication targets.
 
+## Build gates and native agent binaries
+
+The candidate Dockerfile includes every tracked Go source tree, including `internal`, `agentrestore` and `nasversion`. Run `bash scripts/verify-alpha-build-context.sh` before building. If the complete Go 1.25 package tests, static analysis, or controller compilation fail, the Docker image build fails; **stop there** and report the failure rather than bypassing tests.
+
+Build current agents from the identical checkout (requires Docker BuildKit):
+
+```bash
+docker build --target alpha-agent-export --output type=local,dest=./alpha-agent-binaries .
+(cd alpha-agent-binaries && sha256sum -c SHA256SUMS)
+```
+
+Those seven binaries are development test artifacts; service installation, signed update/rollback and macOS/Windows runtime validation remain open.
+
 ## Isolated Docker candidate deployment
 
 The project now includes `compose.alpha.yaml` which **never references** the production image tag or existing `/data` volume. On a test Docker host:
@@ -22,20 +35,21 @@ The project now includes `compose.alpha.yaml` which **never references** the pro
 ```bash
 git clone --branch feature/v2-release-foundation --single-branch https://github.com/gigabytegrove/syncria.git syncria-alpha
 cd syncria-alpha
+bash scripts/verify-alpha-build-context.sh
 docker compose -f compose.alpha.yaml build --no-cache
 docker compose -f compose.alpha.yaml up -d
 docker compose -f compose.alpha.yaml ps
 docker compose -f compose.alpha.yaml logs --tail=80
 ```
 
-The alpha dashboard listens on port **19764** by default (change with `SYNCRIA_ALPHA_PORT`). Create a new administrator password; do **not** attach existing production data or NAS folders containing important files. The Dockerfile runs all repository package tests as part of the image build and will fail closed if compilation/tests fail. Cross-platform desktop agent binaries are separately available in the development candidate bundle. Do not enter peer secrets over an untrusted plaintext admin connection; use a TLS reverse proxy for remote browser administration.
+The locally labeled alpha candidate dashboard listens on port **19764** by default (change with `SYNCRIA_ALPHA_PORT`). Create a new administrator password; do **not** attach existing production data or NAS folders containing important files. The Dockerfile runs all repository package tests as part of the image build and will fail closed if compilation/tests fail. Cross-platform desktop agent binaries are separately available in the development candidate bundle. Do not enter peer secrets over an untrusted plaintext admin connection; use a TLS reverse proxy for remote browser administration.
 
 ## Safety boundaries
 
 - Controller-managed agent jobs cannot browse unrestricted device folders, force-write to a device, or mutate grants. The source agent authorizes every new peer request and requires ongoing central heartbeat approval.
 - Agent inventories are all-or-error, capped, validated against case collisions, traversal and suspicious entries. Content is streamed with a strong digest and length check. No payloads are intentionally stored in controller `/data`.
 - NAS writes use the existing remote staging/commit path; source change or transport failure fails before a staged NAS object is committed. No new alpha source-to-NAS relationship can overlap an existing defined NAS source/destination relationship.
-- **Unresolved:** existing SMB `Put` replaces a *previously synchronized, unmodified* destination file after creating a transient backup. Production-grade retained file version history, crash restoration of every replacement failure mode, and all platform-specific network/storage regression tests remain release blockers. Do not test replacement of valuable files.
+- **Unresolved:** agent-to-NAS version retention, checksum-backed restore, and confirmation-based cleanup are implemented, but real SMB crash consistency, version metadata behavior under power loss, and provider-wide recovery remain unverified. Existing cloud/NAS paths preserve their old behavior. Do not test replacement of valuable files.
 - The source agent peer token is independent of enrollment; treat it as a sensitive credential. Network communication requires trusted TLS except explicit loopback development. There is no automatic remote agent installation or signed updater yet.
 
 ## Build and acceptance commands
@@ -60,4 +74,4 @@ This checks package tests with `-race`, vet and seven native desktop-agent cross
 - [ ] Formal signed platform binaries, release checksums, update compatibility, and standalone/Docker deployment verification.
 - [ ] Production-grade version retention, conflict and recovery acceptance.
 
-**Do not label this code a platform-wide approved alpha release or publish `v1.0.0-alpha.1` until the unchecked gates pass.**
+**This is a versioned local alpha build candidate, not a certified or published `v1.0.0-alpha.1` release.** Full Go 1.25 build status can be determined by the test host; do not mark unverified release gates complete.

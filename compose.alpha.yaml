@@ -7,8 +7,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        APP_VERSION: v1.0.0-alpha.candidate
-    image: syncria:1.0.0-alpha.candidate
+        APP_VERSION: v1.0.0-alpha.1-local
+    image: syncria:1.0.0-alpha.1-local
     container_name: syncria-alpha
     restart: unless-stopped
     ports:
