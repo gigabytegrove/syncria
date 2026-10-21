@@ -434,8 +434,15 @@ code{overflow-wrap:anywhere}
 </section>
 <section class="view" id="view-updates">
 <div class="workspace-intro"><div><p>Install updates here. Download, verification, and restart progress appear when an update runs.</p></div></div>
-<div class="panel" style="margin-bottom:1rem;padding:0.85rem 1rem"><label for="updateChannel">Release channel</label> <select id="updateChannel" aria-label="Release channel" onchange="checkUpdate(true)"><option value="stable" selected>Stable</option><option value="beta">Beta</option><option value="alpha">Alpha</option></select><p class="muted">Alpha and Beta are opt-in test builds. Stable never installs a prerelease.</p></div>
-<div class="update-console">
+<section class="panel update-channel-panel" aria-labelledby="updateChannelHeading">
+ <div class="section-heading"><div><span class="mini-overline">Release preferences</span><h2 id="updateChannelHeading">Update channel</h2><p>Choose which releases Syncria is allowed to install. Your choice is saved on this server.</p></div></div>
+ <div class="channel-choice-grid" id="updateChannelChoices" role="radiogroup" aria-label="Syncria release channel">
+ <label class="channel-choice"><input type="radio" name="syncriaUpdateChannel" value="stable" checked><span><strong>Stable</strong><small>Recommended for everyday use. Tested production releases only.</small></span></label>
+ <label class="channel-choice"><input type="radio" name="syncriaUpdateChannel" value="beta"><span><strong>Beta</strong><small>Stable plus release candidates and beta previews.</small></span></label>
+ <label class="channel-choice"><input type="radio" name="syncriaUpdateChannel" value="alpha"><span><strong>Alpha</strong><small>All channels, including experimental builds. Expect more frequent changes.</small></span></label>
+ </div>
+ <div class="channel-choice-footer"><p id="updateChannelMessage" class="muted" role="status">Loading saved channel…</p><button type="button" class="primary" id="saveUpdateChannelButton" onclick="saveUpdateChannel()">Save channel</button></div>
+</section>
 <section class="panel update-primary" id="updateStatusCard" data-update-state="checking" aria-live="polite">
  <div class="update-status-header"><span class="update-status-icon" id="updateStatusIcon" aria-hidden="true">↻</span><div class="update-status-text"><span class="mini-overline">Application status</span><h2 id="updateStatusHeadline">Checking for updates…</h2><p id="updateMessage">Checking the latest verified release for this device.</p></div><button class="secondary" type="button" onclick="checkUpdate(true)">Check for updates</button></div>
  <div class="update-version-line"><div><small>INSTALLED VERSION</small><strong id="installedVersion">{{.Version}}</strong></div><span class="update-version-arrow" aria-hidden="true">→</span><div><small>LATEST RELEASE</small><strong id="updateAvailableVersion">Checking…</strong></div></div>
@@ -943,7 +950,7 @@ function navigate(view){
  $('pageTitle').textContent=page[0];
  const breadcrumb=$('pageBreadcrumb');if(breadcrumb)breadcrumb.textContent=page[1];
  history.replaceState(null,'',view==='sync-detail'&&selectedSyncID?'#sync-detail/'+encodeURIComponent(selectedSyncID)+'/'+selectedSyncDetailTab:'#'+view);
- if(view==='updates')checkUpdate();
+ if(view==='updates'){loadUpdateChannel();checkUpdate();}
 }
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.view)));
 let syncReviewed=false,syncStep=1,selectedNASTargetID='';
@@ -1375,7 +1382,7 @@ async function startUpdate(operation){
  if(updateSubmitting||updateRunning)return;
  hiddenCompletedUpdate='';
  if(completedUpdateTimer){clearTimeout(completedUpdateTimer);completedUpdateTimer=null;}
- if(!confirm(operation==='rollback'?'Restore Syncria\'s saved previous executable?':'Download, verify and install the selected '+getUpdateChannel()+' release?'))return;
+ if(!confirm(operation==='rollback'?'Restore Syncria\'s saved previous executable?':'Download, verify and install the latest published Syncria release on '+selectedUpdateChannel+'?'))return;
  navigate('updates');
  $('updateFlow').classList.remove('hidden');
  updateSubmitting=true;
@@ -1386,7 +1393,7 @@ async function startUpdate(operation){
  $('updateError').classList.add('hidden');
  $('installUpdateButton').disabled=true;$('rollbackUpdateButton').disabled=true;
  try{
-  const response=await fetch('/api/update/progress',{method:'POST',credentials:'same-origin',cache:'no-store',body:new URLSearchParams({operation,channel:getUpdateChannel(),expected_tag:operation==='install'?selectedUpdateTag:''})});
+  const response=await fetch('/api/update/progress',{method:'POST',credentials:'same-origin',cache:'no-store',body:new URLSearchParams({operation})});
   if(!response.ok)throw Error((await response.text()).trim()||('HTTP '+response.status));
   const started=await response.json();
   if(started.target)sessionStorage.setItem('syncria-update-expected',started.target);
@@ -1400,24 +1407,58 @@ async function startUpdate(operation){
   set('updateError',error.message);$('updateError').classList.remove('hidden');
  }finally{updateSubmitting=false;await pollUpdateProgress();}
 }
-let selectedUpdateTag='';
-function getUpdateChannel(){return ($('updateChannel')&&$('updateChannel').value)||'stable';}
+let selectedUpdateChannel='stable';
+let updateChannelSaving=false;
+function updateChannelSelection(){
+ const chosen=document.querySelector('input[name="syncriaUpdateChannel"]:checked');
+ return chosen?chosen.value:'stable';
+}
+function setUpdateChannelUI(channel){
+ selectedUpdateChannel=channel;
+ const input=document.querySelector('input[name="syncriaUpdateChannel"][value="'+channel+'"]');
+ if(input)input.checked=true;
+ const msg=$('updateChannelMessage');
+ if(msg)msg.textContent='Currently receiving '+channel[0].toUpperCase()+channel.slice(1)+' releases.';
+}
+async function loadUpdateChannel(){
+ try{
+  const resp=await fetch('/api/update/channel',{credentials:'same-origin',cache:'no-store'});
+  if(!resp.ok)throw Error('Channel lookup returned HTTP '+resp.status);
+  const data=await resp.json();
+  setUpdateChannelUI(data.channel||'stable');
+ }catch(e){const msg=$('updateChannelMessage');if(msg)msg.textContent='Could not load saved channel: '+e.message;}
+}
+async function saveUpdateChannel(){
+ if(updateChannelSaving||updateRunning||updateSubmitting)return;
+ const channel=updateChannelSelection();
+ const btn=$('saveUpdateChannelButton');
+ const msg=$('updateChannelMessage');
+ updateChannelSaving=true;if(btn)btn.disabled=true;
+ if(msg)msg.textContent='Saving '+channel+' channel…';
+ try{
+  const resp=await fetch('/api/update/channel',{method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'Content-Type':'application/json'},body:JSON.stringify({channel})});
+  if(!resp.ok)throw Error((await resp.text()).trim()||'HTTP '+resp.status);
+  const result=await resp.json();
+  setUpdateChannelUI(result.channel);
+  await checkUpdate(true);
+ }catch(e){if(msg)msg.textContent='Could not change update channel: '+e.message;}
+ finally{updateChannelSaving=false;if(btn)btn.disabled=false;}
+}
 async function checkUpdate(force=false){
  if(!$('latestVersion'))return;
  $('latestVersion').textContent='Checking GitHub Releases…';
  if($('updateStatusCard'))$('updateStatusCard').dataset.updateState='checking';
  if($('updateStatusHeadline'))$('updateStatusHeadline').textContent='Checking for updates…';
  if($('updateStatusIcon'))$('updateStatusIcon').textContent='↻';
- $('updateMessage').textContent='';updateInstallAvailable=false;selectedUpdateTag='';
+ $('updateMessage').textContent='';updateInstallAvailable=false;
  $('installUpdateButton').disabled=true;
  try{
-  const channel=getUpdateChannel();
-  const res=await fetch('/api/update/status?channel='+encodeURIComponent(channel)+(force?'&refresh=1':''),{credentials:'same-origin',cache:'no-store'});
+  const res=await fetch('/api/update/status'+(force?'?refresh=1':''),{credentials:'same-origin',cache:'no-store'});
   if(!res.ok)throw Error('Release check HTTP '+res.status);
   const result=await res.json();
   if(result.error)throw Error(result.error);
-  if(channel!==getUpdateChannel())return;
-  selectedUpdateTag=result.available?(result.latest||''):'';
+  if(result.channel&&result.channel!==selectedUpdateChannel)setUpdateChannelUI(result.channel);
   $('latestVersion').textContent=result.latest||'No published release';
   $('updateAvailableVersion').textContent=result.latest||'None';
   const notes=$('updateReleaseNotes');

@@ -152,6 +152,7 @@ type Config struct {
 	Accounts     []Account `json:"accounts"`
 	Jobs         []Job     `json:"jobs"`
 	Shares       []StorageShare `json:"shares,omitempty"`
+    UpdateChannel string `json:"update_channel,omitempty"`
 }
 type App struct {
     // Serialize remote writers, including a shared designated cloud NAS
@@ -1149,7 +1150,8 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 	switch action {
 	case "update_check":
         ctx,cancel:=context.WithTimeout(r.Context(),30*time.Second)
-        release,e:=latestRelease(ctx);cancel()
+        a.mu.Lock();channel:=normalizeUpdateChannel(a.cfg.UpdateChannel);a.mu.Unlock()
+        release,e:=latestReleaseForChannel(ctx,channel);cancel()
         if e!=nil{redirect(w,r,"Update check failed: "+e.Error());return}
         redirect(w,r,"Latest GitHub release: "+release.Tag+"; running "+appVersion)
         return
@@ -1540,10 +1542,9 @@ func (a *App) updateStatus(w http.ResponseWriter,r *http.Request){
   _=json.NewEncoder(w).Encode(map[string]any{"current":appVersion})
   return
  }
- channel:=strings.TrimSpace(r.URL.Query().Get("channel"))
- if channel==""{channel="stable"}
- if !validUpdateChannel(channel){http.Error(w,"Invalid release channel",http.StatusBadRequest);return}
- status:=channelUpdateStatus(r.Context(),channel,r.URL.Query().Get("refresh")=="1")
+ a.mu.Lock();channel:=normalizeUpdateChannel(a.cfg.UpdateChannel);a.mu.Unlock()
+ var status map[string]any
+ if r.URL.Query().Get("refresh")=="1"{status=refreshedUpdateStatusForChannel(r.Context(),channel)}else{status=cachedUpdateStatusForChannel(r.Context(),channel)}
  _=json.NewEncoder(w).Encode(status)
 }
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
@@ -1684,6 +1685,7 @@ func main() {
 	mux.HandleFunc("/assets/syncria-logo.svg", serveBrandLogo)
 	mux.HandleFunc("/api/browse/drive", a.browseDrive)
 	mux.HandleFunc("/api/update/status", a.updateStatus)
+    mux.HandleFunc("/api/update/channel", a.updateChannelAPI)
     mux.HandleFunc("/api/update/progress", a.updateProgressAPI)
 	mux.HandleFunc("/api/update/manual", a.manualUpdate)
     mux.HandleFunc("/api/browse/nas", a.browseNAS)
