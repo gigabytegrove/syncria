@@ -434,6 +434,7 @@ code{overflow-wrap:anywhere}
 </section>
 <section class="view" id="view-updates">
 <div class="workspace-intro"><div><p>Install updates here. Download, verification, and restart progress appear when an update runs.</p></div></div>
+<div class="panel" style="margin-bottom:1rem;padding:0.85rem 1rem"><label for="updateChannel">Release channel</label> <select id="updateChannel" aria-label="Release channel" onchange="checkUpdate(true)"><option value="stable" selected>Stable</option><option value="beta">Beta</option><option value="alpha">Alpha</option></select><p class="muted">Alpha and Beta are opt-in test builds. Stable never installs a prerelease.</p></div>
 <div class="update-console">
 <section class="panel update-primary" id="updateStatusCard" data-update-state="checking" aria-live="polite">
  <div class="update-status-header"><span class="update-status-icon" id="updateStatusIcon" aria-hidden="true">↻</span><div class="update-status-text"><span class="mini-overline">Application status</span><h2 id="updateStatusHeadline">Checking for updates…</h2><p id="updateMessage">Checking the latest verified release for this device.</p></div><button class="secondary" type="button" onclick="checkUpdate(true)">Check for updates</button></div>
@@ -1374,7 +1375,7 @@ async function startUpdate(operation){
  if(updateSubmitting||updateRunning)return;
  hiddenCompletedUpdate='';
  if(completedUpdateTimer){clearTimeout(completedUpdateTimer);completedUpdateTimer=null;}
- if(!confirm(operation==='rollback'?'Restore Syncria\'s saved previous executable?':'Download, verify and install the latest published Syncria release?'))return;
+ if(!confirm(operation==='rollback'?'Restore Syncria\'s saved previous executable?':'Download, verify and install the selected '+getUpdateChannel()+' release?'))return;
  navigate('updates');
  $('updateFlow').classList.remove('hidden');
  updateSubmitting=true;
@@ -1385,7 +1386,7 @@ async function startUpdate(operation){
  $('updateError').classList.add('hidden');
  $('installUpdateButton').disabled=true;$('rollbackUpdateButton').disabled=true;
  try{
-  const response=await fetch('/api/update/progress',{method:'POST',credentials:'same-origin',cache:'no-store',body:new URLSearchParams({operation})});
+  const response=await fetch('/api/update/progress',{method:'POST',credentials:'same-origin',cache:'no-store',body:new URLSearchParams({operation,channel:getUpdateChannel(),expected_tag:operation==='install'?selectedUpdateTag:''})});
   if(!response.ok)throw Error((await response.text()).trim()||('HTTP '+response.status));
   const started=await response.json();
   if(started.target)sessionStorage.setItem('syncria-update-expected',started.target);
@@ -1399,24 +1400,29 @@ async function startUpdate(operation){
   set('updateError',error.message);$('updateError').classList.remove('hidden');
  }finally{updateSubmitting=false;await pollUpdateProgress();}
 }
+let selectedUpdateTag='';
+function getUpdateChannel(){return ($('updateChannel')&&$('updateChannel').value)||'stable';}
 async function checkUpdate(force=false){
  if(!$('latestVersion'))return;
  $('latestVersion').textContent='Checking GitHub Releases…';
  if($('updateStatusCard'))$('updateStatusCard').dataset.updateState='checking';
  if($('updateStatusHeadline'))$('updateStatusHeadline').textContent='Checking for updates…';
  if($('updateStatusIcon'))$('updateStatusIcon').textContent='↻';
- $('updateMessage').textContent='';updateInstallAvailable=false;
+ $('updateMessage').textContent='';updateInstallAvailable=false;selectedUpdateTag='';
  $('installUpdateButton').disabled=true;
  try{
-  const res=await fetch('/api/update/status'+(force?'?refresh=1':''),{credentials:'same-origin',cache:'no-store'});
+  const channel=getUpdateChannel();
+  const res=await fetch('/api/update/status?channel='+encodeURIComponent(channel)+(force?'&refresh=1':''),{credentials:'same-origin',cache:'no-store'});
   if(!res.ok)throw Error('Release check HTTP '+res.status);
   const result=await res.json();
   if(result.error)throw Error(result.error);
+  if(channel!==getUpdateChannel())return;
+  selectedUpdateTag=result.available?(result.latest||''):'';
   $('latestVersion').textContent=result.latest||'No published release';
   $('updateAvailableVersion').textContent=result.latest||'None';
   const notes=$('updateReleaseNotes');
   if(notes){
-   const valid=/^v?[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/.test(result.latest||'');
+   const valid=/^(?:(?:alpha|beta)-)?v?[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/.test(result.latest||'');
    notes.href=valid?'https://github.com/gigabytegrove/syncria/releases/tag/'+encodeURIComponent(result.latest):'https://github.com/gigabytegrove/syncria/releases';
    notes.textContent=valid?'See what changed in '+result.latest+' ↗':'View published releases ↗';
   }

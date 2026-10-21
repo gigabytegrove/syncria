@@ -1540,8 +1540,10 @@ func (a *App) updateStatus(w http.ResponseWriter,r *http.Request){
   _=json.NewEncoder(w).Encode(map[string]any{"current":appVersion})
   return
  }
- var status map[string]any
- if r.URL.Query().Get("refresh")=="1" {status=refreshedUpdateStatus(r.Context())} else {status=cachedUpdateStatus(r.Context())}
+ channel:=strings.TrimSpace(r.URL.Query().Get("channel"))
+ if channel==""{channel="stable"}
+ if !validUpdateChannel(channel){http.Error(w,"Invalid release channel",http.StatusBadRequest);return}
+ status:=channelUpdateStatus(r.Context(),channel,r.URL.Query().Get("refresh")=="1")
  _=json.NewEncoder(w).Encode(status)
 }
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
