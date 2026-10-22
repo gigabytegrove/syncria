@@ -4,6 +4,19 @@
 
 # Syncria
 
+<!-- GIGABYTE GROVE REPOSITORY BADGES START -->
+<p align="center">
+  <a href="https://github.com/gigabytegrove/syncria"><img alt="GitHub repository" src="https://img.shields.io/badge/GitHub-Repository-181717?logo=github&logoColor=white"></a>
+  <a href="https://github.com/gigabytegrove/syncria/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/gigabytegrove/syncria?style=flat&label=Stars&logo=github"></a>
+  <a href="https://github.com/gigabytegrove/syncria/issues"><img alt="Issues" src="https://img.shields.io/badge/Issues-View-555555?logo=github"></a>
+  <a href="https://github.com/gigabytegrove/syncria/releases"><img alt="Releases" src="https://img.shields.io/badge/Releases-View-555555?logo=github"></a>
+  <a href="https://paypal.me/gigabytegrove"><img alt="Donate via PayPal" src="https://img.shields.io/badge/Donate-PayPal-0070BA?logo=paypal&logoColor=white"></a>
+</p>
+<p align="center">
+  <a href="https://github.com/gigabytegrove/syncria">Repository</a> · <a href="https://github.com/gigabytegrove/syncria/stargazers">Stars</a> · <a href="https://github.com/gigabytegrove/syncria/issues">Issues</a> · <a href="https://github.com/gigabytegrove/syncria/releases">Releases</a> · <a href="https://paypal.me/gigabytegrove">Donate via PayPal</a>
+</p>
+<!-- GIGABYTE GROVE REPOSITORY BADGES END -->
+
 **Keep your files together, wherever you save them.**
 
 **Interface (v0.8.5):** Syncria uses a quieter, locally bundled Tailwind CSS design with straightforward navigation, forms, progress, and storage management. No browser CDN or external UI service is needed.
