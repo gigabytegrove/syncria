@@ -151,3 +151,7 @@ The v0.8.2 UI does not modify sync policies, data destinations, credentials, or 
 **Cloud Accounts** has corrected provider-card alignment, full-width Add Account buttons, consistent Test/Remove sizing, and a properly padded Connect your cloud files wizard on desktop and mobile. The NAS connection form uses the same spacing conventions.
 
 See [v0.8.3 release notes](docs/RELEASE-v0.8.3.md).
+
+## Support Gigabyte Grove
+
+If this project is useful to you, you can support ongoing Gigabyte Grove development with an optional [PayPal donation](https://paypal.me/gigabytegrove). Donations are appreciated but never required to use this repository.
