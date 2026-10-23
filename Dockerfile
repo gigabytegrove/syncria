@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
-FROM --platform=$BUILDPLATFORM node:22-alpine AS css
+FROM --platform=$BUILDPLATFORM node:22.23.4-alpine AS css
 WORKDIR /src
 COPY package.json tailwind.config.cjs ./
 COPY ui.go ./
 COPY assets/syncria.tailwind.css ./assets/syncria.tailwind.css
 RUN npm install --no-audit --no-fund && npm run build:css
 
-FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS build
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 ARG APP_VERSION=v0.8.5
