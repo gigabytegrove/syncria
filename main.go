@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-var appVersion = "v0.8.5"
+var appVersion = "v0.8.6-alpha.6"
 const folderMime = "application/vnd.google-apps.folder"
 const scope = "https://www.googleapis.com/auth/drive"
 
@@ -147,6 +147,8 @@ type Config struct {
 	Accounts     []Account `json:"accounts"`
 	Jobs         []Job     `json:"jobs"`
 	Shares       []StorageShare `json:"shares,omitempty"`
+	UpdateChannel string `json:"update_channel,omitempty"`
+	Computers []ComputerRecord `json:"computers,omitempty"`
 }
 type App struct {
     // Serialize remote writers, including a shared designated cloud NAS
@@ -157,6 +159,13 @@ type App struct {
     updateBusy bool
     updateProgress UpdateProgress
     syncProgress map[string]SyncProgress
+    computerInviteMu sync.Mutex
+    computerInvites map[string]*computerInvite
+    computerAssetMu sync.Mutex
+    computerTransferMu sync.Mutex
+    computerTransferJobs map[string]computerTransfer
+    computerTransferCancels map[string]context.CancelFunc
+    computerTransferSlots chan struct{}
     index *syncIndex
     indexBroken bool
     watchers sync.Map
@@ -1140,7 +1149,8 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 	switch action {
 	case "update_check":
         ctx,cancel:=context.WithTimeout(r.Context(),30*time.Second)
-        release,e:=latestRelease(ctx);cancel()
+        a.mu.Lock();channel:=normalizeUpdateChannel(a.cfg.UpdateChannel);a.mu.Unlock()
+        release,e:=latestReleaseForChannel(ctx,channel);cancel()
         if e!=nil{redirect(w,r,"Update check failed: "+e.Error());return}
         redirect(w,r,"Latest GitHub release: "+release.Tag+"; running "+appVersion)
         return
@@ -1529,8 +1539,11 @@ func (a *App) updateStatus(w http.ResponseWriter,r *http.Request){
   _=json.NewEncoder(w).Encode(map[string]any{"current":appVersion})
   return
  }
+ a.mu.Lock()
+ channel:=normalizeUpdateChannel(a.cfg.UpdateChannel)
+ a.mu.Unlock()
  var status map[string]any
- if r.URL.Query().Get("refresh")=="1" {status=refreshedUpdateStatus(r.Context())} else {status=cachedUpdateStatus(r.Context())}
+ if r.URL.Query().Get("refresh")=="1" {status=refreshedUpdateStatusForChannel(r.Context(),channel)} else {status=cachedUpdateStatusForChannel(r.Context(),channel)}
  _=json.NewEncoder(w).Encode(status)
 }
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
@@ -1620,7 +1633,17 @@ func restartSyncria(dataDir string){
 func main() {
 	listen := flag.String("listen", "127.0.0.1:9764", "Web UI listen address (use reverse proxy for external access)")
 	dataDir := flag.String("data", "", "Configuration/data directory")
+	agentMode := flag.Bool("agent", false, "Run a native computer agent instead of the Syncria hub")
+    transferWorkerMode := flag.Bool("transfer-worker", false, "Internal isolated direct-transfer worker")
+	agentData := flag.String("agent-data", "", "Persistent agent identity directory")
+	agentName := flag.String("agent-name", "", "Computer name shown in Syncria")
+    enrollHub := flag.String("enroll-hub", "", "HTTPS Syncria server for one-time automatic pairing")
+    enrollToken := flag.String("enroll-token", "", "One-time pairing code issued by Syncria")
+	var agentRoots agentRootsFlag
+	flag.Var(&agentRoots, "agent-root", "Shared folder Name=/absolute/path (repeatable)")
 	flag.Parse()
+	if *transferWorkerMode { if err:=runComputerTransferWorker();err!=nil{log.Fatal("Transfer worker: ",err)};return }
+	if *agentMode { if err := runComputerAgentWithEnrollment(*listen,*agentData,*agentName,agentRoots,*enrollHub,*enrollToken);err!=nil{log.Fatal(err)};return }
 	dir := *dataDir
 	if dir == "" {
 		if u, e := os.UserConfigDir(); e == nil {
@@ -1659,6 +1682,7 @@ func main() {
  if err:=a.initializeFileIndex(dir);err!=nil{log.Fatal("File index startup failed: ",err)}
  defer a.index.Close()
  a.reconcileUpdateOnStartup()
+    if err:=a.restoreComputerTransfers();err!=nil{log.Fatal("Cannot read direct transfer history: ",err)}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go a.scheduler(ctx)
@@ -1667,9 +1691,20 @@ func main() {
     if os.Getenv("SYNCRIA_ENABLE_MOUNTS")=="1" {go a.restoreShares()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.home)
+	mux.HandleFunc("/api/computers",a.computersAPI)
+    mux.HandleFunc("/api/computers/invite",a.computerInviteAPI)
+    mux.HandleFunc("/api/computers/enroll",a.computerEnrollAPI)
+    mux.HandleFunc("/api/computers/bootstrap",a.computerBootstrapAPI)
+    mux.HandleFunc("/api/computers/asset",a.computerAgentAssetAPI)
+	mux.HandleFunc("/api/computers/register",a.computerRegisterAPI)
+	mux.HandleFunc("/api/computers/remove",a.computerRemoveAPI)
+	mux.HandleFunc("/api/computers/browse",a.computerBrowseAPI)
+	mux.HandleFunc("/api/computers/transfers",a.computerTransfersAPI)
+	mux.HandleFunc("/api/computers/transfers/action",a.computerTransferActionAPI)
 	mux.HandleFunc("/assets/syncria-logo.svg", serveBrandLogo)
 	mux.HandleFunc("/api/browse/drive", a.browseDrive)
 	mux.HandleFunc("/api/update/status", a.updateStatus)
+ mux.HandleFunc("/api/update/channel", a.updateChannelAPI)
     mux.HandleFunc("/api/update/progress", a.updateProgressAPI)
 	mux.HandleFunc("/api/update/manual", a.manualUpdate)
     mux.HandleFunc("/api/browse/nas", a.browseNAS)

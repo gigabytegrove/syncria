@@ -92,7 +92,119 @@ code{overflow-wrap:anywhere}
 .sync-history-file small{font-size:12px;color:#496d86}
 .sync-detail-pager{display:flex;justify-content:flex-start;margin-top:12px}
 @media(max-width:850px){.sync-detail-columns{grid-template-columns:minmax(0,1fr)}.sync-run-list{max-height:320px}}
-` + v051Theme + syncriaDesignCSS + `</style></head><body>
+` + v051Theme + syncriaDesignCSS + `
+.computer-layout{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;margin-bottom:18px}
+.computer-device-list,.computer-transfer-list{display:grid;gap:10px}
+.computer-device{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 14px;border:1px solid #dce7f0;border-radius:10px;background:#fff}
+.computer-device strong,.computer-device small{display:block;overflow-wrap:anywhere}
+.computer-device small{color:#658095;margin-top:4px;font-size:12px}
+.computer-device .secondary{flex-shrink:0}
+.computer-online{color:#237556}.computer-offline{color:#a5483b}
+.computer-help{background:#f3f8fc;padding:15px;border:1px solid #dce9f2;border-radius:10px;margin-bottom:16px;display:grid;gap:8px}
+.computer-help strong{font-size:12px}.computer-help code{display:block;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}
+.computer-help small{color:#536e84;line-height:1.5}
+.computer-pair-form{display:grid;gap:10px}
+.computer-explorer{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+.computer-explorer-pane{min-width:0;border:1px solid #dce7f0;border-radius:12px;padding:16px;background:#f9fcfe}
+.computer-explorer-pane h3{margin:0 0 14px}
+.computer-path{display:flex;align-items:center;gap:10px;padding:10px 0;min-width:0}
+.computer-path span{font-size:12px;overflow-wrap:anywhere;min-width:0}
+.computer-file-list{height:320px;overflow-y:auto;border:1px solid #dce7f0;background:#fff;border-radius:9px;padding:6px}
+.computer-file-list p{padding:8px}
+.computer-file{display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px;padding:11px;border:0;border-bottom:1px solid #edf1f6;background:transparent;text-align:left;color:inherit;cursor:pointer}
+.computer-file:hover,.computer-file.is-selected{background:#e9f4fd}
+.computer-file strong{font-size:13px;overflow-wrap:anywhere}
+.computer-file small{font-size:11px;white-space:nowrap;color:#658095}
+.computer-file.is-selected{outline:2px solid #6eb6e7;outline-offset:-2px}
+.computer-transfer-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid #e6edf3;margin-top:18px;padding-top:16px}
+.computer-transfer-actions strong,.computer-transfer-actions small{display:block}
+.computer-transfer-actions small{font-size:12px;color:#5a7489;margin-top:5px}
+.computer-transfer-record{padding:12px;border:1px solid #e0eaf1;border-radius:10px;background:#fff;display:grid;gap:5px}
+.computer-transfer-record strong{overflow-wrap:anywhere;font-size:13px}.computer-transfer-record small{font-size:12px;color:#57738a}
+@media(max-width:950px){.computer-layout,.computer-explorer{grid-template-columns:minmax(0,1fr)}.computer-file-list{height:250px}}
+
+.update-channel-panel{margin-bottom:18px}
+.channel-choice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
+.channel-choice{display:flex;align-items:flex-start;gap:11px;padding:16px;border:1px solid #d7e5f0;border-radius:12px;background:#f8fbfe;cursor:pointer;min-width:0;min-height:110px}
+.channel-choice:has(input:checked){border-color:#4397cf;background:#edf7ff;box-shadow:0 0 0 1px #4397cf inset}
+.channel-choice:focus-within{outline:2px solid #4397cf;outline-offset:2px}
+.channel-choice input{margin-top:4px;flex:none;accent-color:#1275ad}
+.channel-choice span,.channel-choice strong,.channel-choice small{display:block}
+.channel-choice strong{font-size:14px;margin-bottom:6px}
+.channel-choice small{font-size:12px;color:#59758a;line-height:1.45}
+.channel-choice-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:16px}
+.channel-choice-footer p{margin:0}
+@media(max-width:760px){.channel-choice-grid{grid-template-columns:minmax(0,1fr)}.channel-choice{min-height:0}}
+
+/* Standalone direct-connections workspaces */
+.computer-overview-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.computer-overview-stat{background:#fff;border:1px solid #dae6ef;border-radius:13px;padding:17px;min-width:0}
+.computer-overview-stat>*{display:block}
+.computer-overview-stat small{font-size:10px;letter-spacing:.10em;font-weight:750;color:#698097}
+.computer-overview-stat strong{font-size:28px;line-height:1.45;color:#173a5a}
+.computer-overview-stat span{color:#607b90;font-size:12px}
+.computer-card-grid{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:14px;gap:14px}
+.computer-device-card{display:grid;gap:14px;padding:18px;border:1px solid #dde8f0;border-radius:14px;min-width:0;background:#fff}
+.computer-device-heading{display:flex;align-items:center;gap:13px;min-width:0}
+.computer-device-icon{display:grid;place-items:center;width:47px;height:47px;flex:none;border-radius:11px;background:#eaf5fc;color:#23658b;font-size:22px}
+.computer-device-name{min-width:0;flex:1}.computer-device-name strong{display:block;overflow-wrap:anywhere;font-size:16px}.computer-device-name small{display:block;overflow-wrap:anywhere;color:#738a9e;font-size:12px;margin-top:3px}
+.computer-device-status{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:100px;font-size:11px;font-weight:700;background:#e9f7f0;color:#146d47;white-space:nowrap}
+.computer-device-status.offline{background:#fff3ef;color:#a94734}
+.computer-device-meta{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:12px;color:#58768a}
+.computer-device-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid #e8f0f5;padding-top:12px}
+.computer-device-actions .secondary,.computer-device-actions .primary{font-size:12px}
+.computer-device-detail{font-size:12px;color:#56758b;overflow-wrap:anywhere}.computer-device-detail summary{cursor:pointer;font-weight:600}
+.computer-device-detail ul{margin:10px 0 0;padding-left:19px}.computer-device-detail li{margin:4px 0}
+.computer-empty-dashboard{text-align:center;padding:48px 18px;grid-column:1/-1;background:#f9fcff;border:1px dashed #b8d5e9;border-radius:14px}
+.computer-empty-dashboard>*{display:block;margin:0 auto 12px}.computer-empty-dashboard p{max-width:440px;color:#647f93}
+.computer-intro-bottom{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;padding:20px 23px;border:1px solid #d8e5ef;border-radius:13px;background:#eff7fd;margin-top:18px}
+.computer-intro-bottom p{margin:5px 0 0;font-size:12px;color:#55768a}
+.computer-onboard-dialog{width:min(660px,calc(100% - 25px));max-height:88vh;border:1px solid #cbdde9;border-radius:16px;background:#fff;color:#183850;padding:0;box-shadow:0 24px 90px #07274144}
+.computer-onboard-dialog::backdrop{background:#0c2a4166}
+.computer-onboard-header,.computer-onboard-footer{padding:19px 23px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.computer-onboard-header h2{margin:4px 0;font-size:22px}
+.computer-onboard-header p{margin:4px 0;color:#638094;font-size:13px}
+.computer-onboard-footer{border-top:1px solid #e3ebf2}
+.computer-setup-progress{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:0 23px 14px}
+.computer-setup-progress span{font-size:11px;padding:10px 7px;text-align:center;border-radius:7px;background:#f2f7fa;color:#6b8194}
+.computer-setup-progress span.active{background:#d8edff;color:#185985;font-weight:700}
+.computer-onboard-body{padding:22px 23px;overflow-y:auto;max-height:52vh;border-top:1px solid #e6eef5}
+.computer-setup-step h3{margin:0 0 7px;font-size:18px}.computer-setup-step>p{margin:0 0 16px;color:#5d7b91;font-size:13px}
+.computer-platform-choice{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:15px}
+.computer-platform-choice label{display:grid;gap:4px;padding:15px;border:1px solid #d8e6ef;border-radius:11px;cursor:pointer}
+.computer-platform-choice label:has(input:checked){background:#ecf7ff;border-color:#65a9d9}
+.computer-platform-choice input{accent-color:#2179b0}
+.computer-platform-choice small{font-size:12px;color:#6f879a}
+.computer-agent-instructions{display:grid;gap:10px;background:#f1f7fb;padding:14px;border-radius:11px;margin-bottom:13px}
+.computer-agent-instructions code{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.6}
+.computer-agent-instructions button{justify-self:start}
+.computer-setup-message{min-height:18px;color:#3d6681;font-size:12px;margin:12px 0 0}
+.computer-pane-heading{display:flex;align-items:center;gap:10px;margin-bottom:15px}.computer-pane-heading h3{margin:3px 0}.computer-pane-heading small{font-size:10px;letter-spacing:.12em;color:#718ba0;font-weight:800}
+.computer-direction-symbol{font-size:23px;width:37px;height:37px;display:grid;place-items:center;border-radius:9px;background:#e0f0fa;color:#21648e}
+.computer-transfer-safe{font-size:11px;color:#246c5c;font-weight:700}
+.computer-job-panel{margin-top:18px}
+.computer-job-panel select{width:auto;min-width:160px;padding:9px;border:1px solid #d8e6f1;border-radius:7px}
+.computer-transfer-record{padding:17px;gap:10px}
+.computer-transfer-record-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.computer-transfer-state{font-size:11px;font-weight:700;text-transform:capitalize;padding:5px 10px;border-radius:100px;background:#ecf2f6;color:#4b687c}
+.computer-transfer-state.completed{background:#e6f8ef;color:#25774e}.computer-transfer-state.failed,.computer-transfer-state.interrupted,.computer-transfer-state.canceled{background:#fff1ec;color:#a44b34}
+.computer-transfer-record-path{font-size:12px;color:#57758a;overflow-wrap:anywhere}
+.computer-transfer-record progress{height:10px;width:100%;border-radius:10px;accent-color:#237bab}
+.computer-transfer-record-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.computer-transfer-record-actions button{font-size:12px}
+@media(max-width:950px){.computer-overview-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.computer-card-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:530px){.computer-overview-stats,.computer-platform-choice{grid-template-columns:minmax(0,1fr)}.computer-onboard-header,.computer-onboard-footer{padding:14px}.computer-setup-progress{padding:0 14px 10px}.computer-onboard-body{padding:14px}}
+.computer-file-filter-label{display:grid;gap:6px;margin:5px 0 9px;font-size:11px;color:#647f91;font-weight:700}
+.computer-file-filter-label input{width:100%;padding:9px 11px;border:1px solid #dbe7f0;border-radius:8px}
+.computer-file[hidden]{display:none!important}
+.computer-transfer-error{color:#a04b3a;font-size:12px;padding:9px 12px;border-left:3px solid #bc6d54;background:#fff5f1;margin:0;overflow-wrap:anywhere}
+.computer-command-collection{display:grid;gap:12px}
+.computer-command-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.computer-agent-instructions code{user-select:all;overflow-wrap:anywhere;white-space:pre-wrap}
+.computer-bootstrap-status{margin:16px 0;padding:16px;border:1px solid #c7e6da;border-radius:12px;background:#eefaf5}
+.computer-bootstrap-status strong{font-size:13px}.computer-bootstrap-status p,.computer-bootstrap-status small{display:block;color:#59778c;font-size:12px;margin:8px 0 0}
+.computer-bootstrap-pulse{color:#19855d;margin-right:8px}
+</style></head><body>
 <main class="{{if and .Configured .Logged}}app-layout{{else}}auth-layout{{end}}">
 {{if and .Configured .Logged}}
 <aside class="sidebar" aria-label="Syncria navigation">
@@ -105,6 +217,8 @@ code{overflow-wrap:anywhere}
     </nav></div>
     <div class="nav-group"><p class="nav-section-label">CONNECTIONS</p><nav class="nav" aria-label="Connections">
       <button type="button" data-view="storage" class="" aria-label="My NAS Boxes"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="8" rx="2"/><rect x="3" y="13" width="18" height="8" rx="2"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6"/></svg></span><span class="nav-copy"><strong>My NAS Boxes</strong><small>Network storage</small></span></button>
+      <button type="button" data-view="computers" aria-label="My Computers"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></span><span class="nav-copy"><strong>My Computers</strong><small>Direct file transfers</small></span></button>
+      <button type="button" data-view="computer-transfers" aria-label="Computer Transfers"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h16m0 0-4-4m4 4-4 4M21 16H5m0 0 4-4m-4 4 4 4"/></svg></span><span class="nav-copy"><strong>Computer Transfers</strong><small>Direct copies and moves</small></span></button>
       <button type="button" data-view="accounts" class="" aria-label="Cloud Accounts"><span class="nav-icon"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16.5a4 4 0 0 1 1-7.7 7.5 7.5 0 0 1 14.4 1.2A4.5 4.5 0 0 1 18 19H6.5"/><path d="M8 16h8m-4-4v8"/></svg></span><span class="nav-copy"><strong>Cloud Accounts</strong><small>Google & Dropbox</small></span></button>
     </nav></div>
     <div class="nav-group"><p class="nav-section-label">SYSTEM</p><nav class="nav" aria-label="System">
@@ -435,6 +549,15 @@ code{overflow-wrap:anywhere}
 <section class="view" id="view-updates">
 <div class="workspace-intro"><div><p>Install updates here. Download, verification, and restart progress appear when an update runs.</p></div></div>
 <div class="update-console">
+<section class="panel update-channel-panel" aria-labelledby="updateChannelHeading">
+ <div class="section-heading"><div><span class="mini-overline">Release preferences</span><h2 id="updateChannelHeading">Update channel</h2><p>Choose which releases Syncria is allowed to install. Your choice is saved on this server.</p></div></div>
+ <div class="channel-choice-grid" id="updateChannelChoices" role="radiogroup" aria-label="Syncria release channel">
+ <label class="channel-choice"><input type="radio" name="syncriaUpdateChannel" value="stable" checked><span><strong>Stable</strong><small>Recommended for everyday use. Tested production releases only.</small></span></label>
+ <label class="channel-choice"><input type="radio" name="syncriaUpdateChannel" value="beta"><span><strong>Beta</strong><small>Stable plus release candidates and beta previews.</small></span></label>
+ <label class="channel-choice"><input type="radio" name="syncriaUpdateChannel" value="alpha"><span><strong>Alpha</strong><small>All channels, including experimental builds. Expect more frequent changes.</small></span></label>
+ </div>
+ <div class="channel-choice-footer"><p id="updateChannelMessage" class="muted" role="status">Loading saved channel…</p><button type="button" class="primary" id="saveUpdateChannelButton" onclick="saveUpdateChannel()">Save channel</button></div>
+</section>
 <section class="panel update-primary" id="updateStatusCard" data-update-state="checking" aria-live="polite">
  <div class="update-status-header"><span class="update-status-icon" id="updateStatusIcon" aria-hidden="true">↻</span><div class="update-status-text"><span class="mini-overline">Application status</span><h2 id="updateStatusHeadline">Checking for updates…</h2><p id="updateMessage">Checking the latest verified release for this device.</p></div><button class="secondary" type="button" onclick="checkUpdate(true)">Check for updates</button></div>
  <div class="update-version-line"><div><small>INSTALLED VERSION</small><strong id="installedVersion">{{.Version}}</strong></div><span class="update-version-arrow" aria-hidden="true">→</span><div><small>LATEST RELEASE</small><strong id="updateAvailableVersion">Checking…</strong></div></div>
@@ -457,6 +580,81 @@ code{overflow-wrap:anywhere}
 <section class="panel hidden" id="updateHistoryPanel"><div class="panel-head"><h2>Live update log</h2><span class="status" id="updateLogState">Waiting</span></div><p class="muted">Real events recorded by Syncria, with timestamps.</p><ol class="update-timeline" id="updateEventTimeline" aria-live="polite"><li><strong>Ready</strong><small>Events appear here during an update.</small></li></ol></section>
 <section class="update-advanced-section"><details class="advanced-update"><summary>Advanced options</summary><div class="advanced-update-body"><div class="update-rollback-section"><h2>Restore previous version</h2><p class="muted">Return to the saved executable if a recent update has caused problems. Your sync settings are retained.</p><button id="rollbackUpdateButton" class="secondary" type="button" onclick="startUpdate('rollback')">Restore previous version</button></div><p class="muted">For troubleshooting or installations without access to automatic updates. Most people won't need these options.</p><h2>Manual installation</h2><p class="muted">Use this only when automatic downloads are unavailable. Supply a matching app file and SHA256SUMS. Your previous version remains available for rollback.</p><form id="manualUpdateForm" action="/api/update/manual" method="post" enctype="multipart/form-data" onsubmit="return submitManualUpdate(event)"><label class="field">App executable<input type="file" name="binary" id="manualBinary" required></label><label class="field">SHA256SUMS<input type="file" name="checksums" required></label><button id="manualUpdateButton" class="secondary" type="submit">Verify & install files</button></form></div></details></section>
 </div>
+</section>
+
+<section class="view" id="view-computers">
+ <div class="workspace-intro"><div><span class="mini-overline">MY COMPUTERS</span><h2>Your connected devices</h2><p>Add computers once, monitor secure connections, and choose where you want to send files. File transfers have their own workspace.</p></div><div class="row"><button type="button" class="secondary" onclick="loadComputers()">Refresh status</button><button type="button" class="primary" onclick="openComputerOnboard()">+ Add computer</button></div></div>
+ <div class="computer-overview-stats" aria-label="Computer connection overview">
+  <div class="computer-overview-stat"><small>CONNECTED</small><strong id="computerCount">0</strong><span>saved computers</span></div>
+  <div class="computer-overview-stat"><small>ONLINE</small><strong id="computerOnlineCount">0</strong><span>ready to send and receive</span></div>
+  <div class="computer-overview-stat"><small>NEEDS ATTENTION</small><strong id="computerOfflineCount">0</strong><span>currently unreachable</span></div>
+  <div class="computer-overview-stat"><small>SHARED FOLDERS</small><strong id="computerFolderCount">0</strong><span>on connected computers</span></div>
+ </div>
+ <section class="panel"><div class="section-heading"><div><span class="mini-overline">CONNECTED DEVICES</span><h2>My Computers</h2><p>Live connection status and permitted folders. Only folders shared by an agent can be accessed.</p></div><button class="secondary" type="button" onclick="navigate('computer-transfers')">Open Computer Transfers →</button></div>
+  <div id="computerDeviceList" class="computer-device-list computer-card-grid"><p class="muted">Checking your computers…</p></div>
+ </section>
+ <section class="computer-intro-bottom"><div><strong>Need to send a file?</strong><p>Use the dedicated Computer Transfers workspace to browse source and destination devices, see the queue, and track completed jobs.</p></div><button type="button" class="primary" onclick="navigate('computer-transfers')">Go to Computer Transfers →</button></section>
+</section>
+
+<dialog id="computerOnboard" class="computer-onboard-dialog" aria-labelledby="computerOnboardTitle">
+ <div class="computer-onboard-header"><div><span class="mini-overline">ONE-COMMAND SETUP</span><h2 id="computerOnboardTitle">Add a computer</h2><p>Syncria installs, configures, and pairs the native agent for you.</p></div><button class="secondary" type="button" onclick="closeComputerOnboard()" aria-label="Close setup">✕</button></div>
+ <div class="computer-setup-progress" aria-label="Computer onboarding steps"><span data-computer-step="1">1 · Name computer</span><span data-computer-step="2">2 · Copy & run command</span><span data-computer-step="3">3 · Connected automatically</span></div>
+ <div class="computer-onboard-body">
+  <div id="computerStep1" class="computer-setup-step">
+   <h3>Name the computer</h3>
+   <p>Enter the friendly name you'll see in My Computers. The command will detect Windows/Linux and the CPU architecture automatically.</p>
+   <label class="field">Computer name<input id="computerPairLabel" autocomplete="off" placeholder="Office desktop" maxlength="80" required></label>
+   <p class="muted">Syncria generates a single-use 20-minute invitation. No IP address, pairing key, certificate fingerprint, or manual download is needed. LAN HTTP and HTTPS are both supported.</p>
+  </div>
+  <div id="computerStep2" class="computer-setup-step hidden">
+   <h3>Copy one command onto that computer</h3>
+   <p>Open your preferred terminal on that computer and run one of the commands below. The installer downloads the matching agent <strong>from your Syncria server</strong>, verifies SHA-256, configures it, launches it, and pairs automatically.</p>
+   <div class="computer-command-collection">
+    <div class="computer-agent-instructions"><div class="computer-command-heading"><strong>Windows PowerShell</strong><button type="button" class="secondary" onclick="copyComputerBootstrap('ps')">Copy PowerShell</button></div><code id="computerPSCommand">Preparing one-time command…</code></div>
+    <div class="computer-agent-instructions"><div class="computer-command-heading"><strong>Windows CMD</strong><button type="button" class="secondary" onclick="copyComputerBootstrap('cmd')">Copy CMD</button></div><code id="computerCMDCommand">Preparing one-time command…</code></div>
+    <div class="computer-agent-instructions"><div class="computer-command-heading"><strong>Linux terminal</strong><button type="button" class="secondary" onclick="copyComputerBootstrap('linux')">Copy Linux</button></div><code id="computerLinuxCommand">Preparing one-time command…</code></div>
+   </div>
+   <div class="computer-bootstrap-status"><span class="computer-bootstrap-pulse">●</span><strong id="computerEnrollState">Waiting for the new computer to connect…</strong><p id="computerEnrollDetail">Syncria checks the agent's secure connection automatically.</p><small id="computerInviteExpiry">Invitation expires after 20 minutes.</small></div>
+   <p class="muted">An empty <strong>Syncria Shared</strong> folder will be created in that user's home directory. Other folders are not shared. The server can use HTTP on a trusted private LAN or HTTPS. Make sure the new computer can reach Syncria, and permit agent TCP 9765 from your LAN.</p>
+  </div>
+  <div id="computerStep3" class="computer-setup-step hidden">
+   <h3>Computer securely connected</h3><p>The agent has been installed and Syncria verified its pairing key, TLS certificate fingerprint, and reachable LAN address.</p>
+   <button type="button" class="primary" onclick="closeComputerOnboard();navigate('computers')">View in My Computers →</button>
+  </div>
+  <p id="computerPairMessage" class="computer-setup-message" role="status"></p>
+ </div>
+ <div class="computer-onboard-footer"><button type="button" class="secondary" id="computerStepBack" onclick="computerSetupBack()">Back</button><button type="button" class="primary" id="computerStepNext" onclick="computerSetupNext()">Generate install commands →</button></div>
+</dialog>
+
+<section class="view" id="view-computer-transfers">
+ <div class="workspace-intro"><div><span class="mini-overline">DIRECT FILE OPERATIONS</span><h2>Computer Transfers</h2><p>Transfer directly between paired devices without SMB/NFS and without uploading files to Syncria. Each transfer runs in its own isolated worker process.</p></div><div class="row"><button type="button" class="secondary" onclick="navigate('computers')">Manage computers</button><button type="button" class="secondary" onclick="refreshComputerTransfers()">Refresh queue</button></div></div>
+ <div class="computer-overview-stats computer-transfer-stats">
+  <div class="computer-overview-stat"><small>RUNNING</small><strong id="computerTransferActive">0</strong><span>worker processes</span></div>
+  <div class="computer-overview-stat"><small>WAITING</small><strong id="computerTransferQueued">0</strong><span>queued operations</span></div>
+  <div class="computer-overview-stat"><small>FINISHED</small><strong id="computerTransferFinished">0</strong><span>saved transfer records</span></div>
+  <div class="computer-overview-stat"><small>CONCURRENCY</small><strong id="computerTransferCapacity">3</strong><span>simultaneous transfers</span></div>
+ </div>
+ <section class="panel computer-transfer-workspace"><div class="section-heading"><div><span class="mini-overline">NEW TRANSFER</span><h2>Select file and destination</h2><p>Browse a shared source folder, select a file, and open a destination folder. Existing destination files will never be overwritten.</p></div><span class="computer-transfer-safe">Encrypted · Direct · Verified</span></div>
+  <div class="computer-explorer">
+   <div class="computer-explorer-pane"><div class="computer-pane-heading"><span class="computer-direction-symbol">↗</span><div><small>FROM</small><h3>Source computer</h3></div></div>
+    <label class="field">Computer<select id="computerSourceID" onchange="computerSideChanged('source')"><option value="">Select source</option></select></label>
+    <label class="field">Shared folder<select id="computerSourceRoot" onchange="computerRootChanged('source')"><option value="">Choose folder</option></select></label>
+    <div class="computer-path"><button type="button" class="secondary" onclick="computerUp('source')">↑ Up</button><span id="computerSourcePath">Choose a computer</span></div>
+    <label class="computer-file-filter-label">Find files in this folder<input id="computerSourceFilter" type="search" placeholder="Filter filenames…" oninput="filterComputerFiles('source')"></label><div class="computer-file-list" id="computerSourceFiles" role="list"><p class="muted">Choose a source computer.</p></div>
+   </div>
+   <div class="computer-explorer-pane"><div class="computer-pane-heading"><span class="computer-direction-symbol">↙</span><div><small>TO</small><h3>Destination computer</h3></div></div>
+    <label class="field">Computer<select id="computerDestinationID" onchange="computerSideChanged('destination')"><option value="">Select destination</option></select></label>
+    <label class="field">Shared folder<select id="computerDestinationRoot" onchange="computerRootChanged('destination')"><option value="">Choose folder</option></select></label>
+    <div class="computer-path"><button type="button" class="secondary" onclick="computerUp('destination')">↑ Up</button><span id="computerDestinationPath">Choose a computer</span></div>
+    <label class="computer-file-filter-label">Find files in this folder<input id="computerDestinationFilter" type="search" placeholder="Filter filenames…" oninput="filterComputerFiles('destination')"></label><div class="computer-file-list" id="computerDestinationFiles" role="list"><p class="muted">Choose a destination computer.</p></div>
+   </div>
+  </div>
+  <div class="computer-transfer-actions"><div><strong id="computerSelectedFile">No file selected</strong><small id="computerTransferMessage">Copy preserves the source; Move deletes it only after the received file is verified.</small></div><div class="row"><button type="button" class="secondary" onclick="startComputerTransfer(false)">Copy file →</button><button type="button" class="primary" onclick="startComputerTransfer(true)">Move file →</button></div></div>
+ </section>
+ <section class="panel computer-job-panel">
+  <div class="section-heading"><div><span class="mini-overline">TRANSFER MANAGER</span><h2>Queue and history</h2><p>Jobs continue if you close this page. Results survive Syncria restarts; interrupted jobs require an explicit retry.</p></div><select id="computerTransferFilter" aria-label="Filter transfer jobs" onchange="renderComputerTransfers()"><option value="all">All transfers</option><option value="active">Running and queued</option><option value="completed">Completed</option><option value="failed">Failed / canceled</option></select></div>
+  <div id="computerTransferList" class="computer-transfer-list"><p class="muted">No transfer jobs yet.</p></div>
+ </section>
 </section>
 <section class="view" id="view-settings"><div class="workspace-intro"><div><p>Manage account credentials and connection settings. These usually only need to be configured once.</p></div></div><section class="panel"><h2>Google sign-in settings (advanced)</h2><p>For an administrator: create a Google Cloud web sign-in app, enable the Google Drive API, and add the address shown below as its redirect URL:</p><div class="selected"><code>{{.Callback}}</code></div><form method="post" action="/action"><input type="hidden" name="action" value="oauth_settings"><label class="field">Google app ID (Client ID)<input name="client_id" value="{{.ClientID}}" required></label><label class="field">Google app secret<input name="client_secret" type="password" placeholder="Leave blank to keep existing secret"></label><label class="field">Your Syncria web address<input name="base_url" value="{{.BaseURL}}" required></label><button class="primary">Save Google sign-in settings</button></form></section><section class="panel"><h2>Dropbox sign-in settings (advanced)</h2>
 <p>For an administrator: add this return address to your Dropbox developer app:</p><div class="selected"><code>{{.DropboxCallback}}</code></div>
@@ -918,6 +1116,363 @@ async function loadSyncRun(runID,more=false){
   }
  }catch(error){$('syncRunSummary').textContent='Unable to load run details: '+error.message;}
 }
+
+let computerCache=[];
+const computerSides={source:{id:'',root:'',path:'',parent:'',selected:null,selectedFiles:[],seq:0},destination:{id:'',root:'',path:'',parent:'',selected:null,seq:0}};
+async function computerJSON(url,options){
+ const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options});
+ if(!response.ok)throw Error((await response.text()).trim()||'HTTP '+response.status);
+ return response.json();
+}
+let computerSetupStep=1,computerEnrollmentCode='',computerEnrollmentPoll=null;
+const computerBootstrapCommands={ps:'',cmd:'',linux:''};
+function openComputerOnboard(){
+ computerSetupShow(1);
+ const dialog=$('computerOnboard');
+ if(!dialog.open)dialog.showModal();
+}
+function closeComputerOnboard(){
+ if(computerEnrollmentPoll){clearInterval(computerEnrollmentPoll);computerEnrollmentPoll=null;}
+ const dialog=$('computerOnboard');
+ if(dialog.open)dialog.close();
+}
+function computerSetupShow(step){
+ computerSetupStep=step;
+ for(let i=1;i<=3;i++){
+  $('computerStep'+i).classList.toggle('hidden',i!==step);
+  document.querySelector('[data-computer-step="'+i+'"]')?.classList.toggle('active',i===step);
+ }
+ $('computerStepBack').disabled=step!==1?true:true;
+ $('computerStepBack').classList.add('hidden');
+ $('computerStepNext').classList.toggle('hidden',step!==1);
+ $('computerPairMessage').textContent='';
+ if(step===1){$('computerStepNext').disabled=false;}
+}
+async function computerSetupNext(){
+ if(computerSetupStep!==1)return;
+ const label=$('computerPairLabel').value.trim();
+ if(!label){$('computerPairMessage').textContent='Name this computer before continuing.';return;}
+ if(location.protocol!=='https:'&&location.protocol!=='http:'){
+  $('computerPairMessage').textContent='Open Syncria over HTTP on your private LAN or over HTTPS to enroll an agent.';return;
+ }
+ $('computerStepNext').disabled=true;
+ $('computerPairMessage').textContent='Creating a secure, single-use invitation…';
+ try{
+  const issued=await computerJSON('/api/computers/invite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({label})});
+  computerEnrollmentCode=issued.code;
+  const base=location.origin;
+  const windowsURL=base+'/api/computers/bootstrap?code='+encodeURIComponent(issued.code)+'&platform=windows&hub='+encodeURIComponent(base);
+  const linuxURL=base+'/api/computers/bootstrap?code='+encodeURIComponent(issued.code)+'&platform=linux&hub='+encodeURIComponent(base);
+  computerBootstrapCommands.ps="powershell -NoProfile -ExecutionPolicy Bypass -Command \"irm '"+windowsURL+"' | iex\"";
+  computerBootstrapCommands.cmd="powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"irm '"+windowsURL+"' | iex\"";
+  computerBootstrapCommands.linux="curl -fsSL '"+linuxURL+"' | bash";
+  $('computerPSCommand').textContent=computerBootstrapCommands.ps;
+  $('computerCMDCommand').textContent=computerBootstrapCommands.cmd;
+  $('computerLinuxCommand').textContent=computerBootstrapCommands.linux;
+  $('computerInviteExpiry').textContent='Expires '+new Date(issued.expires_at).toLocaleTimeString()+' · Single use';
+  computerSetupShow(2);
+  if(location.protocol==='http:'){
+   $('computerPairMessage').textContent='LAN HTTP mode: installation and initial pairing traffic are unencrypted. Use this on a trusted private network only. Direct file transfers remain encrypted with pinned HTTPS.';
+  }
+  $('computerEnrollState').textContent='Waiting for agent installation and secure connection…';
+  $('computerEnrollDetail').textContent='Agent address and pairing credentials will be detected and verified automatically.';
+  if(computerEnrollmentPoll)clearInterval(computerEnrollmentPoll);
+  computerEnrollmentPoll=setInterval(checkComputerEnrollment,2500);
+  await checkComputerEnrollment();
+ }catch(error){$('computerPairMessage').textContent='Could not create invitation: '+error.message;$('computerStepNext').disabled=false;}
+}
+function computerSetupBack(){closeComputerOnboard();openComputerOnboard();}
+async function copyComputerBootstrap(which){
+ const code=computerBootstrapCommands[which];
+ if(!code)return;
+ let copied=false;
+ if(navigator.clipboard&&window.isSecureContext){
+  try{await navigator.clipboard.writeText(code);copied=true;}catch(error){}
+ }
+ // Navigator Clipboard requires a secure context in many browsers. The
+ // legacy selection-copy path keeps HTTP LAN installations usable.
+ if(!copied){
+  const field=document.createElement('textarea');
+  field.value=code;field.readOnly=true;field.setAttribute('aria-label','Syncria setup command');
+  field.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:0';
+  document.body.append(field);
+  field.focus();field.select();field.setSelectionRange(0,field.value.length);
+  try{copied=document.execCommand('copy');}catch(error){}
+  field.remove();
+ }
+ $('computerPairMessage').textContent=copied?
+  (which==='ps'?'PowerShell':which==='cmd'?'CMD':'Linux')+' command copied. Run it on the computer you are adding.':
+  'Automatic clipboard copy was blocked by the browser. Select the command above and copy it normally.';
+}
+async function checkComputerEnrollment(){
+ if(!computerEnrollmentCode||computerSetupStep!==2)return;
+ try{
+  const state=await computerJSON('/api/computers/invite?code='+encodeURIComponent(computerEnrollmentCode));
+  if(state.status==='connected'){
+   clearInterval(computerEnrollmentPoll);computerEnrollmentPoll=null;
+   computerSetupShow(3);
+   $('computerPairMessage').textContent=state.message||'Secure enrollment complete.';
+   computerEnrollmentCode='';
+   await loadComputers();return;
+  }
+  $('computerEnrollState').textContent=state.status==='verifying'?'Checking agent encryption and network reachability…':'Waiting for the new agent…';
+  if(new Date(state.expires_at).getTime()<Date.now()){
+   clearInterval(computerEnrollmentPoll);computerEnrollmentPoll=null;
+   $('computerEnrollState').textContent='Invitation expired — start over to generate fresh commands.';
+  }
+ }catch(error){
+  $('computerEnrollDetail').textContent='Connection status: '+error.message+'. If invitation expired, close this window and generate a new one.';
+ }
+}
+function computerOption(select,value,label){
+ const option=document.createElement('option');option.value=value;option.textContent=label;select.append(option);
+}
+async function loadComputers(){
+ let data;
+ try{data=await computerJSON('/api/computers')}catch(error){$('computerDeviceList').textContent='Could not check computers: '+error.message;return}
+ computerCache=data.computers||[];
+ $('computerCount').textContent=computerCache.length;
+ $('computerOnlineCount').textContent=computerCache.filter(c=>c.online).length;
+ $('computerOfflineCount').textContent=computerCache.filter(c=>!c.online).length;
+ $('computerFolderCount').textContent=computerCache.reduce((n,c)=>n+(c.roots||[]).length,0);
+ const list=$('computerDeviceList');list.replaceChildren();
+ if(!computerCache.length){
+  const card=document.createElement('div');card.className='computer-empty-dashboard';
+  const symbol=document.createElement('span');symbol.textContent='▣';symbol.style.fontSize='32px';
+  const title=document.createElement('strong');title.textContent='No computers connected yet';
+  const note=document.createElement('p');note.textContent='Add a Windows or Linux computer, choose the folders it can share, and securely pair its agent. Files stay on the computer.';
+  const add=document.createElement('button');add.type='button';add.className='primary';add.textContent='+ Add your first computer';add.onclick=openComputerOnboard;
+  card.append(symbol,title,note,add);list.append(card);
+ }
+ for(const c of computerCache){
+  const card=document.createElement('article');card.className='computer-device-card';
+  const heading=document.createElement('div');heading.className='computer-device-heading';
+  const glyph=document.createElement('div');glyph.className='computer-device-icon';glyph.textContent='▣';
+  const identity=document.createElement('div');identity.className='computer-device-name';
+  const name=document.createElement('strong');name.textContent=c.label;
+  const address=document.createElement('small');address.textContent=c.url;
+  identity.append(name,address);
+  const state=document.createElement('span');state.className='computer-device-status'+(c.online?'':' offline');
+  state.textContent=c.online?'● Online':'● Offline';
+  heading.append(glyph,identity,state);
+  const meta=document.createElement('div');meta.className='computer-device-meta';
+  meta.textContent=c.online?(c.roots||[]).length+' shared folders · Encrypted connection':(c.error||'Computer is unreachable');
+  const details=document.createElement('details');details.className='computer-device-detail';
+  const summary=document.createElement('summary');summary.textContent='Connection details and shared folders';
+  const body=document.createElement('ul');
+  for(const root of c.roots||[]){const item=document.createElement('li');item.textContent=root.name;body.append(item)}
+  if(!body.children.length){const item=document.createElement('li');item.textContent='Folder list unavailable while offline';body.append(item)}
+  details.append(summary,body);
+  const actions=document.createElement('div');actions.className='computer-device-actions';
+  const send=document.createElement('button');send.type='button';send.className='primary';
+  send.textContent='Transfer files →';send.disabled=!c.online;
+  send.onclick=()=>startTransferWithComputer(c.id);
+  const refresh=document.createElement('button');refresh.type='button';refresh.className='secondary';refresh.textContent='Check status';refresh.onclick=loadComputers;
+  const remove=document.createElement('button');remove.type='button';remove.className='secondary';remove.textContent='Disconnect';remove.onclick=()=>removeComputer(c);
+  actions.append(send,refresh,remove);
+  card.append(heading,meta,details,actions);list.append(card);
+ }
+ for(const side of ['source','destination']){
+  const sel=$('computer'+(side==='source'?'Source':'Destination')+'ID'),old=sel.value;
+  sel.replaceChildren();computerOption(sel,'','Choose computer');
+  for(const c of computerCache)computerOption(sel,c.id,c.label+(c.online?'':' (offline)'));
+  sel.value=computerCache.some(c=>c.id===old)?old:'';
+  if(sel.value!==computerSides[side].id)computerSideChanged(side);
+  else if(sel.value)computerUpdateRoots(side);
+ }
+}
+async function startTransferWithComputer(id){
+ navigate('computer-transfers');
+ if(!computerCache.length)await loadComputers();
+ const s=$('computerSourceID');
+ s.value=id;computerSideChanged('source');
+ const roots=computerCache.find(c=>c.id===id)?.roots||[];
+ if(roots.length){$('computerSourceRoot').value=roots[0].name;computerRootChanged('source')}
+}
+async function removeComputer(c){
+ if(!confirm('Disconnect '+c.label+' from Syncria? Files and the agent remain untouched. Active transfers must finish or be canceled first.'))return;
+ try{await computerJSON('/api/computers/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:c.id})});await loadComputers()}
+ catch(error){alert(error.message)}
+}
+function computerSidePrefix(side){return side==='source'?'computerSource':'computerDestination'}
+function computerUpdateRoots(side){
+ const s=computerSides[side],prefix=computerSidePrefix(side);
+ const dev=computerCache.find(c=>c.id===s.id),list=$(''+prefix+'Root'),old=list.value;
+ list.replaceChildren();computerOption(list,'','Choose shared folder');
+ for(const root of dev?.roots||[])computerOption(list,root.name,root.name);
+ list.value=(dev?.roots||[]).some(x=>x.name===old)?old:'';
+ if(s.root!==list.value)computerRootChanged(side);
+}
+function computerSideChanged(side){
+ const s=computerSides[side],prefix=computerSidePrefix(side);
+ s.id=$(prefix+'ID').value;s.root='';s.path='';s.selected=null;if(side==='source')s.selectedFiles=[];s.seq++;
+ computerUpdateRoots(side);
+ $(prefix+'Files').replaceChildren();$(prefix+'Path').textContent=s.id?'Choose a shared folder':'Choose a computer';
+ if(side==='source')$('computerSelectedFile').textContent='No file selected';
+}
+function computerRootChanged(side){
+ const s=computerSides[side],prefix=computerSidePrefix(side);
+ s.root=$(prefix+'Root').value;s.path='';s.selected=null;if(side==='source')s.selectedFiles=[];s.seq++;
+ if(side==='source')$('computerSelectedFile').textContent='No file selected';
+ if(s.root)browseComputer(side,'');
+ else{$(prefix+'Files').replaceChildren();$(prefix+'Path').textContent='Choose a shared folder'}
+}
+function computerUp(side){const s=computerSides[side];if(s.root&&s.path)browseComputer(side,s.parent)}
+async function browseComputer(side,relative){
+ const s=computerSides[side],prefix=computerSidePrefix(side),seq=++s.seq;
+ const list=$(prefix+'Files');list.textContent='Loading files…';
+ try{
+  const query=new URLSearchParams({id:s.id,root:s.root,path:relative});
+  const data=await computerJSON('/api/computers/browse?'+query);
+  if(seq!==s.seq)return;
+  s.path=data.path||'';s.parent=data.parent||'';
+  if(side==='source'){s.selected=null;s.selectedFiles=[];$('computerSelectedFile').textContent='No file selected'}
+  $(prefix+'Path').textContent=s.root+(s.path?' / '+s.path:' /');
+  list.replaceChildren();
+  const filter=$('computer'+(side==='source'?'Source':'Destination')+'Filter');
+  if(filter)filter.value='';
+  if(!(data.entries||[]).length){const p=document.createElement('p');p.className='muted';p.textContent='This folder is empty.';list.append(p)}
+  for(const file of data.entries||[]){
+   const row=document.createElement('button');row.type='button';row.className='computer-file';
+   const name=document.createElement('strong');name.textContent=(file.directory?'📁 ':'📄 ')+file.name;
+   const size=document.createElement('small');size.textContent=file.directory?'Open folder':formatBytes(file.size);
+   row.append(name,size);
+   row.dataset.filename=file.name.toLowerCase();
+   if(file.directory)row.addEventListener('click',()=>browseComputer(side,s.path?s.path+'/'+file.name:file.name));
+   else if(side==='source')row.addEventListener('click',()=>{
+    if(s.selectedFiles.some(item=>item.name===file.name)){
+     s.selectedFiles=s.selectedFiles.filter(item=>item.name!==file.name);
+     row.classList.remove('is-selected');
+    }else{
+     if(s.selectedFiles.length>=100){$('computerTransferMessage').textContent='Select up to 100 files in one batch.';return}
+     s.selectedFiles.push(file);
+     row.classList.add('is-selected');
+    }
+    s.selected=s.selectedFiles[0]||null;
+    const count=s.selectedFiles.length;
+    const total=s.selectedFiles.reduce((n,item)=>n+Number(item.size||0),0);
+    $('computerSelectedFile').textContent=count?count+' file'+(count===1?'':'s')+' selected · '+formatBytes(total):'No files selected';
+   });
+   else{row.disabled=true;row.title='Choose a destination folder, not a file'}
+   list.append(row);
+  }
+ }catch(error){if(seq===s.seq){list.textContent=error.message;$(prefix+'Path').textContent='Unable to browse shared folder'}}
+}
+
+function filterComputerFiles(side){
+ const prefix='computer'+(side==='source'?'Source':'Destination');
+ const search=$(prefix+'Filter').value.trim().toLowerCase();
+ for(const row of $(prefix+'Files').querySelectorAll('.computer-file'))row.hidden=!row.dataset.filename.includes(search);
+}
+async function startComputerTransfer(move){
+ const from=computerSides.source,to=computerSides.destination;
+ const message=$('computerTransferMessage');
+ const files=from.selectedFiles||[];
+ if(!files.length||!from.id||!from.root||!to.id||!to.root){
+  message.textContent='Choose one or more source files and a destination shared folder.';return;
+ }
+ if(from.id===to.id){message.textContent='Select two different computers.';return;}
+ const total=files.reduce((n,item)=>n+Number(item.size||0),0);
+ if(!confirm((move?'Move':'Copy')+' '+files.length+' file(s) ('+formatBytes(total)+') from '+
+  computerCache.find(c=>c.id===from.id)?.label+' to '+computerCache.find(c=>c.id===to.id)?.label+
+  '? Each file is independently verified. Existing destination files are never overwritten.'))return;
+ let accepted=0;
+ const errors=[];
+ for(const file of files){
+  const sourcePath=from.path?from.path+'/'+file.name:file.name;
+  const destPath=to.path?to.path+'/'+file.name:file.name;
+  message.textContent='Queueing '+(accepted+errors.length+1)+' of '+files.length+' files…';
+  try{
+   await computerJSON('/api/computers/transfers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    source_id:from.id,destination_id:to.id,source_root:from.root,destination_root:to.root,
+    source_path:sourcePath,destination_path:destPath,move
+   })});
+   accepted++;
+  }catch(error){errors.push(file.name+': '+error.message);}
+ }
+ message.textContent=accepted+' file'+(accepted===1?'':'s')+' queued in isolated workers.'+
+  (errors.length?' '+errors.length+' rejected: '+errors.slice(0,3).join('; '):'');
+ await refreshComputerTransfers();
+}
+let computerTransferRecords=[];
+let computerTransferRefreshing=false;
+async function refreshComputerTransfers(){
+ if(computerTransferRefreshing)return;
+ computerTransferRefreshing=true;
+ try{
+  const data=await computerJSON('/api/computers/transfers');
+  computerTransferRecords=data.transfers||[];
+  $('computerTransferActive').textContent=data.active||0;
+  $('computerTransferQueued').textContent=data.queued||0;
+  $('computerTransferFinished').textContent=data.finished||0;
+  $('computerTransferCapacity').textContent=data.max_concurrent||3;
+  renderComputerTransfers();
+ }catch(error){$('computerTransferList').textContent='Could not load transfer queue: '+error.message}
+ finally{computerTransferRefreshing=false}
+}
+function renderComputerTransfers(){
+ const filter=$('computerTransferFilter').value;
+ const visible=computerTransferRecords.filter(t=>{
+  if(filter==='active')return !['completed','failed','canceled','interrupted'].includes(t.status);
+  if(filter==='completed')return t.status==='completed';
+  if(filter==='failed')return ['failed','canceled','interrupted'].includes(t.status);
+  return true;
+ });
+ const list=$('computerTransferList');list.replaceChildren();
+ if(!visible.length){
+  const p=document.createElement('p');p.className='muted';
+  p.textContent=filter==='all'?'No computer transfers yet. Choose a source file and destination above.':'No jobs match this filter.';
+  list.append(p);return;
+ }
+ for(const t of visible){
+  const record=document.createElement('article');record.className='computer-transfer-record';
+  const head=document.createElement('div');head.className='computer-transfer-record-top';
+  const name=document.createElement('strong');name.textContent=(t.move?'Move':'Copy')+' · '+t.file.split('/').pop();
+  const status=document.createElement('span');status.className='computer-transfer-state '+t.status;status.textContent=t.status;
+  head.append(name,status);
+  const places=document.createElement('div');places.className='computer-transfer-record-path';
+  places.textContent=t.source+' / '+t.source_root+' / '+t.file+'  →  '+t.destination+' / '+t.destination_root+' / '+t.target;
+  const when=document.createElement('small');
+  when.textContent='Started '+new Date(t.started).toLocaleString()+(t.finished?' · Finished '+new Date(t.finished).toLocaleString():'');
+  const bytes=document.createElement('small');
+  const done=Number(t.bytes||0),total=Number(t.total||0);
+  bytes.textContent=done?formatBytes(done)+(total?' / '+formatBytes(total):''):total?'0 / '+formatBytes(total):'Waiting for file size';
+  record.append(head,places,when,bytes);
+  if(total>0){
+   const bar=document.createElement('progress');bar.max=total;bar.value=Math.min(total,done);bar.setAttribute('aria-label','Actual received bytes');
+   record.append(bar);
+  }else if(t.status==='transferring'){
+   const bar=document.createElement('progress');bar.setAttribute('aria-label','Transfer is running');record.append(bar);
+  }
+  if(t.error){
+   const error=document.createElement('p');error.className='computer-transfer-error';
+   error.textContent=t.error;record.append(error);
+  }
+  const actions=document.createElement('div');actions.className='computer-transfer-record-actions';
+  function addAction(label,action,className){
+   const button=document.createElement('button');button.type='button';button.className=className;
+   button.textContent=label;button.onclick=()=>changeComputerTransfer(t,action);actions.append(button);
+  }
+  if(!['completed','failed','canceled','interrupted'].includes(t.status))addAction('Cancel transfer','cancel','secondary');
+  if(['failed','canceled','interrupted'].includes(t.status))addAction('Retry safely','retry','primary');
+  if(['completed','failed','canceled','interrupted'].includes(t.status))addAction('Clear record','clear','secondary');
+  if(actions.children.length)record.append(actions);
+  list.append(record);
+ }
+}
+async function changeComputerTransfer(job,action){
+ let warning='';
+ if(action==='cancel')warning='Cancel this transfer? A destination copy that already completed may remain.';
+ if(action==='retry')warning='Retry '+job.file+'? Syncria never overwrites an existing destination; inspect both computers first if a prior attempt partially completed.';
+ if(action==='clear')warning='Remove this transfer record from history? This does not remove any files.';
+ if(!confirm(warning))return;
+ try{
+  await computerJSON('/api/computers/transfers/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:job.id,action})});
+  await refreshComputerTransfers();
+ }catch(error){alert('Transfer action failed: '+error.message)}
+}
+setInterval(()=>{if(document.getElementById('view-computer-transfers')?.classList.contains('active'))refreshComputerTransfers()},2500);
+
 function navigate(view){
  if(!$('view-'+view))return;
  const feedback=$('actionFeedback');if(feedback&&currentView!==view)feedback.remove();
@@ -932,6 +1487,8 @@ function navigate(view){
   overview:['Your overview','OVERVIEW'],
   sync:['Your syncs','MY SYNCS'],
   storage:['Storage devices','MY NAS BOXES'],
+  computers:['My computers','DIRECT CONNECTIONS'],
+  'computer-transfers':['Computer transfers','DIRECT TRANSFERS'],
   accounts:['Cloud connections','CLOUD ACCOUNTS'],
   activity:['Transfer activity','ACTIVITY'],
   'sync-detail':['Sync details','SYNC DETAILS'],
@@ -942,7 +1499,9 @@ function navigate(view){
  $('pageTitle').textContent=page[0];
  const breadcrumb=$('pageBreadcrumb');if(breadcrumb)breadcrumb.textContent=page[1];
  history.replaceState(null,'',view==='sync-detail'&&selectedSyncID?'#sync-detail/'+encodeURIComponent(selectedSyncID)+'/'+selectedSyncDetailTab:'#'+view);
- if(view==='updates')checkUpdate();
+ if(view==='updates'){loadUpdateChannel();checkUpdate();}
+ if(view==='computers')loadComputers();
+ if(view==='computer-transfers'){loadComputers();refreshComputerTransfers();}
 }
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.view)));
 let syncReviewed=false,syncStep=1,selectedNASTargetID='';
@@ -1191,6 +1750,45 @@ async function verifyConnectedAccount(id,button){
  catch(e){button.textContent='Could not connect';button.title='Check the account sign-in or try again. Details: '+e.message;}
  finally{button.disabled=false;}
 }
+
+let selectedUpdateChannel='stable';
+let updateChannelSaving=false;
+function updateChannelSelection(){
+ const chosen=document.querySelector('input[name="syncriaUpdateChannel"]:checked');
+ return chosen?chosen.value:'stable';
+}
+function setUpdateChannelUI(channel){
+ selectedUpdateChannel=channel;
+ const input=document.querySelector('input[name="syncriaUpdateChannel"][value="'+channel+'"]');
+ if(input)input.checked=true;
+ const msg=$('updateChannelMessage');
+ if(msg)msg.textContent='Currently receiving '+channel[0].toUpperCase()+channel.slice(1)+' releases.';
+}
+async function loadUpdateChannel(){
+ try{
+  const resp=await fetch('/api/update/channel',{credentials:'same-origin',cache:'no-store'});
+  if(!resp.ok)throw Error('Channel lookup returned HTTP '+resp.status);
+  const data=await resp.json();
+  setUpdateChannelUI(data.channel||'stable');
+ }catch(e){const msg=$('updateChannelMessage');if(msg)msg.textContent='Could not load saved channel: '+e.message;}
+}
+async function saveUpdateChannel(){
+ if(updateChannelSaving||updateRunning||updateSubmitting)return;
+ const channel=updateChannelSelection();
+ const btn=$('saveUpdateChannelButton');
+ const msg=$('updateChannelMessage');
+ updateChannelSaving=true;if(btn)btn.disabled=true;
+ if(msg)msg.textContent='Saving '+channel+' channel…';
+ try{
+  const resp=await fetch('/api/update/channel',{method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'Content-Type':'application/json'},body:JSON.stringify({channel})});
+  if(!resp.ok)throw Error((await resp.text()).trim()||'HTTP '+resp.status);
+  const result=await resp.json();
+  setUpdateChannelUI(result.channel);
+  await checkUpdate(true);
+ }catch(e){if(msg)msg.textContent='Could not change update channel: '+e.message;}
+ finally{updateChannelSaving=false;if(btn)btn.disabled=false;}
+}
 let updatePollingBusy=false,updateSubmitting=false,updateRunning=false,updateInstallAvailable=false;
 let lastUpdatePhase='idle',lastUpdateLog='',lastConfirmedUpdateStatus='';
 let manualUploadInProgress=false;
@@ -1257,6 +1855,11 @@ function setUpdateProgressBar(phase,current,total){
   label.textContent=phase==='failed'?'Failed':'Measured progress only';
  }
 }
+// GitHub prerelease tags use an alpha-/beta- safety prefix that is not
+// part of the running binary version.
+function runtimeVersionOfRelease(tag){
+ return String(tag||'').replace(/^(?:alpha|beta)-(?=v[0-9]+\.[0-9]+\.[0-9]+-)/,'');
+}
 // Only navigate after the new process confirms the expected version.
 function finishVerifiedUpdate(version){
  if(!version || sessionStorage.getItem('syncria-update-refreshing')===version)return;
@@ -1268,11 +1871,11 @@ function renderUpdateProgress(p){
  if(!p||!p.phase)return;
  const phase=p.phase;
  const expectedVersion=sessionStorage.getItem('syncria-update-expected');
- if(expectedVersion&&p.current===expectedVersion&&phase!=='failed'&&!p.active){
-  finishVerifiedUpdate(expectedVersion);
+ if(expectedVersion&&p.current===runtimeVersionOfRelease(expectedVersion)&&phase!=='failed'&&!p.active){
+  finishVerifiedUpdate(p.current);
   return;
  }
- if(phase==='complete'&&p.current&&(p.operation==='rollback'||p.operation==='manual'||p.target===p.current)){
+ if(phase==='complete'&&p.current&&(p.operation==='rollback'||p.operation==='manual'||runtimeVersionOfRelease(p.target)===p.current)){
   finishVerifiedUpdate(p.current);
   return;
  }
@@ -1358,7 +1961,7 @@ async function pollUpdateProgress(){
   const payload=await response.json();
   lastConfirmedUpdateStatus=payload.updated_at||'';
   const expected=sessionStorage.getItem('syncria-update-expected');
-  if(expected&&payload.current===expected&&payload.phase!=='failed'&&!payload.active){finishVerifiedUpdate(expected);return;}
+  if(expected&&payload.current===runtimeVersionOfRelease(expected)&&payload.phase!=='failed'&&!payload.active){finishVerifiedUpdate(payload.current);return;}
   renderUpdateProgress(payload);
  }catch(error){
   if(updateRunning||currentView==='updates'){
@@ -1412,6 +2015,7 @@ async function checkUpdate(force=false){
   if(!res.ok)throw Error('Release check HTTP '+res.status);
   const result=await res.json();
   if(result.error)throw Error(result.error);
+  if(result.channel&&result.channel!==selectedUpdateChannel)setUpdateChannelUI(result.channel);
   $('latestVersion').textContent=result.latest||'No published release';
   $('updateAvailableVersion').textContent=result.latest||'None';
   const notes=$('updateReleaseNotes');
@@ -1425,7 +2029,7 @@ async function checkUpdate(force=false){
   if(card)card.dataset.updateState=state;
   if(headline)headline.textContent=state==='available'?'Update available':state==='pending'?'Update is being prepared':'Syncria is up to date';
   if(icon)icon.textContent=state==='available'?'↓':state==='pending'?'…':'✓';
-  $('updateMessage').textContent=state==='available'?'Syncria '+(result.latest||'')+' is ready to install on this device.':state==='pending'?(result.message||'The release files are not ready yet.'):'You’re running the latest published release.';
+  $('updateMessage').textContent=state==='available'?'Syncria '+(result.latest||'')+' is ready to install on this device.':state==='pending'?(result.message||'The release files are not ready yet.') :'You’re running the latest release available to this channel.';
   if(button)button.textContent=state==='available'?'Download and install '+(result.latest||'update'):'No update available';
   updateInstallAvailable=!!result.available;
   if($('updateNavIndicator'))$('updateNavIndicator').classList.toggle('hidden',!result.available);
