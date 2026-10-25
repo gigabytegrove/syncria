@@ -1,0 +1,27 @@
+# Isolated alpha candidate: never uses the production Syncria volume or image.
+# Build directly from PR #20's development branch.
+# docker compose -f compose.alpha.yaml up -d --build
+services:
+  syncria-alpha:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_VERSION: v1.0.0-alpha.1-local
+    image: syncria:1.0.0-alpha.1-local
+    container_name: syncria-alpha
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:${SYNCRIA_ALPHA_PORT:-19764}:9764"
+    volumes:
+      - syncria_alpha_data:/data
+    stop_grace_period: 1m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9764/ || exit 1"]
+      interval: 30s
+      timeout: 8s
+      start_period: 90s
+      retries: 3
+volumes:
+  syncria_alpha_data:
+    name: syncria_alpha_isolated_data
