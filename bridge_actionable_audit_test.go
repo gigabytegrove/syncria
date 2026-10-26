@@ -20,7 +20,7 @@ func (e *noOpenRecoveryEndpoint) Open(ctx context.Context,rel string)(io.ReadClo
 }
 
 func TestTrackedUnchangedFilesNeverOpenFileBodies(t *testing.T){
- name:="Personal Data/Kaleb/Kaleb Tablet Backup/Bedtime Music/Holiday/Kaleb_Xmas1.mp4"
+ name:="Sample Data/Example User/Tablet Backup/Music/Holiday/sample_video.mp4"
  key:="google_drive:account:root|nas|."
  data:="same-existing-video-metadata"
  job:=Job{ID:"unchanged-no-open",Provider:"bridge",Direction:"one_way",PairStates:map[string]map[string]Item{key:{name:fileState(name,data,data)}}}
