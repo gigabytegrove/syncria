@@ -1,0 +1,126 @@
+name: Publish Syncria v0.8.6-alpha.6 (opt-in prerelease)
+# This deliberately uses an alpha- prefixed tag. Syncria v0.8.5's legacy
+# tag-scanning updater must NOT accidentally offer the prerelease as Stable.
+on:
+  push:
+    branches: [feature/direct-computer-agents]
+    paths:
+      - '.github/workflows/publish-alpha.yml'
+      - 'scripts/verify-direct-worker.py'
+      - 'google_native_safety_test.go'
+      - 'update_progress_test.go'
+      - 'computer_onboarding_test.go'
+      - 'computer_bootstrap.go'
+      - 'computer_agent_distribution.go'
+      - 'computer_enroll_client.go'
+      - 'computer_onboarding.go'
+      - 'ui.go'
+      - 'computer_enroll_client.go'
+      - 'docs/RELEASE-v0.8.6-alpha.6.md'
+      - 'docs/CONNECTED-COMPUTERS.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  alpha-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    concurrency:
+      group: syncria-alpha-v086-6
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+      - name: Build locally bundled UI and validate version
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat VERSION)" = "v0.8.6-alpha.6"
+          test -s docs/RELEASE-v0.8.6-alpha.6.md
+          npm install --no-audit --no-fund
+          npm run build:css
+          test -s assets/syncria.css
+          go mod tidy
+      - name: Verify application, safety tests and races
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -count=1 ./...
+          go test -race -count=1 ./...
+          go vet ./...
+      - name: Build cross-platform alpha binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 linux/arm windows/amd64 windows/arm64 darwin/amd64 darwin/arm64; do
+            os="${target%/*}"
+            arch="${target#*/}"
+            ext=""
+            if [[ "$os" == windows ]]; then ext=".exe"; fi
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath \
+              -ldflags="-s -w -X main.appVersion=v0.8.6-alpha.6" \
+              -o "dist/syncria-${os}-${arch}${ext}" .
+          done
+          (cd dist && sha256sum syncria-* > SHA256SUMS)
+          test "$(wc -l < dist/SHA256SUMS)" -eq 7
+          (cd dist && sha256sum -c SHA256SUMS)
+      - name: End-to-end native agents and isolated transfer worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/verify-direct-worker.py dist/syncria-linux-amd64
+      - name: Publish immutable alpha GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REL: alpha-v0.8.6-alpha.6
+        shell: bash
+        run: |
+          set -euo pipefail
+          existing="$(git ls-remote --tags origin "refs/tags/${REL}" | awk '{print $1}')"
+          echo "Published ref: ${existing:-<none>}; source commit: $GITHUB_SHA"
+          if [[ -n "$existing" && "$existing" != "$GITHUB_SHA" ]]; then
+            echo "::error::Alpha tag already exists at a different commit; refusing to overwrite release"
+            exit 1
+          fi
+          if [[ -z "$existing" ]]; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${REL}" -f sha="$GITHUB_SHA" >/dev/null
+          fi
+          if gh release view "$REL" >/dev/null 2>&1; then
+            echo "::error::This alpha release already exists; publish a new alpha number instead of mutating it"
+            exit 1
+          fi
+          gh release create "$REL" dist/* \
+            --verify-tag --prerelease \
+            --title "Syncria v0.8.6-alpha.6" \
+            --notes-file docs/RELEASE-v0.8.6-alpha.6.md
+          gh release view "$REL" --json tagName,isPrerelease,isDraft,assets \
+            --jq '{tag:.tagName,prerelease:.isPrerelease,draft:.isDraft,files:[.assets[].name]}'
+      - name: Verify GitHub published the exact alpha artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,urllib.request
+          tag="alpha-v0.8.6-alpha.6"
+          url="https://api.github.com/repos/gigabytegrove/syncria/releases/tags/"+tag
+          req=urllib.request.Request(url,headers={"Accept":"application/vnd.github+json","User-Agent":"Syncria-alpha-verification"})
+          with urllib.request.urlopen(req,timeout=30) as resp: obj=json.load(resp)
+          required={"SHA256SUMS","syncria-linux-amd64","syncria-linux-arm64",
+            "syncria-linux-arm","syncria-windows-amd64.exe","syncria-windows-arm64.exe",
+            "syncria-darwin-amd64","syncria-darwin-arm64"}
+          actual={a["name"] for a in obj.get("assets",[]) if a.get("state")=="uploaded" and a.get("size",0)>0}
+          assert obj.get("prerelease") and not obj.get("draft"),"alpha release not published as prerelease"
+          assert obj.get("tag_name")==tag,"unexpected release tag"
+          assert required.issubset(actual),f"missing binaries: {required-actual}"
+          print("PASS: immutable alpha prerelease and all 7 checksummed executables available")
+          PY
