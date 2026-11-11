@@ -12,6 +12,10 @@ const changeRunCooldown=45*time.Second
 
 func syncCheckDue(job Job,now time.Time)bool{
  if !job.Enabled{return false}
+ // Outside an approved device sync window is an expected pause, not a failed run.
+ if job.Provider=="agent_bridge"&&job.AgentSyncPolicy!=nil {
+  if err:=job.AgentSyncPolicy.Validate();err==nil&&!job.AgentSyncPolicy.Allowed(now){return false}
+ }
  last:=job.LastRun
  if job.LastChecked.After(last){last=job.LastChecked}
  cadence:=job.Interval

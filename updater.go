@@ -23,7 +23,7 @@ const tagsAPI = "https://api.github.com/repos/gigabytegrove/syncria/tags?per_pag
 const releaseForTagAPI = "https://api.github.com/repos/gigabytegrove/syncria/releases/tags/"
 
 type releaseAsset struct { Name string `json:"name"`; URL string `json:"url"` }
-type releaseInfo struct { Tag string `json:"tag_name"`; Assets []releaseAsset `json:"assets"` }
+type releaseInfo struct { Tag string `json:"tag_name"`; Assets []releaseAsset `json:"assets"`; Draft bool `json:"draft"`; Prerelease bool `json:"prerelease"` }
 type githubTag struct { Name string `json:"name"` }
 
 // githubRetryAfter honors secondary limits and primary rate-limit reset headers.
@@ -130,8 +130,109 @@ func releaseForTag(ctx context.Context,tag string)(releaseInfo,error){
  return r,nil
 }
 func latestRelease(ctx context.Context)(releaseInfo,error){
- tag,err:=latestTag(ctx);if err!=nil{return releaseInfo{},err}
- return releaseForTag(ctx,tag)
+ return latestReleaseForChannel(ctx,updateChannelStable)
+}
+
+const releasesAPI = "https://api.github.com/repos/gigabytegrove/syncria/releases?per_page=100"
+const updateChannelStable = "stable"
+const updateChannelBeta = "beta"
+const updateChannelAlpha = "alpha"
+func normalizeUpdateChannel(channel string) string {
+ switch strings.ToLower(strings.TrimSpace(channel)) {
+ case updateChannelAlpha:return updateChannelAlpha
+ case updateChannelBeta:return updateChannelBeta
+ default:return updateChannelStable
+ }
+}
+func validUpdateChannel(channel string) bool {
+ return channel==updateChannelStable||channel==updateChannelBeta||channel==updateChannelAlpha
+}
+type parsedUpdateVersion struct {
+ Major,Minor,Patch int
+ Stage string
+ Sequence int
+}
+func parseUpdateVersion(tag string)(parsedUpdateVersion,bool){
+ var v parsedUpdateVersion
+ prefix:=""
+ if strings.HasPrefix(tag,"alpha-"){prefix="alpha";tag=strings.TrimPrefix(tag,"alpha-")} else if strings.HasPrefix(tag,"beta-"){prefix="beta";tag=strings.TrimPrefix(tag,"beta-")}
+ tag=strings.TrimPrefix(tag,"v")
+ parts:=strings.SplitN(tag,"-",2)
+ nums:=strings.Split(parts[0],".")
+ if len(nums)!=3{return v,false}
+ for i,n:=range nums{
+  if n==""||len(n)>8||(len(n)>1&&n[0]=='0'){return v,false}
+  for _,c:=range n{if c<'0'||c>'9'{return v,false}}
+  z,e:=strconv.Atoi(n);if e!=nil{return v,false}
+  switch i{case 0:v.Major=z;case 1:v.Minor=z;case 2:v.Patch=z}
+ }
+ if len(parts)==1{return v,prefix==""}
+ pre:=strings.Split(parts[1],".")
+ if len(pre)!=2||pre[1]==""||len(pre[1])>8{return v,false}
+ if pre[0]!="alpha"&&pre[0]!="beta"&&pre[0]!="rc"{return v,false}
+ if prefix=="alpha"&&pre[0]!="alpha"{return v,false}
+ if prefix=="beta"&&pre[0]!="beta"&&pre[0]!="rc"{return v,false}
+ if len(pre[1])>1&&pre[1][0]=='0'{return v,false}
+ for _,c:=range pre[1]{if c<'0'||c>'9'{return v,false}}
+ sequence,e:=strconv.Atoi(pre[1]);if e!=nil{return v,false}
+ v.Stage=pre[0];v.Sequence=sequence
+ return v,true
+}
+// The public GitHub tag has a protective channel prefix; the executable's
+// actual version never does. Compare the normalized target after restart.
+func releaseTagAppVersion(tag string)string{
+ if _,ok:=parseUpdateVersion(tag);!ok{return ""}
+ if strings.HasPrefix(tag,"alpha-"){return strings.TrimPrefix(tag,"alpha-")}
+ if strings.HasPrefix(tag,"beta-"){return strings.TrimPrefix(tag,"beta-")}
+ return tag
+}
+func updateVersionNewer(candidate,running string)bool{
+ a,ok:=parseUpdateVersion(candidate);if !ok{return false}
+ b,ok:=parseUpdateVersion(strings.TrimSuffix(running,"-local"));if !ok{return false} // never guess about a custom runtime version
+ ai,bi:=[3]int{a.Major,a.Minor,a.Patch},[3]int{b.Major,b.Minor,b.Patch}
+ for i:=range ai{if ai[i]!=bi[i]{return ai[i]>bi[i]}}
+ priority:=func(s string)int{switch s{case "alpha":return 0;case "beta":return 1;case "rc":return 2;default:return 3}}
+ if priority(a.Stage)!=priority(b.Stage){return priority(a.Stage)>priority(b.Stage)}
+ return a.Sequence>b.Sequence
+}
+// Old v0.8.5 installations read the tag list as stable-only. Prefixing
+// alpha/beta tags prevents those older clients from recognizing prereleases.
+func updateReleaseEligible(r releaseInfo,channel string)bool{
+ tag:=r.Tag
+ v,ok:=parseUpdateVersion(tag);if !ok{return false}
+ switch {
+ case v.Stage=="":
+  return !r.Prerelease && !strings.HasPrefix(tag,"alpha-") && !strings.HasPrefix(tag,"beta-")
+ case v.Stage=="alpha":
+  return channel=="alpha" && r.Prerelease && strings.HasPrefix(tag,"alpha-")
+ case v.Stage=="beta"||v.Stage=="rc":
+  return (channel=="beta"||channel=="alpha")&&r.Prerelease&&strings.HasPrefix(tag,"beta-")
+ default:return false
+ }
+}
+func newestReleaseForChannel(releases []releaseInfo,channel string)(releaseInfo,error){
+ channel=normalizeUpdateChannel(channel)
+ var best releaseInfo
+ for _,r:=range releases{
+  if r.Draft||!updateReleaseEligible(r,channel){continue}
+  if best.Tag==""||updateVersionNewer(r.Tag,best.Tag){best=r}
+ }
+ if best.Tag==""{return releaseInfo{},fmt.Errorf("no published releases for the %s channel",channel)}
+ return best,nil
+}
+func latestReleaseForChannel(ctx context.Context,channel string)(releaseInfo,error){
+ resp,err:=releaseRequest(ctx,releasesAPI,"application/vnd.github+json")
+ if err!=nil{return releaseInfo{},err}
+ defer resp.Body.Close()
+ if resp.StatusCode!=http.StatusOK{return releaseInfo{},githubAPIError(resp,"GitHub channel release lookup")}
+ var releases []releaseInfo
+ if err:=json.NewDecoder(io.LimitReader(resp.Body,4<<20)).Decode(&releases);err!=nil{return releaseInfo{},err}
+ return newestReleaseForChannel(releases,channel)
+}
+func verifyReleaseAssets(r releaseInfo)error{
+ if _,ok:=assetFor(r,assetName());!ok{return fmt.Errorf("%s does not have a binary for %s/%s yet",r.Tag,runtime.GOOS,runtime.GOARCH)}
+ if _,ok:=assetFor(r,"SHA256SUMS");!ok{return fmt.Errorf("%s does not have its SHA256SUMS yet",r.Tag)}
+ return nil
 }
 func assetName()string{return "syncria-"+runtime.GOOS+"-"+runtime.GOARCH+func()string{if runtime.GOOS=="windows"{return ".exe"};return ""}()}
 func assetFor(r releaseInfo,name string)(releaseAsset,bool){for _,a:=range r.Assets{if a.Name==name{return a,true}};return releaseAsset{},false}

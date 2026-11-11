@@ -29,6 +29,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"github.com/gigabytegrove/syncria/syncpolicy"
 )
 
 var appVersion = "v0.8.5"
@@ -82,6 +83,10 @@ type PendingDeletion struct {
   Folder bool `json:"folder,omitempty"`
 }
 type Job struct {
+    AgentSyncPolicy *syncpolicy.Policy `json:"agent_sync_policy,omitempty"`
+    AgentDeviceID string `json:"agent_device_id,omitempty"`
+    AgentGrantID string `json:"agent_grant_id,omitempty"`
+    AgentPeerURL string `json:"agent_peer_url,omitempty"`
     RelationshipType string `json:"relationship_type,omitempty"`
     CloudProvider string `json:"cloud_provider,omitempty"`
     DropboxAccountID string `json:"dropbox_account_id,omitempty"`
@@ -147,6 +152,7 @@ type Config struct {
 	Accounts     []Account `json:"accounts"`
 	Jobs         []Job     `json:"jobs"`
 	Shares       []StorageShare `json:"shares,omitempty"`
+    UpdateChannel string `json:"update_channel,omitempty"`
 }
 type App struct {
     // Serialize remote writers, including a shared designated cloud NAS
@@ -735,6 +741,10 @@ func (a *App) syncJob(ctx context.Context, jobID string) error {
       a.bridgeSyncMu.Lock()
       err=a.syncBridge(ctx,&job)
       a.bridgeSyncMu.Unlock()
+    case "agent_bridge":
+      a.bridgeSyncMu.Lock()
+      err=a.syncAgentBridge(ctx,&job)
+      a.bridgeSyncMu.Unlock()
     case "storage":
       err=a.executeStorage(ctx,&job)
     case "","google_drive":
@@ -1140,7 +1150,8 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 	switch action {
 	case "update_check":
         ctx,cancel:=context.WithTimeout(r.Context(),30*time.Second)
-        release,e:=latestRelease(ctx);cancel()
+        a.mu.Lock();channel:=normalizeUpdateChannel(a.cfg.UpdateChannel);a.mu.Unlock()
+        release,e:=latestReleaseForChannel(ctx,channel);cancel()
         if e!=nil{redirect(w,r,"Update check failed: "+e.Error());return}
         redirect(w,r,"Latest GitHub release: "+release.Tag+"; running "+appVersion)
         return
@@ -1328,6 +1339,7 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if action == "delete_job" {
+            agentCredentialJob:=j.Provider=="agent_bridge"
 			if _, running := a.runs.Load(id); running {
 				a.mu.Unlock()
 				redirect(w, r, "Wait for sync to finish before deleting")
@@ -1345,6 +1357,7 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, e.Error(), 500)
 				return
 			}
+            if agentCredentialJob {if cleanupErr:=removeAgentPeerCredential(a.file,id); cleanupErr!=nil {log.Printf("agent job %s credential cleanup failed: %v",id,cleanupErr);redirect(w,r,"Mapping removed; credential cleanup failed; check server logs");return}}
 			redirect(w, r, "Mapping removed. Files left untouched")
 			return
 		}
@@ -1529,8 +1542,9 @@ func (a *App) updateStatus(w http.ResponseWriter,r *http.Request){
   _=json.NewEncoder(w).Encode(map[string]any{"current":appVersion})
   return
  }
+ a.mu.Lock();channel:=normalizeUpdateChannel(a.cfg.UpdateChannel);a.mu.Unlock()
  var status map[string]any
- if r.URL.Query().Get("refresh")=="1" {status=refreshedUpdateStatus(r.Context())} else {status=cachedUpdateStatus(r.Context())}
+ if r.URL.Query().Get("refresh")=="1"{status=refreshedUpdateStatusForChannel(r.Context(),channel)}else{status=cachedUpdateStatusForChannel(r.Context(),channel)}
  _=json.NewEncoder(w).Encode(status)
 }
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
@@ -1666,10 +1680,12 @@ func main() {
     // remain supported only when their existing opt-in mounting is configured.
     if os.Getenv("SYNCRIA_ENABLE_MOUNTS")=="1" {go a.restoreShares()}
 	mux := http.NewServeMux()
+	if err := registerAgentAPIs(mux, a, dir); err != nil { log.Fatal(err) }
 	mux.HandleFunc("/", a.home)
 	mux.HandleFunc("/assets/syncria-logo.svg", serveBrandLogo)
 	mux.HandleFunc("/api/browse/drive", a.browseDrive)
 	mux.HandleFunc("/api/update/status", a.updateStatus)
+    mux.HandleFunc("/api/update/channel", a.updateChannelAPI)
     mux.HandleFunc("/api/update/progress", a.updateProgressAPI)
 	mux.HandleFunc("/api/update/manual", a.manualUpdate)
     mux.HandleFunc("/api/browse/nas", a.browseNAS)

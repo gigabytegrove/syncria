@@ -211,6 +211,12 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
    if err!=nil{return err}
    recordTransfer(j,true,bytes);countForward++;if j.operationHook!=nil{j.operationHook("copy",rel,"Primary","Secondary")}
   }else if !tracked{
+   // Device-to-NAS alpha jobs cannot declare two preexisting files identical
+   // merely because size and modification time match. The source inventory
+   // supplies metadata, not a verified content fingerprint.
+   if oneWay && j.Provider=="agent_bridge" {
+    return fmt.Errorf("Device-to-NAS conflict at %q: destination file already exists; review or move it before syncing. No files replaced",rel)
+   }
    same,err:=bridgeSameFirstRun(ctx,primary,secondary,rel,l,r)
    if err!=nil{return err}
    if !same{
@@ -235,7 +241,10 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
   }else{
    changedPrimary,changedSecondary:=metadataChanged(prior,l,r)
    if changedPrimary&&changedSecondary{
-    if oneWay&&j.Provider=="nas_bridge"{return fmt.Errorf("Both files changed at %s; one-way NAS relationship will not overwrite them",rel)}
+    if oneWay&&(j.Provider=="nas_bridge"||j.Provider=="agent_bridge"){
+     if j.Provider=="agent_bridge"{return fmt.Errorf("Device-to-NAS conflict: source and destination both changed at %s; no files overwritten",rel)}
+     return fmt.Errorf("Both files changed at %s; one-way NAS relationship will not overwrite them",rel)
+    }
     if oneWay{
      if err=resolveBridgeConflict(ctx,j,primary,secondary,rel,"primary",conflictPrimary,&l,&r);err!=nil{return err}
      countForward++
@@ -255,7 +264,10 @@ func (a *App) executePolicyPair(ctx context.Context,j *Job,primary,secondary rec
     if err!=nil{return err}
     recordTransfer(j,true,bytes);countForward++;if j.operationHook!=nil{j.operationHook("copy",rel,"Primary","Secondary")}
    }else if changedSecondary{
-    if oneWay&&j.Provider=="nas_bridge"{return fmt.Errorf("One-way NAS destination was modified at %s; no overwrite attempted",rel)}
+    if oneWay&&(j.Provider=="nas_bridge"||j.Provider=="agent_bridge"){
+     if j.Provider=="agent_bridge"{return fmt.Errorf("Device-to-NAS conflict: NAS destination changed independently at %s; no overwrite attempted",rel)}
+     return fmt.Errorf("One-way NAS destination was modified at %s; no overwrite attempted",rel)
+    }
     if oneWay{
      checksum:="";if len(l.Fingerprint)==32||len(l.Fingerprint)==64{checksum=l.Fingerprint}
      var bytes int64
