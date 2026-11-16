@@ -6,10 +6,10 @@ COPY ui.go ./
 COPY assets/syncria.tailwind.css ./assets/syncria.tailwind.css
 RUN npm install --no-audit --no-fund && npm run build:css
 
-FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS build
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
-ARG APP_VERSION=v0.8.5
+ARG APP_VERSION=v0.8.6
 WORKDIR /src
 COPY go.mod ./
 COPY *.go ./
@@ -17,7 +17,7 @@ COPY assets/ ./assets/
 COPY --from=css /src/assets/syncria.css ./assets/syncria.css
 RUN go mod tidy && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w -X main.appVersion=$APP_VERSION" -o /out/syncria .
 
-FROM alpine:3.21
+FROM alpine:3.24.4
 RUN apk add --no-cache ca-certificates tzdata nfs-utils cifs-utils samba-client util-linux inotify-tools && mkdir -p /data
 COPY --from=build /out/syncria /usr/local/bin/syncria
 COPY launcher.sh /usr/local/bin/syncria-launcher
