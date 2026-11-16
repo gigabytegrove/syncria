@@ -1,0 +1,80 @@
+name: Publish Syncria v0.8.6 Docker archive fallback
+
+# GHCR package permissions are controlled by the owner. This workflow does
+# not change package ACLs or reuse tag names. It builds the EXACT released
+# source and attaches immutable, checksum-verified Docker load archives.
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-v086-image-archives.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    concurrency:
+      group: syncria-v086-immutable-image-archives
+      cancel-in-progress: false
+    steps:
+      - name: Check out exact immutable release source
+        uses: actions/checkout@v4
+        with:
+          ref: 012d56781ad2519c17ed4142c63fe948cf3cedaa
+          persist-credentials: false
+      - name: Verify release source identity and GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "012d56781ad2519c17ed4142c63fe948cf3cedaa"
+          test "$(tr -d '\r\n' < VERSION)" = "v0.8.6"
+          test "$(gh api repos/gigabytegrove/syncria/releases/tags/v0.8.6 --jq '.draft')" = "false"
+          for asset in SHA256SUMS syncria-linux-amd64 syncria-linux-arm64; do
+            gh release view v0.8.6 --json assets --jq '.assets[].name' | grep -Fxq "$asset"
+          done
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build arch-specific loadable Docker images
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          image="ghcr.io/gigabytegrove/syncria:v0.8.6"
+          for arch in amd64 arm64; do
+            docker buildx build \
+              --platform "linux/$arch" --load \
+              --build-arg APP_VERSION=v0.8.6 \
+              --tag "$image" .
+            actual="$(docker image inspect --format '{{.Architecture}}' "$image")"
+            test "$actual" = "$arch"
+            asset="syncria-v0.8.6-docker-linux-$arch.tar.gz"
+            docker save "$image" | gzip -1 > "dist/$asset"
+            test -s "dist/$asset"
+            gzip -t "dist/$asset"
+            docker image rm "$image"
+          done
+          (cd dist && sha256sum syncria-v0.8.6-docker-linux-*.tar.gz > syncria-v0.8.6-DOCKER-SHA256SUMS.txt)
+          (cd dist && sha256sum -c syncria-v0.8.6-DOCKER-SHA256SUMS.txt)
+      - name: Upload new immutable Docker archive assets to existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p verify-existing
+          for path in dist/*; do
+            filename="${path##*/}"
+            if gh release view v0.8.6 --json assets --jq '.assets[].name' | grep -Fxq "$filename"; then
+              gh release download v0.8.6 --pattern "$filename" --dir verify-existing
+              cmp "$path" "verify-existing/$filename"
+              echo "Verified existing immutable asset: $filename"
+            else
+              gh release upload v0.8.6 "$path"
+            fi
+          done
+          gh release view v0.8.6 --json assets --jq '.assets[].name' | sort
